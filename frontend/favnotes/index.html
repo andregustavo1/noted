@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FavNotes</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+    function updateFavicon() {
+        const darkBrowser = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const favicon = document.querySelector('link[rel="icon"]');
+
+        if (darkBrowser) {
+          favicon.href = "./src/assets/icon-white.svg";
+        } else {
+          favicon.href = "./src/assets/icon-black.svg";
+        }
+      }
+
+      updateFavicon();
+
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", updateFavicon);
+    </script>
+  </body>
+</html>
