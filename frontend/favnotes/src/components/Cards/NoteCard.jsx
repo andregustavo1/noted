@@ -62,7 +62,7 @@ const NoteCard = ({ title, content, date, category, onEdit, isPinned, onPinNote,
                 </div>
             </div>
 
-            <p className='text-sm text-slate-700 mt-2'>{isPinned ? content?.slice(0, 80) : content?.slice(0, 80)}...</p>
+            <p className='text-sm text-slate-700 mt-2'>{isPinned ? content?.slice(0, 80) : content?.slice(0, 90)}...</p>
 
             <div className='flex items-center justify-between mt-2'>
                 <p className='text-sm text-slate-700'>{date}</p>
