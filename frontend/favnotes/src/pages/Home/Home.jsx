@@ -15,7 +15,7 @@ const Home = () => {
         setOnConfig(!onConfig)
     }
 
-    const navigate = useNavigate;
+    const navigate = useNavigate();
 
     const onLogout = () => {
         navigate("/login");

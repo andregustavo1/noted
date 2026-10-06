@@ -3,7 +3,7 @@ import Navbar from "../../components/Navbar/Navbar";
 import { Link } from "react-router-dom";
 import PasswordInput from "../../components/Input/PasswordInput";
 
-const login = () => {
+const Login = () => {
 
     useEffect(() => {
         const overlay = document.getElementById("overlay");
@@ -236,4 +236,4 @@ const login = () => {
     </>;
 }
 
-export default login
+export default Login
