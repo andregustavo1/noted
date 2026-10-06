@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 import { IoMdEye, IoMdEyeOff } from "react-icons/io";
 
-const PasswordInput = ({ value, onChange, placeholder }) => {
+const PasswordInput = ({ value, onChange, onFocus, placeholder }) => {
     const [isShowPassword, setIsShowPassword] = useState(false)
 
     const toggleShowPassword = () => {
@@ -14,6 +14,7 @@ const PasswordInput = ({ value, onChange, placeholder }) => {
             <input
                 value={value}
                 onChange={onChange}
+                onFocus={onFocus}
                 type={isShowPassword ? "text" : "password"}
                 placeholder={placeholder || "Senha"}
                 className="bg-slate-100 w-[280px] px-4 py-2 rounded-sm outline-none"

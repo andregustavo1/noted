@@ -25,6 +25,12 @@ const authErrorMessage = (error) => {
     }
 }
 
+// Wait for the mobile keyboard to open, then bring the field into view smoothly.
+const scrollToInput = (e) => {
+    const input = e.target;
+    setTimeout(() => input.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+}
+
 const Login = () => {
 
     useEffect(() => {
@@ -181,17 +187,18 @@ const Login = () => {
     return <>
         <Navbar />
 
-        <div className="px-4 my-10 max-w-[450px] mx-auto md:max-w-[768px]">
-            <div className="bg-white rounded-lg custom-shadow h-[700px] overflow-hidden relative flex justify-between">
-                <div id="panel-white-signin" className="h-[350px] md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
+        <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
+            <div className="bg-white rounded-lg custom-shadow h-[calc(100dvh-8rem)] min-h-[536px] max-h-[700px] md:h-[700px] overflow-hidden relative flex justify-between">
+                <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
-                        <h1 className="font-bold text-3xl">Entrar</h1>
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">Entrar</h1>
 
                         <input
                             type="email"
+                            onFocus={scrollToInput}
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="bg-slate-100 mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="bg-slate-100 mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);
@@ -201,6 +208,7 @@ const Login = () => {
                         />
 
                         <PasswordInput
+                            onFocus={scrollToInput}
                             value={password}
                             onChange={(e) => {
                                 setPassowrd(e.target.value);
@@ -217,11 +225,11 @@ const Login = () => {
                     </form>
                 </div>
 
-                <div id="overlay" className="h-[350px] md:h-full bg-primary w-full md:w-1/2 absolute translate-y-[100%] md:translate-y-[0] md:translate-x-[100%] z-40 duration-500"></div>
+                <div id="overlay" className="h-1/2 md:h-full bg-primary w-full md:w-1/2 absolute translate-y-[100%] md:translate-y-[0] md:translate-x-[100%] z-40 duration-500"></div>
 
-                <div id="panel-overlay-signup" className="h-[350px] md:h-full z-50 text-white grid place-items-center w-full md:w-1/2 absolute translate-y-[100%] md:translate-y-[0] md:translate-x-[100%] duration-500 ease-in-out">
-                    <div className="grid place-items-center">
-                        <h1 className="font-bold text-3xl">Bem vindo!</h1>
+                <div id="panel-overlay-signup" className="h-1/2 md:h-full z-50 text-white grid place-items-center w-full md:w-1/2 absolute translate-y-[100%] md:translate-y-[0] md:translate-x-[100%] duration-500 ease-in-out">
+                    <div className="grid place-items-center px-4 text-center">
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">Bem vindo!</h1>
 
                         <p className="mt-4">Ainda não tem uma conta?</p>
 
@@ -229,9 +237,9 @@ const Login = () => {
                     </div>
                 </div>
 
-                <div id="panel-overlay-signin" className="h-[350px] md:h-full z-50 text-white grid place-items-center w-full md:w-1/2 absolute translate-y-[-100%] md:translate-y-[0] md:translate-x-[-100%] duration-500 ease-in-out opacity-0">
-                    <div className="grid place-items-center">
-                        <h1 className="font-bold text-3xl">Bem vindo de volta!</h1>
+                <div id="panel-overlay-signin" className="h-1/2 md:h-full z-50 text-white grid place-items-center w-full md:w-1/2 absolute translate-y-[-100%] md:translate-y-[0] md:translate-x-[-100%] duration-500 ease-in-out opacity-0">
+                    <div className="grid place-items-center px-4 text-center">
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">Bem vindo de volta!</h1>
 
                         <p className="mt-4">Já tem uma conta?</p>
 
@@ -239,15 +247,16 @@ const Login = () => {
                     </div>
                 </div>
 
-                <div id="panel-white-signup" className="h-[350px] md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white translate-y-[50%] md:translate-y-[0] md:translate-x-[50%] duration-500 ease-in-out opacity-0">
+                <div id="panel-white-signup" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white translate-y-[50%] md:translate-y-[0] md:translate-x-[50%] duration-500 ease-in-out opacity-0">
                     <form noValidate onSubmit={handleSignUp} className="grid place-items-center">
-                        <h1 className="font-bold text-3xl">Crie uma conta</h1>
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">Crie uma conta</h1>
 
                         <input
                             type="email"
+                            onFocus={scrollToInput}
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="input-box bg-slate-100 mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="input-box bg-slate-100 mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);
@@ -257,6 +266,7 @@ const Login = () => {
                         />
 
                         <PasswordInput
+                            onFocus={scrollToInput}
                             value={password}
                             onChange={(e) => {
                                 setPassowrd(e.target.value);
