@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { BsSearch } from "react-icons/bs";
 import { IoMdClose } from "react-icons/io";
 
-const SearchBar = ({ value, onChange, handleSearch, onClearSearch, logoHidden }) => {
+const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
 
     const searchBarInput = useRef(null)
 

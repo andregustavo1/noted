@@ -1,13 +1,13 @@
 import React from "react";
 
-const CategoryBar = ({ title, quantity }) => {
+const CategoryBar = ({ title, quantity, isActive, onClick }) => {
     return (
-        <div className="">
-            <div className="rounded-full px-4 py-2 w-min gap-1 bg-white flex items-center justify-between font-medium shadow-sm">
-                <h1 className="">{title}</h1>
-                <p className="bg-[#f3f3f3] p-1 rounded-full leading-none w-7 h-7 grid place-items-center">{quantity}</p>
-            </div>
-        </div>
+        <button
+            onClick={onClick}
+            className={`rounded-full px-4 py-2 gap-1 flex items-center justify-between font-medium shadow-sm whitespace-nowrap duration-300 ${isActive ? "bg-primary text-white" : "bg-white"}`}>
+            <span>{title}</span>
+            <span className={`p-1 rounded-full leading-none min-w-7 h-7 grid place-items-center ${isActive ? "bg-white/20" : "bg-[#f3f3f3]"}`}>{quantity}</span>
+        </button>
     )
 }
 

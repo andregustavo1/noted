@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 
-const ProfileConfig = ({ onLogout }) => { 
+const ProfileConfig = ({ name, email, onLogout }) => {
     return (
         <>
             <div className="h-full w-[275px] shadow-md py-8 px-8 bg-[#f8f8f8] rounded-l-3xl">
-                <div className="grid ml-6 px-8 h-10">
-                    <p className="font-medium text-sm">André Gustavo</p>
-                    <p className="text-slate-600 text-sm">Email@email.com</p>
+                <div className="grid ml-6 px-8 h-10 min-w-0">
+                    <p className="font-medium text-sm truncate">{name}</p>
+                    <p className="text-slate-600 text-sm truncate">{email}</p>
                 </div>
 
                 <div className="grid mt-16">

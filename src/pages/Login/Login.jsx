@@ -1,7 +1,29 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar/Navbar";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import PasswordInput from "../../components/Input/PasswordInput";
+import { supabase } from "../../lib/supabase";
+
+const authErrorMessage = (error) => {
+    switch (error.code) {
+        case "invalid_credentials":
+            return "E-mail ou senha incorretos";
+        case "user_already_exists":
+        case "email_exists":
+            return "Este e-mail já está cadastrado";
+        case "weak_password":
+            return "Senha muito fraca";
+        case "email_not_confirmed":
+            return "Confirme seu e-mail para entrar";
+        case "signup_disabled":
+            return "Cadastro desativado";
+        case "over_request_rate_limit":
+        case "over_email_send_rate_limit":
+            return "Muitas tentativas, tente mais tarde";
+        default:
+            return "Algo deu errado, tente novamente";
+    }
+}
 
 const Login = () => {
 
@@ -104,10 +126,23 @@ const Login = () => {
             setError("Insira uma senha");
             return;
         }
+
+        setLoading(true);
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        setLoading(false);
+
+        if (error) {
+            setError(authErrorMessage(error));
+            return;
+        }
+
+        navigate("/dashboard", { replace: true });
     }
 
     const [user, setUser] = useState("")
     const [errorSignUp, setErrorSignUp] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const handleSignUp = async (e) => {
         e.preventDefault()
@@ -124,10 +159,30 @@ const Login = () => {
             return;
         }
 
-        if (!password) {
-            setErrorSignUp("Insira uma senha");
+        if (password.length < 6) {
+            setErrorSignUp("A senha precisa ter ao menos 6 caracteres");
             return;
         }
+
+        setLoading(true);
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { name: user.trim() } },
+        });
+        setLoading(false);
+
+        if (error) {
+            setErrorSignUp(authErrorMessage(error));
+            return;
+        }
+
+        if (!data.session) {
+            setErrorSignUp("Confirme seu e-mail para entrar");
+            return;
+        }
+
+        navigate("/dashboard", { replace: true });
     }
 
     return <>
@@ -136,11 +191,12 @@ const Login = () => {
         <div className="px-4 my-10 max-w-[450px] mx-auto md:max-w-[768px]">
             <div className="bg-white rounded-lg custom-shadow h-[700px] overflow-hidden relative flex justify-between">
                 <div id="panel-white-signin" className="h-[350px] md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
-                    <form onSubmit={handleSignIn} className="grid place-items-center">
+                    <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
                         <h1 className="font-bold text-3xl">Entrar</h1>
 
                         <input
-                            type="text"
+                            type="email"
+                            autoComplete="email"
                             placeholder="E-mail"
                             className="bg-slate-100 mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
@@ -164,7 +220,7 @@ const Login = () => {
 
                         <p className="mt-1">Esqueceu sua senha?</p>
 
-                        <button type="submit" className="bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300">ENTRAR</button>
+                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300">ENTRAR</button>
                     </form>
                 </div>
 
@@ -191,7 +247,7 @@ const Login = () => {
                 </div>
 
                 <div id="panel-white-signup" className="h-[350px] md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white translate-y-[50%] md:translate-y-[0] md:translate-x-[50%] duration-500 ease-in-out opacity-0">
-                    <form onSubmit={handleSignUp} className="grid place-items-center">
+                    <form noValidate onSubmit={handleSignUp} className="grid place-items-center">
                         <h1 className="font-bold text-3xl">Crie uma conta</h1>
 
                         <input
@@ -206,7 +262,8 @@ const Login = () => {
                         />
 
                         <input
-                            type="text"
+                            type="email"
+                            autoComplete="email"
                             placeholder="E-mail"
                             className="input-box bg-slate-100 mt-3 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
@@ -228,7 +285,7 @@ const Login = () => {
 
                         <p className="text-red-500 mt-0.5">&nbsp;{errorSignUp}</p>
 
-                        <button type="submit" className="bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300">CRIAR</button>
+                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300">CRIAR</button>
                     </form>
                 </div>
             </div>

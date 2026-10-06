@@ -1,42 +1,22 @@
-import React, { useState } from "react";
+import React from "react";
 
-const ProfileInfo = ({ onConfigClick }) => {
-    const getInitials = (user) => {
+const getInitials = (name) => {
+    const words = name.trim().split(/\s+/).filter(Boolean);
 
-        if (user.trim().includes(" ")) {
-            const words = user.split(" ");
-            let initials = "";
-    
-            for (let i = 0; i < Math.min(words.length, 2); i++) {
-                initials += words [i] [0];
-            }
-    
-            return initials.toUpperCase();
-        } else {
-            let initials = "";
-    
-            for (let i = 0; i < Math.min(user.length, 2); i++) {
-                initials += user [i] [0];
-            }
-    
-            return initials.toUpperCase();
-        }
+    if (words.length > 1) {
+        return (words[0][0] + words[1][0]).toUpperCase();
     }
 
-    const [onProfileSettings , setOnProfileSettings] = useState(false)
+    return (words[0] || "?").slice(0, 2).toUpperCase();
+}
 
-    const toggleProfileSettings = () => {
-        setOnProfileSettings(!onProfileSettings)
-    }
-
+const ProfileInfo = ({ name, onConfigClick }) => {
     return (
-        <>
-            <div className="cursor-pointer">
-                <div className="w-10 h-10 flex items-center justify-center rounded-full text-slate-950 font-medium bg-white shadow-sm" onClick={() => { onConfigClick(); toggleProfileSettings(); }}>
-                    {getInitials("André Gustavo")}
-                </div>
+        <div className="cursor-pointer">
+            <div className="w-10 h-10 flex items-center justify-center rounded-full text-slate-950 font-medium bg-white shadow-sm" onClick={onConfigClick}>
+                {getInitials(name)}
             </div>
-        </>
+        </div>
     )
 }
 
