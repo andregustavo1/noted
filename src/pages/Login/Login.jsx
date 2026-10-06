@@ -25,13 +25,62 @@ const authErrorMessage = (error) => {
     }
 }
 
-// Wait for the mobile keyboard to open, then bring the field into view smoothly.
+// Smoothly center a field in the area left visible above the mobile keyboard.
+// The keyboard only shrinks the visual viewport, so measure against that rather
+// than the whole screen, and wait until it has finished opening.
 const scrollToInput = (e) => {
     const input = e.target;
-    setTimeout(() => input.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    const viewport = window.visualViewport;
+
+    const center = () => {
+        const visibleTop = viewport ? viewport.offsetTop : 0;
+        const visibleHeight = viewport ? viewport.height : window.innerHeight;
+        const rect = input.getBoundingClientRect();
+        const offset = rect.top + rect.height / 2 - (visibleTop + visibleHeight / 2);
+        if (Math.abs(offset) > 8) window.scrollBy({ top: offset, behavior: "smooth" });
+    };
+
+    if (!viewport) {
+        setTimeout(center, 300);
+        return;
+    }
+
+    // Center once the viewport stops resizing, or after a short wait when the
+    // keyboard is already open (moving between fields) or there is none.
+    let timeout = setTimeout(done, 500);
+    function done() {
+        viewport.removeEventListener("resize", onResize);
+        center();
+    }
+    function onResize() {
+        clearTimeout(timeout);
+        timeout = setTimeout(done, 100);
+    }
+    viewport.addEventListener("resize", onResize);
+}
+
+// While the on-screen keyboard is open, extra space at the bottom of the page so
+// even the lowest field can be scrolled up to the middle of the visible area.
+const useKeyboardSpace = () => {
+    const [space, setSpace] = useState(0);
+
+    useEffect(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+
+        const update = () => {
+            const keyboard = Math.max(0, Math.round(window.innerHeight - viewport.height));
+            setSpace(keyboard > 0 ? keyboard + Math.round(viewport.height / 2) : 0);
+        };
+        viewport.addEventListener("resize", update);
+        return () => viewport.removeEventListener("resize", update);
+    }, []);
+
+    return space;
 }
 
 const Login = () => {
+    const keyboardSpace = useKeyboardSpace();
 
     useEffect(() => {
         const overlay = document.getElementById("overlay");
@@ -187,8 +236,8 @@ const Login = () => {
     return <>
         <Navbar />
 
-        <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
-            <div className="bg-white rounded-lg custom-shadow h-[calc(100dvh-8rem)] min-h-[536px] max-h-[700px] md:h-[700px] overflow-hidden relative flex justify-between">
+        <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]" style={{ paddingBottom: keyboardSpace }}>
+            <div className="bg-white rounded-lg custom-shadow h-[calc(100svh-8rem)] min-h-[536px] max-h-[700px] md:h-[700px] overflow-hidden relative flex justify-between">
                 <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
                         <h1 className="font-bold text-2xl md:text-3xl text-center">Entrar</h1>
