@@ -1,17 +1,10 @@
 # noted
 
-A notes app.
-
-## Structure
-
-```
-frontend/   React + Vite + Tailwind app (deployed on Vercel)
-```
+A notes app built with React, Vite and Tailwind, using Supabase as the backend. Deployed on Vercel.
 
 ## Run locally
 
 ```
-cd frontend
 pnpm install
 pnpm dev
 ```
