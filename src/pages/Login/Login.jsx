@@ -139,18 +139,12 @@ const Login = () => {
         navigate("/dashboard", { replace: true });
     }
 
-    const [user, setUser] = useState("")
     const [errorSignUp, setErrorSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleSignUp = async (e) => {
         e.preventDefault()
-
-        if (!user) {
-            setErrorSignUp("Insira um nome");
-            return;
-        }
 
         if (email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
             setErrorSignUp(false);
@@ -168,7 +162,6 @@ const Login = () => {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { name: user.trim() } },
         });
         setLoading(false);
 
@@ -251,21 +244,10 @@ const Login = () => {
                         <h1 className="font-bold text-3xl">Crie uma conta</h1>
 
                         <input
-                            type="text"
-                            placeholder="Usuário"
-                            className="input-box bg-slate-100 mt-6 w-[280px] px-4 py-2 rounded-sm"
-                            value={user}
-                            onChange={(e) => {
-                                setUser(e.target.value);
-                                setErrorSignUp(false);
-                            }}
-                        />
-
-                        <input
                             type="email"
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="input-box bg-slate-100 mt-3 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="input-box bg-slate-100 mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);
