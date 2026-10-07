@@ -159,7 +159,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
         const box = bodyRef.current;
         if (!el || !box) return;
         const pad = parseFloat(box.style.scrollPaddingBottom) || 0;
-        const r = el.getBoundingClientRect(), b = box.getBoundingClientRect();
+        const r = el.parentElement.getBoundingClientRect(), b = box.getBoundingClientRect();
         if (r.bottom > b.bottom - pad) box.scrollTop += r.bottom - (b.bottom - pad);
         else if (r.top < b.top) box.scrollTop -= b.top - r.top;
     };
@@ -315,6 +315,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
         const viewport = window.visualViewport;
         if (!viewport) return;
         const update = () => {
+            if (viewport.height < 100) return; // nothing visible (backgrounded); not a keyboard
             setVvHeight(viewport.height);
             const keyboard = appHeight() - viewport.height;
             if (keyboard > 100 && isField(document.activeElement)) localStorage.setItem("keyboardHeight", Math.round(keyboard));
@@ -417,10 +418,8 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                     {lines.map((raw, index) => {
                         const line = parseLine(raw);
                         return (
-                            <div key={keys[index]} className={`relative flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
+                            <div key={keys[index]} style={{ zIndex: lines.length - index }} className={`relative flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
                                 {line.check !== undefined && (
-                                    // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
-                                    <span className="h-[1.625em] shrink-0 flex items-center">
                                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
                                         className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
                                         {line.done && (
@@ -430,7 +429,6 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                                             </svg>
                                         )}
                                     </button>
-                                    </span>
                                 )}
                                 {line.marker && line.check === undefined && !line.heading && (
                                     <span className={`w-[18px] shrink-0 text-center ${!line.number && !line.marker.includes("–") ? "text-xl leading-none" : ""}`}>{line.number ? `${line.number}.` : line.marker.includes("–") ? "–" : "•"}</span>
@@ -448,7 +446,10 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                                     onPaste={(e) => onPaste(e, index)}
                                     onFocus={() => { activeRow.current = index; setActiveIndex(index); setFocused(true); shrinkForKeyboard(); }}
                                     onBlur={onBlur}
-                                    className={`block w-full outline-none whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
+                                    // pt/-mt: when a row gets focus with the keyboard up, iOS scrolls the page to center a small element in
+                                    // the area above the keyboard, so tapping a lower row jumps the screen. A tall element whose top edge is
+                                    // already off screen is left where it is (WebKit _zoomToFocusRect), and the padding keeps the text in place.
+                                    className={`block w-full outline-none whitespace-pre-wrap break-words pt-[100vh] -mt-[100vh] ${headingClass(line.heading)}`}
                                 />
                                 {/* An invisible copy of the text over the row, whose background draws the strike line. */}
                                 {line.check !== undefined && (
