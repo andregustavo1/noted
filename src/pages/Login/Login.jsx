@@ -82,6 +82,14 @@ const useKeyboardSpace = () => {
 const Login = () => {
     const keyboardSpace = useKeyboardSpace();
 
+    // The login fits the screen, so a downward swipe has nothing to scroll and the
+    // browser turns it into pull-to-refresh. Disable that while this page is open.
+    useEffect(() => {
+        const elements = [document.documentElement, document.body];
+        elements.forEach((el) => { el.style.overscrollBehaviorY = "none"; });
+        return () => elements.forEach((el) => { el.style.overscrollBehaviorY = ""; });
+    }, []);
+
     useEffect(() => {
         const overlay = document.getElementById("overlay");
 
