@@ -25,63 +25,7 @@ const authErrorMessage = (error) => {
     }
 }
 
-// Smoothly center a field in the area left visible above the mobile keyboard.
-// The keyboard only shrinks the visual viewport, so measure against that rather
-// than the whole screen, and wait until it has finished opening.
-const scrollToInput = (e) => {
-    const input = e.target;
-    const viewport = window.visualViewport;
-
-    const center = () => {
-        const visibleTop = viewport ? viewport.offsetTop : 0;
-        const visibleHeight = viewport ? viewport.height : window.innerHeight;
-        const rect = input.getBoundingClientRect();
-        const offset = rect.top + rect.height / 2 - (visibleTop + visibleHeight / 2);
-        if (Math.abs(offset) > 8) window.scrollBy({ top: offset, behavior: "smooth" });
-    };
-
-    if (!viewport) {
-        setTimeout(center, 300);
-        return;
-    }
-
-    // Center once the viewport stops resizing, or after a short wait when the
-    // keyboard is already open (moving between fields) or there is none.
-    let timeout = setTimeout(done, 500);
-    function done() {
-        viewport.removeEventListener("resize", onResize);
-        center();
-    }
-    function onResize() {
-        clearTimeout(timeout);
-        timeout = setTimeout(done, 100);
-    }
-    viewport.addEventListener("resize", onResize);
-}
-
-// While the on-screen keyboard is open, extra space at the bottom of the page so
-// even the lowest field can be scrolled up to the middle of the visible area.
-const useKeyboardSpace = () => {
-    const [space, setSpace] = useState(0);
-
-    useEffect(() => {
-        const viewport = window.visualViewport;
-        if (!viewport) return;
-
-        const update = () => {
-            const keyboard = Math.max(0, Math.round(window.innerHeight - viewport.height));
-            setSpace(keyboard > 0 ? keyboard + Math.round(viewport.height / 2) : 0);
-        };
-        viewport.addEventListener("resize", update);
-        return () => viewport.removeEventListener("resize", update);
-    }, []);
-
-    return space;
-}
-
 const Login = () => {
-    const keyboardSpace = useKeyboardSpace();
-
     // The login fits the screen, so a downward swipe has nothing to scroll and the
     // browser turns it into pull-to-refresh. Disable that while this page is open.
     useEffect(() => {
@@ -244,7 +188,7 @@ const Login = () => {
     return <>
         <Navbar />
 
-        <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]" style={{ paddingBottom: keyboardSpace }}>
+        <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
             <div className="bg-white rounded-lg custom-shadow h-[calc(100svh-8rem)] min-h-[536px] max-h-[700px] md:h-[700px] overflow-hidden relative flex justify-between">
                 <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
@@ -252,7 +196,6 @@ const Login = () => {
 
                         <input
                             type="email"
-                            onFocus={scrollToInput}
                             autoComplete="email"
                             placeholder="E-mail"
                             className="bg-slate-100 mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
@@ -265,7 +208,6 @@ const Login = () => {
                         />
 
                         <PasswordInput
-                            onFocus={scrollToInput}
                             value={password}
                             onChange={(e) => {
                                 setPassowrd(e.target.value);
@@ -310,7 +252,6 @@ const Login = () => {
 
                         <input
                             type="email"
-                            onFocus={scrollToInput}
                             autoComplete="email"
                             placeholder="E-mail"
                             className="input-box bg-slate-100 mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
@@ -323,7 +264,6 @@ const Login = () => {
                         />
 
                         <PasswordInput
-                            onFocus={scrollToInput}
                             value={password}
                             onChange={(e) => {
                                 setPassowrd(e.target.value);
