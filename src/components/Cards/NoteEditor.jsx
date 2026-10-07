@@ -264,10 +264,11 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
         update(next, { index: index + last, caret: plain(last ? parts[last] : before + parts[0]).length });
     };
 
-    // Toolbar shows while a row is focused, pinned just above the keyboard on phones.
+    // Toolbar pops up below the focused row while it has focus.
     const [focused, setFocused] = useState(false);
-    // Stays true after blur until the slide-down finishes, then the toolbar unmounts.
+    // Stays true after blur until the pop-out finishes, then the toolbar unmounts.
     const [toolbarShown, setToolbarShown] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
     if (focused && !toolbarShown) setToolbarShown(true);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
@@ -332,10 +333,10 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     // What the open menu should light up: the focused line's heading/list marker; styles come from the selection.
     const activeLine = parseLine(lines[activeRow.current] ?? "");
     const activeList = activeLine.marker.trimStart().replace(/\[[xX]\]/, "[ ]");
-    const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary");
+    const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]");
 
     return (
-        // Full screen on phones; on wider screens a card whose bottom ends at the toolbar's middle (12px offset + half its 62px height).
+        // Full screen on phones; a centered card on wider screens.
         <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
             // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
@@ -343,7 +344,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6`}>
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6 caret-[var(--primary-color)]`}>
 
                 <div className="flex items-center justify-between gap-2">
                     <input
@@ -391,15 +392,15 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                 <div
                     ref={bodyRef}
                     className="text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
-                    // Keep the last rows reachable above the toolbar (and the keyboard on phones).
-                    style={{ paddingBottom: focused ? 72 : 0, scrollPaddingBottom: focused ? 72 : 0 }}
+                    // Room under the last row for the toolbar (and its open menu) below it.
+                    style={{ paddingBottom: focused ? (menuOpen ? 136 : 80) : 0, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the row on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
                     onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
                     {lines.map((raw, index) => {
                         const line = parseLine(raw);
                         return (
-                            <div key={index} className={`flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
+                            <div key={index} className={`relative flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
                                 {line.check !== undefined && (
                                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
                                         className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
@@ -412,7 +413,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                                     </button>
                                 )}
                                 {line.marker && line.check === undefined && !line.heading && (
-                                    <span className="w-[18px] shrink-0 text-center">{line.number ? `${line.number}.` : line.marker.includes("–") ? "–" : "•"}</span>
+                                    <span className={`w-[18px] shrink-0 text-center ${!line.number && !line.marker.includes("–") ? "text-xl leading-none" : ""}`}>{line.number ? `${line.number}.` : line.marker.includes("–") ? "–" : "•"}</span>
                                 )}
                                 <div className={`relative flex-1 min-w-0 transition-opacity duration-300 ${line.done ? "opacity-60" : ""}`}>
                                 <div
@@ -420,12 +421,12 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                                     contentEditable
                                     suppressContentEditableWarning
                                     ref={(el) => { rows.current[index] = el; }}
-                                    data-placeholder={index === 0 && lines.length === 1 ? "Escreva sua nota..." : undefined}
+                                    data-placeholder={index === 0 && lines.length === 1 ? "" : undefined}
                                     // Chrome leaves a <br> in an emptied row; clear it so the placeholder (:empty) shows again.
                                     onInput={(e) => { if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
                                     onKeyDown={(e) => onKeyDown(e, index)}
                                     onPaste={(e) => onPaste(e, index)}
-                                    onFocus={(e) => { activeRow.current = index; setFocused(true); e.currentTarget.scrollIntoView({ block: "nearest" }); }}
+                                    onFocus={(e) => { activeRow.current = index; setActiveIndex(index); setFocused(true); e.currentTarget.scrollIntoView({ block: "nearest" }); }}
                                     onBlur={onBlur}
                                     className={`block w-full outline-none whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
                                 />
@@ -436,6 +437,38 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                                     </div>
                                 )}
                                 </div>
+                                {toolbarShown && index === activeIndex && (
+                                    // Pops up below the focused row; onMouseDown preventDefault keeps the row focused (and the keyboard open).
+                                    <div className={`absolute left-0 top-full mt-2 z-10 origin-top-left ${focused ? "animate-pop-in" : "animate-pop-out"}`}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onAnimationEnd={(e) => { if (e.target === e.currentTarget && !focused) setToolbarShown(false); }}>
+                                        <div ref={toolbarRef} className="relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full rounded-tl-none shadow-lg gap-1">
+                                            {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
+                                                <button key={id} type="button" onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl bg-light-bg-color-secondary transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
+                                                    <Icon />
+                                                </button>
+                                            ))}
+                                            {menuOpen && (
+                                                // Options already in effect on the focused line (or selection) show in the primary color.
+                                                <div className={`flex absolute left-0 top-full mt-2 w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in`}>
+                                                    {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
+                                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
+                                                            className={`text-2xl py-3 px-5 transition-colors ${option(activeList === prefix)}`}><Icon /></button>
+                                                    ))}
+                                                    {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
+                                                        <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
+                                                            className={`text-2xl py-3 px-5 transition-colors ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                                    ))}
+                                                    {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
+                                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
+                                                            className={`flex-1 py-3 px-3 transition-colors whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -443,40 +476,6 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
 
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
             </div>
-
-            {toolbarShown && (
-                // onMouseDown preventDefault keeps the row focused (and the keyboard open).
-                <div className={`absolute left-0 right-0 bottom-3 z-10 flex justify-center px-2 ${focused ? "animate-slide-up" : "animate-slide-down"}`}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onAnimationEnd={(e) => { if (e.target === e.currentTarget && !focused) setToolbarShown(false); }}>
-                    <div ref={toolbarRef} className="relative w-full max-w-[375px] border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full shadow-lg gap-1">
-                        {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
-                            <button key={id} type="button" onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
-                                className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-light-bg-color-secondary"}`}>
-                                <Icon />
-                            </button>
-                        ))}
-                        {menuOpen && (
-                            // The heading menu spans the toolbar so its four labels fit one line on phones.
-                            // Options already in effect on the focused line (or selection) show in the primary color.
-                            <div className={`flex absolute left-0 bottom-full mb-2 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in ${menuOpen === "heading" ? "right-0" : ""}`}>
-                                {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
-                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
-                                        className={`text-2xl py-3 px-5 hover:opacity-70 ${option(activeList === prefix)}`}><Icon /></button>
-                                ))}
-                                {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
-                                    <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
-                                        className={`text-2xl py-3 px-5 hover:opacity-70 ${option(document.queryCommandState(command))}`}><Icon /></button>
-                                ))}
-                                {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
-                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
-                                        className={`flex-1 py-3 px-2 hover:opacity-70 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
