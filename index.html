@@ -14,6 +14,22 @@
         if (bg) root.setProperty("--primary-color", bg);
         if (fg) root.setProperty("--primary-color-fg", fg);
       } catch {}
+
+      // --app-height: the viewport height without the keyboard. The keyboard only ever shrinks the height
+      // (and iOS home-screen apps may keep it shrunk afterwards), so only follow resizes that grow it or rotate the screen.
+      let appW = innerWidth, appH = 0;
+      const setAppHeight = () => {
+        appH = innerHeight; appW = innerWidth;
+        document.documentElement.style.setProperty("--app-height", appH + "px");
+      };
+      setAppHeight();
+      addEventListener("resize", () => { if (innerHeight > appH || innerWidth !== appW) setAppHeight(); });
+
+      // No pinch zoom in the home-screen app: iOS ignores user-scalable=no there, so block the gesture directly
+      // (double-tap zoom is already off via touch-action in index.css).
+      for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
+        document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+      }
     </script>
   </head>
   <body>

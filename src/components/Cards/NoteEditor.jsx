@@ -332,7 +332,9 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     return (
         // Full screen on phones; on wider screens a card whose bottom ends at the toolbar's middle (12px offset + half its 62px height).
         <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
-            style={{ height: vv.height, transform: `translateY(${vv.top}px)` }}>
+            // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
+            // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
+            style={{ height: typing ? vv.height : "var(--app-height, 100dvh)", transform: `translateY(${typing ? vv.top : 0}px)` }}>
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
