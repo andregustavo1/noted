@@ -420,6 +420,8 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                         return (
                             <div key={keys[index]} style={{ zIndex: lines.length - index }} className={`relative flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
                                 {line.check !== undefined && (
+                                    // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
+                                    <span className="h-[1.625em] shrink-0 flex items-center">
                                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
                                         className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
                                         {line.done && (
@@ -429,6 +431,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                                             </svg>
                                         )}
                                     </button>
+                                    </span>
                                 )}
                                 {line.marker && line.check === undefined && !line.heading && (
                                     <span className={`w-[18px] shrink-0 text-center ${!line.number && !line.marker.includes("–") ? "text-xl leading-none" : ""}`}>{line.number ? `${line.number}.` : line.marker.includes("–") ? "–" : "•"}</span>
