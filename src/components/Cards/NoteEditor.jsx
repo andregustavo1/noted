@@ -197,7 +197,6 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
         const next = [...lines];
         next[index] = (marker === prefix ? "" : prefix) + text;
         update(next, { index, caret: selectionIn(rows.current[index])?.[0] ?? plain(text).length });
-        setMenuOpen(null);
     };
 
     // The toolbar keeps the row focused, so the command applies to its selection (or to what is typed next).
@@ -206,7 +205,6 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
         document.execCommand("styleWithCSS", false, false);
         document.execCommand(command);
         setLineText(index, sanitize(rows.current[index].innerHTML));
-        setMenuOpen(null);
     };
 
     const moveTo = (index, caret) => {
@@ -272,19 +270,28 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     const [toolbarShown, setToolbarShown] = useState(false);
     if (focused && !toolbarShown) setToolbarShown(true);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
-    // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus).
+    // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
     useEffect(() => {
         if (!menuOpen) return;
-        const onDown = (e) => { if (!toolbarRef.current?.contains(e.target)) setMenuOpen(null); };
+        const onDown = (e) => { if (!toolbarRef.current?.contains(e.target) && !bodyRef.current?.contains(e.target)) setMenuOpen(null); };
+        // Re-render on caret moves so the menu lights up the new line's heading/list and the selection's styles.
+        const onSelect = () => rerender((n) => n + 1);
         document.addEventListener("pointerdown", onDown);
-        return () => document.removeEventListener("pointerdown", onDown);
+        document.addEventListener("selectionchange", onSelect);
+        return () => {
+            document.removeEventListener("pointerdown", onDown);
+            document.removeEventListener("selectionchange", onSelect);
+        };
     }, [menuOpen]);
-    const [bottom, setBottom] = useState(0);
+    const [, rerender] = useState(0);
+    // The overlay tracks the visual viewport: on phones the keyboard only shrinks and pans that (the layout viewport
+    // stays full height, especially in an iOS home-screen app), so the close button and toolbar would otherwise drift off screen.
+    const [vv, setVv] = useState(() => ({ height: window.visualViewport?.height ?? window.innerHeight, top: window.visualViewport?.offsetTop ?? 0 }));
     useEffect(() => {
         const viewport = window.visualViewport;
         if (!viewport) return;
-        const update = () => setBottom(Math.max(0, window.innerHeight - viewport.offsetTop - viewport.height));
+        const update = () => setVv({ height: viewport.height, top: viewport.offsetTop });
         update();
         viewport.addEventListener("resize", update);
         viewport.addEventListener("scroll", update);
@@ -293,6 +300,10 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
             viewport.removeEventListener("scroll", update);
         };
     }, []);
+    // Keep the caret's row inside the resized overlay after the keyboard moves the viewport.
+    useEffect(() => {
+        if (focused) rows.current[activeRow.current]?.scrollIntoView({ block: "nearest" });
+    }, [vv, focused]);
     // Wait a tick on blur so moving between rows doesn't flicker the toolbar.
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
     const [typing, setTyping] = useState(false);
@@ -320,7 +331,8 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
 
     return (
         // pb-[43px]: the card ends at the toolbar's middle (12px offset + half its 62px height).
-        <div className={`fixed inset-0 z-[60] flex justify-center px-4 pt-[2vh] pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}>
+        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center px-4 pt-[2vh] pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
+            style={{ height: vv.height, transform: `translateY(${vv.top}px)` }}>
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
@@ -373,7 +385,9 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                     ref={bodyRef}
                     className="text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Keep the last rows reachable above the toolbar (and the keyboard on phones).
-                    style={{ paddingBottom: bottom + (focused ? 16 : 0), scrollPaddingBottom: bottom + (focused ? 16 : 0) }}
+                    style={{ paddingBottom: focused ? 16 : 0, scrollPaddingBottom: focused ? 16 : 0 }}
+                    // preventDefault on the empty area: blurring the row on press would close the toolbar before the click refocuses.
+                    onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
                     onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
                     {lines.map((raw, index) => {
                         const line = parseLine(raw);
@@ -425,7 +439,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
 
             {toolbarShown && (
                 // onMouseDown preventDefault keeps the row focused (and the keyboard open).
-                <div className={`fixed left-0 right-0 z-10 flex justify-center px-2 ${focused ? "animate-slide-up" : "animate-slide-down"}`} style={{ bottom: bottom + 12 }}
+                <div className={`absolute left-0 right-0 bottom-3 z-10 flex justify-center px-2 ${focused ? "animate-slide-up" : "animate-slide-down"}`}
                     onMouseDown={(e) => e.preventDefault()}
                     onAnimationEnd={(e) => { if (e.target === e.currentTarget && !focused) setToolbarShown(false); }}>
                     <div ref={toolbarRef} className="relative w-full max-w-[375px] border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full shadow-lg gap-1">
