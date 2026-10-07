@@ -4,6 +4,8 @@ import Navbar from "../../components/Navbar/Navbar";
 import NoteCard from "../../components/Cards/NoteCard";
 import NoteEditor from "../../components/Cards/NoteEditor";
 import { TfiPlus } from "react-icons/tfi";
+import { MdOutlineCreate } from "react-icons/md";
+import { BsTrash3 } from "react-icons/bs";
 import CategoryBar from "../../components/Cards/CategoryBar";
 import ProfileInfo from "../../components/Cards/ProfileInfo";
 import ProfileConfig from "../../components/Cards/ProfileConfig.jsx";
@@ -11,6 +13,8 @@ import { useNavigate } from "react-router-dom"
 import { supabase } from "../../lib/supabase";
 import { getUserName, useAuth } from "../../context/AuthContext";
 import { createNote, deleteNote, fetchNotes, updateNote } from "../../lib/notes";
+import { createCategory, deleteCategory, fetchCategories, renameCategory } from "../../lib/categories";
+import Modal, { ModalButtons } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
 
 const sortNotes = (notes) =>
@@ -106,6 +110,7 @@ const Home = () => {
     };
 
     const [notes, setNotes] = useState([]);
+    const [categoryList, setCategoryList] = useState([]); // { id, name } rows
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -116,7 +121,10 @@ const Home = () => {
         setLoading(true);
         setLoadError(false);
         try {
-            setNotes(await fetchNotes());
+            // Categories are a side dish: if the table is missing (schema.sql not run yet) the names on notes still show.
+            const [fetched, cats] = await Promise.all([fetchNotes(), fetchCategories().catch((e) => { console.error(e); return []; })]);
+            setNotes(fetched);
+            setCategoryList(cats);
         } catch (error) {
             console.error(error);
             setLoadError(true);
@@ -142,13 +150,16 @@ const Home = () => {
         return () => { document.documentElement.style.overflow = prev; };
     }, [onConfig]);
 
+    // Stored categories plus any name still only on notes (before the schema migration ran), with note counts.
     const categories = useMemo(() => {
-        const counts = {};
+        const byName = Object.fromEntries(categoryList.map((c) => [c.name, { ...c, count: 0 }]));
         notes.forEach((note) => {
-            if (note.category) counts[note.category] = (counts[note.category] || 0) + 1;
+            if (!note.category) return;
+            byName[note.category] ??= { id: null, name: note.category, count: 0 };
+            byName[note.category].count++;
         });
-        return Object.keys(counts).sort((a, b) => a.localeCompare(b)).map((name) => ({ name, count: counts[name] }));
-    }, [notes]);
+        return Object.values(byName).sort((a, b) => a.name.localeCompare(b.name));
+    }, [notes, categoryList]);
 
     const currentCategory = categories.some((c) => c.name === activeCategory) ? activeCategory : "";
 
@@ -162,6 +173,11 @@ const Home = () => {
     const [editor, setEditor] = useState(null);
     const [editorError, setEditorError] = useState("");
     const [pendingDelete, setPendingDelete] = useState(null);
+    // Long-press menu on a category chip, and the dialog it (or the "+" / card menu) opens.
+    const [categoryMenu, setCategoryMenu] = useState(null); // { category, rect }
+    const [dialog, setDialog] = useState(null); // { type: "add" } | { type: "rename" | "delete", category } | { type: "pick", note }
+    const [dialogName, setDialogName] = useState("");
+    const openDialog = (next) => { setCategoryMenu(null); setDialogName(next.category?.name ?? ""); setDialog(next); };
     // Id of the note being autosaved (set once a new note is created). Saves run one at a
     // time so a fast second edit can't create the same new note twice.
     const editorNoteId = useRef(null);
@@ -191,6 +207,7 @@ const Home = () => {
             onEdit={() => openEditor(note)}
             onDelete={() => setPendingDelete(note)}
             onPinNote={() => handlePin(note)}
+            onCategory={() => openDialog({ type: "pick", note })}
             onDuplicate={() => handleDuplicate(note)}
         />
     );
@@ -205,7 +222,8 @@ const Home = () => {
                 if (editorNoteId.current) {
                     replaceNote(await updateNote(editorNoteId.current, fields));
                 } else {
-                    const created = await createNote(fields);
+                    // A note started while a category is filtered lands in that category, so it stays in view.
+                    const created = await createNote({ ...fields, category: currentCategory });
                     editorNoteId.current = created.id;
                     setNotes((prev) => sortNotes([created, ...prev]));
                 }
@@ -256,6 +274,48 @@ const Home = () => {
         }
     };
 
+    const handleSetCategory = async (note, category) => {
+        setDialog(null);
+        if (category === note.category) return;
+        animateNotes(() => replaceNote({ ...note, category }));
+        try {
+            replaceNote(await updateNote(note.id, { category }));
+        } catch (error) {
+            console.error(error);
+            animateNotes(() => replaceNote(note));
+            setMessage("Não foi possível alterar a categoria");
+        }
+    };
+
+    // Add / rename / delete a category. The name dialogs submit here; an empty or duplicate name is ignored.
+    const handleCategoryDialog = async () => {
+        const name = dialogName.trim();
+        const { type, category } = dialog;
+        setDialog(null);
+        try {
+            if (type === "add") {
+                if (!name || categories.some((c) => c.name === name)) return;
+                const created = await createCategory(name);
+                setCategoryList((prev) => [...prev, created]);
+            } else if (type === "rename") {
+                if (!name || name === category.name || categories.some((c) => c.name === name)) return;
+                await renameCategory(category.id, category.name, name);
+                setCategoryList((prev) => prev.map((c) => (c.name === category.name ? { ...c, name } : c)));
+                setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: name } : n)));
+                if (activeCategory === category.name) setActiveCategory(name);
+            } else if (type === "delete") {
+                await deleteCategory(category.id, category.name);
+                setCategoryList((prev) => prev.filter((c) => c.name !== category.name));
+                setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: "" } : n)));
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage("Não foi possível salvar a categoria");
+        }
+    };
+
+    const menuItem = "flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary";
+
     return (
         <>
             <div className="max-w-[768px] relative mx-auto">
@@ -284,9 +344,36 @@ const Home = () => {
                         quantity={category.count}
                         isActive={currentCategory === category.name}
                         onClick={() => setActiveCategory(category.name)}
+                        onHold={(rect) => setCategoryMenu({ category, rect })}
                     />
                 ))}
+
+                <button
+                    aria-label="Nova categoria"
+                    onClick={() => openDialog({ type: "add" })}
+                    className="w-10 h-10 shrink-0 grid place-items-center rounded-full bg-[var(--primary-color)] text-[var(--primary-color-fg)] shadow-sm hover:brightness-95 duration-300">
+                    <TfiPlus />
+                </button>
             </div>
+
+            {categoryMenu && (
+                // Same menu as the card's, narrower; fixed so the scrolling chip row can't clip it. The backdrop closes it.
+                <div className="fixed inset-0 z-[60]" onMouseDown={() => setCategoryMenu(null)} onTouchStart={() => setCategoryMenu(null)}>
+                    <div
+                        style={{ left: Math.min(categoryMenu.rect.left, document.documentElement.clientWidth - 158), top: categoryMenu.rect.bottom + 4 }}
+                        onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
+                        className="fixed w-[150px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary animate-pop-in origin-top-left">
+                        <button className={`${menuItem} rounded-t-xl`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
+                            <p>Editar</p>
+                            <MdOutlineCreate />
+                        </button>
+                        <button className={`${menuItem} rounded-b-xl text-red-600 hover:bg-red-500 hover:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: categoryMenu.category })}>
+                            <p>Excluir</p>
+                            <BsTrash3 />
+                        </button>
+                    </div>
+                </div>
+            )}
 
 
             <div onClick={toggleConfig} className={`bg-black w-screen h-screen absolute top-0 z-30 duration-300 ${onConfig ? "opacity-20 visible" : "opacity-0 invisible"}`}></div>
@@ -333,7 +420,6 @@ const Home = () => {
             {editor && (
                 <NoteEditor
                     note={editor.note}
-                    categories={categories.map((c) => c.name)}
                     error={editorError}
                     onSave={handleSave}
                     onClose={closeEditor}
@@ -341,29 +427,51 @@ const Home = () => {
             )}
 
             {pendingDelete && (
-                <div className="fixed inset-0 z-[80] grid place-items-center bg-black/20" onMouseDown={() => setPendingDelete(null)}>
-                    <div
-                        role="alertdialog"
-                        aria-modal="true"
-                        aria-labelledby="delete-title"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        // Stop Escape here so the editor's document listener doesn't close the note too.
-                        onKeyDown={(e) => { if (e.key === "Escape") { e.nativeEvent.stopPropagation(); setPendingDelete(null); } }}
-                        // Same width as an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 40px.
-                        className="bg-light-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-6 text-center">
-                        <p id="delete-title" className="font-medium text-lg">Excluir nota?</p>
-                        <p className="text-sm text-light-text-color-tertiary mt-2 break-words">"{pendingDelete.title || "Sem título"}"<br />será excluída.</p>
-                        {/* Buttons stack when the card is phone-narrow, sit side by side otherwise. */}
-                        <div className="flex flex-wrap gap-2 mt-6">
-                            <button autoFocus onClick={() => setPendingDelete(null)} className="flex-1 basis-[120px] rounded-full py-2 font-semibold bg-light-bg-color-secondary hover:brightness-95 duration-200">
-                                Cancelar
-                            </button>
-                            <button onClick={() => handleDelete(pendingDelete)} className="flex-1 basis-[120px] rounded-full py-2 font-semibold text-white bg-red-500 hover:bg-red-600 duration-200">
-                                Excluir
-                            </button>
-                        </div>
+                <Modal title="Excluir nota?" onClose={() => setPendingDelete(null)}>
+                    <p className="text-sm text-light-text-color-tertiary mt-2 break-words">"{pendingDelete.title || "Noted"}"<br />será excluída.</p>
+                    <ModalButtons danger confirm="Excluir" onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(pendingDelete)} />
+                </Modal>
+            )}
+
+            {(dialog?.type === "add" || dialog?.type === "rename") && (
+                <Modal title={dialog.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
+                    <form onSubmit={(e) => { e.preventDefault(); handleCategoryDialog(); }}>
+                        <input
+                            autoFocus
+                            autoComplete="off"
+                            maxLength={40}
+                            value={dialogName}
+                            onChange={(e) => setDialogName(e.target.value)}
+                            placeholder="Nome"
+                            className="mt-4 w-full text-sm bg-light-bg-color-secondary rounded-full px-4 py-2 outline-none text-center caret-[var(--primary-color)]"
+                        />
+                        <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} />
+                    </form>
+                </Modal>
+            )}
+
+            {dialog?.type === "delete" && (
+                <Modal title="Excluir categoria?" onClose={() => setDialog(null)}>
+                    <p className="text-sm text-light-text-color-tertiary mt-2 break-words">"{dialog.category.name}" será excluída.<br />Suas notas ficam em "Todas".</p>
+                    <ModalButtons danger confirm="Excluir" onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
+                </Modal>
+            )}
+
+            {dialog?.type === "pick" && (
+                // The note's current category is the one in the primary color; tapping another moves the note.
+                <Modal title="Categoria" onClose={() => setDialog(null)}>
+                    <div className="flex flex-wrap justify-center gap-2 mt-4">
+                        {[{ name: "" }, ...categories].map(({ name }) => {
+                            const on = dialog.note.category === name;
+                            return (
+                                <button key={name} type="button" onClick={() => handleSetCategory(dialog.note, name)} aria-pressed={on}
+                                    className={`rounded-full px-4 py-2 text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary hover:brightness-95"} ${name ? "" : "italic"}`}>
+                                    {name || "Sem categoria"}
+                                </button>
+                            );
+                        })}
                     </div>
-                </div>
+                </Modal>
             )}
 
             {message && (

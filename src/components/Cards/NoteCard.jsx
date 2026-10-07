@@ -6,12 +6,13 @@ import { BsTrash3 } from 'react-icons/bs';
 import { MdOutlineCreate } from "react-icons/md";
 import { HiOutlineDuplicate } from "react-icons/hi";
 import { IoMdCheckmark } from "react-icons/io";
+import { MdLabelOutline } from "react-icons/md";
 import { sanitize } from "../../lib/richtext";
 
 const CHECK = /^(\s*)- \[([ xX])\] (.*)$/;
 const BULLET = /^(\s*)[-*] (.*)$/;
 
-const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, onPinNote, onDuplicate, onDelete }) => {
+const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, onPinNote, onCategory, onDuplicate, onDelete }) => {
     const [isNoteOptionsVisible, setNoteOptionsVisible] = useState(false);
     const noteOptionsBtnRef = useRef(null);
     const noteOptionsRef = useRef(null);
@@ -84,7 +85,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
             onClick={onOpen}>
             <div className="">
                 <div className='flex items-center justify-between gap-2'>
-                    <h1 className="font-medium truncate min-w-0">{title || "Sem título"}</h1>
+                    <h1 className="font-medium truncate min-w-0">{title || "Noted"}</h1>
                     <button
                         ref={noteOptionsBtnRef}
                         onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
@@ -120,6 +121,13 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onPinNote(); }}>
                     <p>{isPinned ? "Desfixar" : "Fixar"}</p>
                     {isPinned ? <RiPushpin2Fill /> : <RiUnpinLine />}
+                </button>
+
+                <button
+                    className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary'
+                    onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onCategory(); }}>
+                    <p>Categoria</p>
+                    <MdLabelOutline />
                 </button>
 
                 <button
