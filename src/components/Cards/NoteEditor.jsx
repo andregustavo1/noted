@@ -302,11 +302,21 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     }, 0);
 
     // Lock the dashboard scroll while the editor is open.
+    // iOS ignores overflow:hidden on body (the page still pans with the keyboard up), so pin it in place instead.
     useEffect(() => {
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => { document.body.style.overflow = prev; };
+        const y = window.scrollY;
+        const { style } = document.body;
+        Object.assign(style, { position: "fixed", top: `-${y}px`, left: "0", right: "0", overflow: "hidden" });
+        return () => {
+            Object.assign(style, { position: "", top: "", left: "", right: "", overflow: "" });
+            window.scrollTo(0, y);
+        };
     }, []);
+
+    // What the open menu should light up: the focused line's heading/list marker; styles come from the selection.
+    const activeLine = parseLine(lines[activeRow.current] ?? "");
+    const activeList = activeLine.marker.trimStart().replace(/\[[xX]\]/, "[ ]");
+    const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary");
 
     return (
         // pb-[43px]: the card ends at the toolbar's middle (12px offset + half its 62px height).
@@ -319,6 +329,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                 <div className="flex items-center justify-between gap-2">
                     <input
                         autoFocus={!note}
+                        autoComplete="off"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Título"
@@ -350,6 +361,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="Categoria"
+                    autoComplete="off"
                     list="note-categories"
                     className="text-sm bg-light-bg-color-secondary rounded-full px-4 py-1 mt-3 w-[180px] outline-none"
                 />
@@ -359,7 +371,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
 
                 <div
                     ref={bodyRef}
-                    className="text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto cursor-text"
+                    className="text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Keep the last rows reachable above the toolbar (and the keyboard on phones).
                     style={{ paddingBottom: bottom + (focused ? 16 : 0), scrollPaddingBottom: bottom + (focused ? 16 : 0) }}
                     onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
@@ -425,15 +437,19 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                         ))}
                         {menuOpen && (
                             // The heading menu spans the toolbar so its four labels fit one line on phones.
+                            // Options already in effect on the focused line (or selection) show in the primary color.
                             <div className={`flex absolute left-0 bottom-full mb-2 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in ${menuOpen === "heading" ? "right-0" : ""}`}>
                                 {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
-                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} className="text-2xl py-3 px-5 bg-light-bg-color-secondary hover:opacity-70"><Icon /></button>
+                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
+                                        className={`text-2xl py-3 px-5 hover:opacity-70 ${option(activeList === prefix)}`}><Icon /></button>
                                 ))}
                                 {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
-                                    <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} className="text-2xl py-3 px-5 bg-light-bg-color-secondary hover:opacity-70"><Icon /></button>
+                                    <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
+                                        className={`text-2xl py-3 px-5 hover:opacity-70 ${option(document.queryCommandState(command))}`}><Icon /></button>
                                 ))}
                                 {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
-                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} className={`flex-1 py-3 px-2 bg-light-bg-color-secondary hover:opacity-70 whitespace-nowrap ${menu}`}>{label}</button>
+                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
+                                        className={`flex-1 py-3 px-2 hover:opacity-70 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
                                 ))}
                             </div>
                         )}

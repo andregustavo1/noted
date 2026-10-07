@@ -134,6 +134,14 @@ const Home = () => {
         return () => clearTimeout(timeout);
     }, [message]);
 
+    // Lock page scroll while the side panel is open.
+    useEffect(() => {
+        if (!onConfig) return;
+        const prev = document.documentElement.style.overflow;
+        document.documentElement.style.overflow = "hidden";
+        return () => { document.documentElement.style.overflow = prev; };
+    }, [onConfig]);
+
     const categories = useMemo(() => {
         const counts = {};
         notes.forEach((note) => {

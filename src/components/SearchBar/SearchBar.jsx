@@ -17,6 +17,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
     }
 
     const closeSearch = () => {
+        onClearSearch();
         if (toggleSearch) {
             toggleSearchBar();
             logoHidden();
@@ -46,6 +47,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
                         <input
                             id="search-bar"
                             type="text"
+                            autoComplete="off"
                             placeholder="Buscar notas"
                             className={`px-4 outline-none`}
                             value={value}
