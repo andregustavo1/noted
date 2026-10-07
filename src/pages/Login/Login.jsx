@@ -268,7 +268,7 @@ const Login = () => {
                             type="email"
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="bg-light-bg-color-secondary mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="bg-light-bg-color-secondary mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-full outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);
@@ -324,7 +324,7 @@ const Login = () => {
                             type="email"
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="input-box bg-light-bg-color-secondary mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="input-box bg-light-bg-color-secondary mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-full outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);
