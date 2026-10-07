@@ -302,11 +302,11 @@ const Home = () => {
                 )}
 
                 {!loading && !loadError && notes.length === 0 && (
-                    <p className="w-full text-center text-light-text-color-tertiary mt-10">Nenhuma nota ainda. Toque em + para criar a primeira.</p>
+                    <p className="w-full text-center text-light-text-color-tertiary mt-10"></p>
                 )}
 
                 {!loading && !loadError && notes.length > 0 && visibleNotes.length === 0 && (
-                    <p className="w-full text-center text-light-text-color-tertiary mt-10">Nenhuma nota encontrada.</p>
+                    <p className="w-full text-center text-light-text-color-tertiary mt-10"></p>
                 )}
 
                 {!loading && visibleNotes.filter((n) => n.is_pinned).map((n) => renderCard(n))}

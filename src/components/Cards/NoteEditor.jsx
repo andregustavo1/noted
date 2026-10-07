@@ -330,13 +330,13 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary");
 
     return (
-        // pb-[43px]: the card ends at the toolbar's middle (12px offset + half its 62px height).
-        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center px-4 pt-[2vh] pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
+        // Full screen on phones; on wider screens a card whose bottom ends at the toolbar's middle (12px offset + half its 62px height).
+        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             style={{ height: vv.height, transform: `translateY(${vv.top}px)` }}>
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary rounded-3xl shadow-md w-full max-w-[736px] flex flex-col px-6 md:px-8 py-6`}>
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6`}>
 
                 <div className="flex items-center justify-between gap-2">
                     <input
@@ -385,7 +385,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                     ref={bodyRef}
                     className="text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Keep the last rows reachable above the toolbar (and the keyboard on phones).
-                    style={{ paddingBottom: focused ? 16 : 0, scrollPaddingBottom: focused ? 16 : 0 }}
+                    style={{ paddingBottom: focused ? 72 : 0, scrollPaddingBottom: focused ? 72 : 0 }}
                     // preventDefault on the empty area: blurring the row on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
                     onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
