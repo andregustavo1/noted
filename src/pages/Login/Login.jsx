@@ -34,6 +34,27 @@ const Login = () => {
         return () => elements.forEach((el) => { el.style.overscrollBehaviorY = ""; });
     }, []);
 
+    // Size the card from the screen height measured once, so the keyboard opening
+    // (which shrinks the viewport on some browsers) can't resize or move it.
+    // Only re-measure when the width changes, i.e. on rotation.
+    useEffect(() => {
+        const root = document.documentElement;
+        let width = window.innerWidth;
+        const measure = () => root.style.setProperty("--login-vh", `${window.innerHeight}px`);
+        const onResize = () => {
+            if (window.innerWidth === width) return;
+            width = window.innerWidth;
+            measure();
+        };
+
+        measure();
+        window.addEventListener("resize", onResize);
+        return () => {
+            window.removeEventListener("resize", onResize);
+            root.style.removeProperty("--login-vh");
+        };
+    }, []);
+
     useEffect(() => {
         const overlay = document.getElementById("overlay");
 
@@ -186,10 +207,10 @@ const Login = () => {
     }
 
     return <>
-        <Navbar compact />
+        <Navbar />
 
-        <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
-            <div className="bg-white rounded-lg custom-shadow h-[calc(100svh-5rem)] min-h-[584px] max-h-[748px] md:h-[748px] overflow-hidden relative flex justify-between">
+        <div className="px-4 mb-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
+            <div className="bg-white rounded-lg custom-shadow h-[calc(var(--login-vh,100svh)-5.5rem)] min-h-[584px] max-h-[748px] md:h-[748px] overflow-hidden relative flex justify-between">
                 <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
                         <h1 className="font-bold text-2xl md:text-3xl text-center">Entrar</h1>

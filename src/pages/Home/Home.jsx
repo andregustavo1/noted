@@ -171,7 +171,7 @@ const Home = () => {
             <div className="max-w-[1280px] relative mx-auto">
                 <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-                <div className={`absolute top-0 py-6 pr-4 pl-2 z-50 duration-300 delay-[10ms] ${onConfig ? "right-[186px] ease-in-out " : "right-0 ease-out"}`}>
+                <div className={`absolute top-0 py-4 pr-4 pl-2 z-50 duration-300 delay-[10ms] ${onConfig ? "right-[186px] ease-in-out " : "right-0 ease-out"}`}>
                     <ProfileInfo name={userName} onConfigClick={toggleConfig}></ProfileInfo>
                 </div>
             </div>
