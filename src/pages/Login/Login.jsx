@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Navbar from "../../components/Navbar/Navbar";
 import { useNavigate } from "react-router-dom";
 import PasswordInput from "../../components/Input/PasswordInput";
@@ -52,6 +52,55 @@ const Login = () => {
         return () => {
             window.removeEventListener("resize", onResize);
             root.style.removeProperty("--login-vh");
+        };
+    }, []);
+
+    // On phones the sign-up form sits in the bottom half, where the keyboard covers
+    // it. While one of its fields is focused, slide the page up just enough to
+    // show the form above the keyboard; on blur it slides back to where it was.
+    const pageRef = useRef(null);
+
+    useEffect(() => {
+        const page = pageRef.current;
+        const signUpForm = document.querySelector("#panel-white-signup form");
+        const viewport = window.visualViewport;
+        let shift = 0;
+
+        const setShift = (value) => {
+            shift = value;
+            page.style.transform = value ? `translateY(-${value}px)` : "";
+        };
+
+        const update = () => {
+            const focused = document.activeElement;
+            if (window.innerWidth >= 768 || !signUpForm.contains(focused) || !viewport) {
+                setShift(0);
+                return;
+            }
+
+            const visibleTop = viewport.offsetTop + 16;
+            const visibleBottom = viewport.offsetTop + viewport.height - 16;
+            const form = signUpForm.getBoundingClientRect();
+            const field = focused.getBoundingClientRect();
+
+            // Fit the whole form if it can, otherwise at least the focused field.
+            let next = Math.max(0, form.bottom + shift - visibleBottom);
+            next = Math.min(next, Math.max(0, field.top + shift - visibleTop));
+            setShift(Math.round(next));
+        };
+
+        // Wait a tick on blur so moving between the two fields doesn't bounce.
+        const onFocusOut = () => setTimeout(update, 0);
+
+        document.addEventListener("focusin", update);
+        document.addEventListener("focusout", onFocusOut);
+        viewport?.addEventListener("resize", update);
+        viewport?.addEventListener("scroll", update);
+        return () => {
+            document.removeEventListener("focusin", update);
+            document.removeEventListener("focusout", onFocusOut);
+            viewport?.removeEventListener("resize", update);
+            viewport?.removeEventListener("scroll", update);
         };
     }, []);
 
@@ -206,7 +255,7 @@ const Login = () => {
         navigate("/dashboard", { replace: true });
     }
 
-    return <>
+    return <div ref={pageRef} className="duration-300 ease-out">
         <Navbar />
 
         <div className="px-4 mb-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
@@ -300,7 +349,7 @@ const Login = () => {
                 </div>
             </div>
         </div>
-    </>;
+    </div>;
 }
 
 export default Login
