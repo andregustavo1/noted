@@ -186,10 +186,10 @@ const Login = () => {
     }
 
     return <>
-        <Navbar />
+        <Navbar compact />
 
         <div className="px-4 my-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
-            <div className="bg-white rounded-lg custom-shadow h-[calc(100svh-8rem)] min-h-[536px] max-h-[700px] md:h-[700px] overflow-hidden relative flex justify-between">
+            <div className="bg-white rounded-lg custom-shadow h-[calc(100svh-5rem)] min-h-[584px] max-h-[748px] md:h-[748px] overflow-hidden relative flex justify-between">
                 <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
                         <h1 className="font-bold text-2xl md:text-3xl text-center">Entrar</h1>

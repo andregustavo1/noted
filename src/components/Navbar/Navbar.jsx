@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SearchBar from "../SearchBar/SearchBar";
 
-const Navbar = ({ searchQuery, onSearchChange }) => {
+const Navbar = ({ searchQuery, onSearchChange, compact }) => {
     const showSearch = Boolean(onSearchChange);
 
     const onClearSearch = () => {
@@ -15,7 +15,7 @@ const Navbar = ({ searchQuery, onSearchChange }) => {
     }
 
     return (
-        <header className="grid place-items-center py-6 mt-2">
+        <header className={`grid place-items-center mt-2 ${compact ? "" : "py-6"}`}>
             <div className="flex items-center w-full md:px-4 min-h-10">
                 <div id="logo" className={`absolute items-center pl-4 md:pl-0 flex duration-300 ${logoToggle ? "opacity-0 md:opacity-100" : "opacity-100"}`}>
                     <h2 className="text-3xl text-black">Noted.</h2>
