@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // hover: only applies on devices that can hover, so taps don't leave sticky hover states.
+  future: { hoverOnlyWhenSupported: true },
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",

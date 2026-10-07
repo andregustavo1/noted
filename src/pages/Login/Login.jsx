@@ -290,7 +290,7 @@ const Login = () => {
 
                         <p className="mt-1">Esqueceu sua senha?</p>
 
-                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300">ENTRAR</button>
+                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center hover:bg-black active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out">ENTRAR</button>
                     </form>
                 </div>
 
@@ -302,7 +302,7 @@ const Login = () => {
 
                         <p className="mt-4">Ainda não tem uma conta?</p>
 
-                        <button id="signup" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary duration-300">CRIAR CONTA</button>
+                        <button id="signup" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary active:scale-[0.97] [transition:transform_150ms_ease-out,background-color_300ms,color_300ms]">CRIAR CONTA</button>
                     </div>
                 </div>
 
@@ -312,7 +312,7 @@ const Login = () => {
 
                         <p className="mt-4">Já tem uma conta?</p>
 
-                        <button id="sigin" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary duration-300">ENTRAR</button>
+                        <button id="sigin" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary active:scale-[0.97] [transition:transform_150ms_ease-out,background-color_300ms,color_300ms]">ENTRAR</button>
                     </div>
                 </div>
 
@@ -344,7 +344,7 @@ const Login = () => {
 
                         <p className="text-red-500 mt-0.5">&nbsp;{errorSignUp}</p>
 
-                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300">CRIAR</button>
+                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center hover:bg-black active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out">CRIAR</button>
                     </form>
                 </div>
             </div>

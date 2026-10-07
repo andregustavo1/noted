@@ -481,7 +481,7 @@ const Home = () => {
             )}
 
             <button
-                className='w-14 h-14 bg-[var(--primary-color)] text-[var(--primary-color-fg)] text-xl grid place-items-center text-center rounded-full fixed bottom-10 hover:scale-105 hover:brightness-95 duration-300 left-1/2 transform -translate-x-1/2 shadow-sm'
+                className='w-14 h-14 bg-[var(--primary-color)] text-[var(--primary-color-fg)] text-xl grid place-items-center text-center rounded-full fixed bottom-10 hover:scale-105 hover:brightness-95 active:scale-95 duration-150 ease-out left-1/2 transform -translate-x-1/2 shadow-sm'
                 // Own view-transition layer, so reordering cards glide under the button instead of over it.
                 style={{ viewTransitionName: "fab" }}
                 aria-label="Nova nota"

@@ -465,7 +465,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                                         <div ref={toolbarRef} className="relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full rounded-tl-none shadow-lg gap-1">
                                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
                                                 <button key={id} type="button" onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
-                                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl bg-light-bg-color-secondary transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
+                                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
                                                     <Icon />
                                                 </button>
                                             ))}

@@ -81,7 +81,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
         <div
             ref={cardRef}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer duration-500 ease-in-out relative ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary"}`}
+            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] active:scale-[0.98] relative ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary"}`}
             onClick={onOpen}>
             <div className="">
                 <div className='flex items-center justify-between gap-2'>
