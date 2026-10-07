@@ -1,35 +1,320 @@
-import React, { useEffect, useState } from "react";
-import { IoMdClose } from "react-icons/io";
-import { BsTrash3 } from "react-icons/bs";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { IoMdCheckmark, IoMdClose } from "react-icons/io";
+import { MdChecklist, MdFormatBold, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdRedo, MdTitle, MdUndo } from "react-icons/md";
+import { escapeHtml, plain, sanitize } from "../../lib/richtext";
 
-const NoteEditor = ({ note, categories, saving, error, onSave, onDelete, onClose }) => {
+const EMPTY = JSON.stringify({ title: "", category: "", content: "" });
+
+// A marker at the start of a line: indent, then "- ", "– ", "- [ ] ", "1. " or "# " (1-3 hashes).
+const MARKER = /^(\s*)(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] )?)/;
+// Same grid as the Md list icons, with short dashes in place of the dots.
+const MdFormatListDashed = () => (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+        <path d="M2 5h3v2H2zm0 6h3v2H2zm0 6h3v2H2zM7 5h14v2H7zm0 6h14v2H7zm0 6h14v2H7z" />
+    </svg>
+);
+const LISTS = [
+    { label: "Lista com marcadores", icon: MdFormatListBulleted, prefix: "- " },
+    { label: "Lista com traços", icon: MdFormatListDashed, prefix: "– " },
+    { label: "Lista numerada", icon: MdFormatListNumbered, prefix: "1. " },
+    { label: "Lista de tarefas", icon: MdChecklist, prefix: "- [ ] " },
+];
+// className styles the row; menu is the same look one step smaller so the four fit in one line.
+const HEADINGS = [
+    { label: "Título", prefix: "# ", className: "text-xl font-semibold text-light-text-color-primary", menu: "text-lg font-semibold" },
+    { label: "Cabeçalho", prefix: "## ", className: "text-lg font-semibold text-light-text-color-primary", menu: "text-base font-semibold" },
+    { label: "Subtítulo", prefix: "### ", className: "text-base font-medium text-light-text-color-primary", menu: "text-sm font-medium" },
+    { label: "Corpo", prefix: "", className: "", menu: "text-xs" },
+];
+const headingClass = (hashes) => HEADINGS.find((h) => h.prefix.trim() === hashes)?.className ?? "";
+// Inline styles are the browser's own editing commands on the focused row (Ctrl+B/I/U work too).
+const STYLES = [
+    { label: "Negrito", icon: MdFormatBold, command: "bold" },
+    { label: "Itálico", icon: MdFormatItalic, command: "italic" },
+    { label: "Sublinhado", icon: MdFormatUnderlined, command: "underline" },
+    { label: "Tachado", icon: MdFormatStrikethrough, command: "strikeThrough" },
+];
+
+const parseLine = (line) => {
+    const m = line.match(MARKER);
+    if (!m) return { marker: "", text: line };
+    return { marker: m[0], text: line.slice(m[0].length), indent: m[1], number: m[2], heading: m[3], check: m[4], done: m[4] !== undefined && m[4] !== " " };
+};
+
+// The marker the next item gets when Enter is pressed on this line. A heading is followed by body text.
+const nextMarker = ({ marker, indent, number, heading }) => (heading ? "" : number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]"));
+
+// Caret helpers: rows are contentEditable, so positions are text offsets inside the row's HTML.
+const pointAt = (el, offset) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+        if (offset <= node.length) return [node, offset];
+        offset -= node.length;
+    }
+    return [el, el.childNodes.length];
+};
+const setSelection = (el, start, end = start) => {
+    const range = document.createRange();
+    range.setStart(...pointAt(el, start));
+    range.setEnd(...pointAt(el, end));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+};
+const selectionIn = (el) => {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+    const range = sel.getRangeAt(0);
+    const before = range.cloneRange();
+    before.selectNodeContents(el);
+    before.setEnd(range.startContainer, range.startOffset);
+    const start = before.toString().length;
+    return [start, start + range.toString().length];
+};
+// The row's HTML before and after the selection, each keeping its enclosing <b>/<i>/... tags.
+const splitAt = (el) => {
+    const range = window.getSelection().getRangeAt(0);
+    const html = (from, to) => {
+        const part = document.createRange();
+        part.selectNodeContents(el);
+        if (from) part.setStart(...from);
+        if (to) part.setEnd(...to);
+        const box = document.createElement("div");
+        box.appendChild(part.cloneContents());
+        return sanitize(box.innerHTML);
+    };
+    return [html(null, [range.startContainer, range.startOffset]), html([range.endContainer, range.endOffset], null)];
+};
+
+const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     const [title, setTitle] = useState(note?.title ?? "");
     const [category, setCategory] = useState(note?.category ?? "");
     const [content, setContent] = useState(note?.content ?? "");
 
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === "Escape") onClose();
-        };
+    // Play the exit animation, then let Home unmount the editor (100ms = animate-pop-out).
+    const [closing, setClosing] = useState(false);
+    const close = () => { setClosing(true); setTimeout(onClose, 100); };
 
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [onClose]);
+    const lastSaved = useRef(note ? JSON.stringify({ title: note.title ?? "", category: note.category ?? "", content: note.content ?? "" }) : EMPTY);
+    const pending = useRef(null);
+    const onSaveRef = useRef(onSave);
+    onSaveRef.current = onSave;
 
-    const isEmpty = !title.trim() && !content.trim();
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (isEmpty) return;
-        onSave({ title: title.trim(), category: category.trim(), content });
+    const flush = () => {
+        if (!pending.current) return;
+        lastSaved.current = JSON.stringify(pending.current);
+        onSaveRef.current(pending.current);
+        pending.current = null;
     };
 
+    // Autosave: debounce edits, and flush whatever is left when the editor closes.
+    useEffect(() => {
+        const fields = { title: title.trim(), category: category.trim(), content };
+        const json = JSON.stringify(fields);
+        // A brand-new note isn't created until it has some text.
+        if (json === lastSaved.current || (lastSaved.current === EMPTY && !fields.title && !plain(content).trim())) {
+            pending.current = null;
+            return;
+        }
+        pending.current = fields;
+        const timeout = setTimeout(flush, 600);
+        return () => clearTimeout(timeout);
+    }, [title, category, content]);
+
+    useEffect(() => () => flush(), []);
+
+    // Undo/redo history: every edit is its own step.
+    const [history, setHistory] = useState({ stack: [{ title, category, content }], i: 0 });
+    useEffect(() => {
+        setHistory(({ stack, i }) => {
+            const cur = stack[i];
+            if (cur.title === title && cur.category === category && cur.content === content) return { stack, i };
+            return { stack: [...stack.slice(0, i + 1), { title, category, content }], i: i + 1 };
+        });
+    }, [title, category, content]);
+    const go = (step) => {
+        const i = history.i + step;
+        const snap = history.stack[i];
+        if (!snap) return;
+        setHistory({ ...history, i });
+        setTitle(snap.title);
+        setCategory(snap.category);
+        setContent(snap.content);
+    };
+
+    // The body is one contentEditable row per line so list markers can render as real UI (circle checkboxes,
+    // bullets, numbers) and inline styles show as they are.
+    const lines = content.split("\n");
+    const rows = useRef([]);
+    const bodyRef = useRef(null);
+
+    // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
+    // (Enter, Backspace merges, list toggles, rows shifting under an inserted line).
+    useLayoutEffect(() => {
+        lines.forEach((raw, index) => {
+            const el = rows.current[index];
+            const { text } = parseLine(raw);
+            if (el && sanitize(el.innerHTML) !== text) el.innerHTML = text;
+        });
+    });
+    const activeRow = useRef(0);
+    const focusAfterRender = useRef(null);
+    const update = (nextLines, focus) => {
+        setContent(nextLines.join("\n"));
+        focusAfterRender.current = focus;
+    };
+    useLayoutEffect(() => {
+        if (!focusAfterRender.current) return;
+        const { index, caret } = focusAfterRender.current;
+        focusAfterRender.current = null;
+        const el = rows.current[index];
+        if (!el) return;
+        el.focus();
+        setSelection(el, caret);
+    });
+
+    const setLineText = (index, html) => {
+        const next = [...lines];
+        next[index] = parseLine(lines[index]).marker + html;
+        setContent(next.join("\n"));
+    };
+
+    // Only the box the user just checked animates, not ones that open already checked.
+    const [justChecked, setJustChecked] = useState(null);
+    const toggleCheck = (index) => {
+        setJustChecked(index);
+        const next = [...lines];
+        const { done } = parseLine(lines[index]);
+        next[index] = lines[index].replace(/\[[ xX]\]/, done ? "[ ]" : "[x]");
+        setContent(next.join("\n"));
+    };
+
+    // Toggle a list marker on the focused line, keeping the caret where it is.
+    const applyList = (prefix) => {
+        const index = activeRow.current;
+        const { marker, text } = parseLine(lines[index]);
+        const next = [...lines];
+        next[index] = (marker === prefix ? "" : prefix) + text;
+        update(next, { index, caret: selectionIn(rows.current[index])?.[0] ?? plain(text).length });
+        setMenuOpen(null);
+    };
+
+    // The toolbar keeps the row focused, so the command applies to its selection (or to what is typed next).
+    const applyStyle = (command) => {
+        const index = activeRow.current;
+        document.execCommand("styleWithCSS", false, false);
+        document.execCommand(command);
+        setLineText(index, sanitize(rows.current[index].innerHTML));
+        setMenuOpen(null);
+    };
+
+    const moveTo = (index, caret) => {
+        const el = rows.current[index];
+        el.focus();
+        setSelection(el, caret);
+    };
+
+    const onKeyDown = (e, index) => {
+        const el = e.currentTarget;
+        const line = parseLine(lines[index]);
+        const next = [...lines];
+        const [start, end] = selectionIn(el) ?? [0, 0];
+        const length = plain(line.text).length;
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (line.marker && !length) {
+                // Enter on an empty item ends the list.
+                next[index] = "";
+                return update(next, { index, caret: 0 });
+            }
+            const [before, after] = splitAt(el);
+            next[index] = line.marker + before;
+            next.splice(index + 1, 0, (line.marker ? nextMarker(line) : "") + after);
+            update(next, { index: index + 1, caret: 0 });
+        } else if (e.key === "Backspace" && start === 0 && end === 0) {
+            if (line.marker) {
+                e.preventDefault();
+                next[index] = line.text;
+                update(next, { index, caret: 0 });
+            } else if (index > 0) {
+                e.preventDefault();
+                const prevText = parseLine(lines[index - 1]).text;
+                next[index - 1] = lines[index - 1] + line.text;
+                next.splice(index, 1);
+                update(next, { index: index - 1, caret: plain(prevText).length });
+            }
+        } else if (e.key === "ArrowUp" && start === 0 && index > 0) {
+            e.preventDefault();
+            moveTo(index - 1, plain(parseLine(lines[index - 1]).text).length);
+        } else if (e.key === "ArrowDown" && start === length && index < lines.length - 1) {
+            e.preventDefault();
+            moveTo(index + 1, 0);
+        }
+    };
+
+    // Pasted text comes in plain; each of its lines becomes a row.
+    const onPaste = (e, index) => {
+        e.preventDefault();
+        const parts = e.clipboardData.getData("text/plain").split(/\r?\n/).map(escapeHtml);
+        const [before, after] = splitAt(e.currentTarget);
+        const line = parseLine(lines[index]);
+        const next = [...lines];
+        const last = parts.length - 1;
+        next.splice(index, 1, line.marker + before + parts[0], ...parts.slice(1, last), ...(last ? [parts[last] + after] : []));
+        if (!last) next[index] += after;
+        update(next, { index: index + last, caret: plain(last ? parts[last] : before + parts[0]).length });
+    };
+
+    // Toolbar shows while a row is focused, pinned just above the keyboard on phones.
+    const [focused, setFocused] = useState(false);
+    // Stays true after blur until the slide-down finishes, then the toolbar unmounts.
+    const [toolbarShown, setToolbarShown] = useState(false);
+    if (focused && !toolbarShown) setToolbarShown(true);
+    const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
+    // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus).
+    const toolbarRef = useRef(null);
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onDown = (e) => { if (!toolbarRef.current?.contains(e.target)) setMenuOpen(null); };
+        document.addEventListener("pointerdown", onDown);
+        return () => document.removeEventListener("pointerdown", onDown);
+    }, [menuOpen]);
+    const [bottom, setBottom] = useState(0);
+    useEffect(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+        const update = () => setBottom(Math.max(0, window.innerHeight - viewport.offsetTop - viewport.height));
+        update();
+        viewport.addEventListener("resize", update);
+        viewport.addEventListener("scroll", update);
+        return () => {
+            viewport.removeEventListener("resize", update);
+            viewport.removeEventListener("scroll", update);
+        };
+    }, []);
+    // Wait a tick on blur so moving between rows doesn't flicker the toolbar.
+    // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
+    const [typing, setTyping] = useState(false);
+    const isField = (el) => el?.matches("input, textarea, [contenteditable]") ?? false;
+    const onBlur = () => setTimeout(() => {
+        if (!rows.current.includes(document.activeElement)) { setFocused(false); setMenuOpen(null); }
+    }, 0);
+
+    // Lock the dashboard scroll while the editor is open.
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, []);
+
     return (
-        <div className="fixed inset-0 z-[60] grid place-items-center px-4 bg-black/20" onMouseDown={onClose}>
-            <form
-                onSubmit={handleSubmit}
-                onMouseDown={(e) => e.stopPropagation()}
-                className="bg-white rounded-3xl shadow-md w-full max-w-[600px] max-h-[90vh] flex flex-col px-6 md:px-8 py-6">
+        // pb-[43px]: the card ends at the toolbar's middle (12px offset + half its 62px height).
+        <div className={`fixed inset-0 z-[60] flex justify-center px-4 pt-[2vh] pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}>
+            <div
+                onFocus={(e) => setTyping(isField(e.target))}
+                onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary rounded-3xl shadow-md w-full max-w-[736px] flex flex-col px-6 md:px-8 py-6`}>
 
                 <div className="flex items-center justify-between gap-2">
                     <input
@@ -40,9 +325,25 @@ const NoteEditor = ({ note, categories, saving, error, onSave, onDelete, onClose
                         className="font-medium text-lg outline-none w-full"
                     />
 
-                    <button type="button" onClick={onClose} className="text-xl text-[#888] hover:text-slate-950 shrink-0" aria-label="Fechar">
-                        <IoMdClose />
-                    </button>
+                    {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). */}
+                    {[[-1, "Desfazer", MdUndo, history.i === 0], [1, "Refazer", MdRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
+                        <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => go(step)} disabled={off} aria-label={label} title={label}
+                            className="w-8 h-8 grid place-items-center rounded-full text-2xl shrink-0 text-light-text-color-tertiary transition-[transform,background-color,color] duration-150 hover:bg-light-bg-color-secondary hover:text-light-text-color-primary active:scale-90 disabled:opacity-30 disabled:pointer-events-none">
+                            <Icon />
+                        </button>
+                    ))}
+
+                    {typing ? (
+                        // onMouseDown preventDefault: blurring on press would swap this back to the X before the click lands.
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.activeElement?.blur()} aria-label="Concluir"
+                            className="w-7 h-7 shrink-0 rounded-full grid place-items-center text-base bg-[var(--primary-color)] text-[var(--primary-color-fg)]">
+                            <IoMdCheckmark />
+                        </button>
+                    ) : (
+                        <button type="button" onClick={close} disabled={closing} className="text-2xl text-light-text-color-tertiary hover:text-light-text-color-primary shrink-0 p-0.5" aria-label="Fechar">
+                            <IoMdClose />
+                        </button>
+                    )}
                 </div>
 
                 <input
@@ -50,36 +351,95 @@ const NoteEditor = ({ note, categories, saving, error, onSave, onDelete, onClose
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="Categoria"
                     list="note-categories"
-                    className="text-sm bg-[#f3f3f3] rounded-full px-4 py-1 mt-3 w-[180px] outline-none"
+                    className="text-sm bg-light-bg-color-secondary rounded-full px-4 py-1 mt-3 w-[180px] outline-none"
                 />
                 <datalist id="note-categories">
                     {categories.map((c) => <option key={c} value={c} />)}
                 </datalist>
 
-                <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Escreva sua nota..."
-                    className="text-sm text-slate-700 mt-4 min-h-[240px] flex-1 resize-none outline-none"
-                />
-
-                <p className="text-red-500 text-sm mt-2">&nbsp;{error}</p>
-
-                <div className="flex items-center justify-between mt-2">
-                    {note ? (
-                        <button type="button" onClick={onDelete} disabled={saving} className="flex items-center gap-2 text-sm text-red-600 hover:opacity-70">
-                            <BsTrash3 /> Excluir
-                        </button>
-                    ) : <span />}
-
-                    <button
-                        type="submit"
-                        disabled={saving || isEmpty}
-                        className="bg-primary rounded-full px-8 py-2 font-semibold text-white border-2 border-transparent hover:border-primary hover:bg-transparent hover:text-primary duration-300 disabled:opacity-50 disabled:pointer-events-none">
-                        {saving ? "SALVANDO..." : "SALVAR"}
-                    </button>
+                <div
+                    ref={bodyRef}
+                    className="text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto cursor-text"
+                    // Keep the last rows reachable above the toolbar (and the keyboard on phones).
+                    style={{ paddingBottom: bottom + (focused ? 16 : 0), scrollPaddingBottom: bottom + (focused ? 16 : 0) }}
+                    onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
+                    {lines.map((raw, index) => {
+                        const line = parseLine(raw);
+                        return (
+                            <div key={index} className={`flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
+                                {line.check !== undefined && (
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
+                                        className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
+                                        {line.done && (
+                                            // The card preview's IoMdCheckmark traced as a stroke, so it can draw in.
+                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1">
+                                                <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={justChecked === index ? "animate-check-draw" : ""} />
+                                            </svg>
+                                        )}
+                                    </button>
+                                )}
+                                {line.marker && line.check === undefined && !line.heading && (
+                                    <span className="w-[18px] shrink-0 text-center">{line.number ? `${line.number}.` : line.marker.includes("–") ? "–" : "•"}</span>
+                                )}
+                                <div className={`relative flex-1 min-w-0 transition-opacity duration-300 ${line.done ? "opacity-60" : ""}`}>
+                                <div
+                                    role="textbox"
+                                    contentEditable
+                                    suppressContentEditableWarning
+                                    ref={(el) => { rows.current[index] = el; }}
+                                    data-placeholder={index === 0 && lines.length === 1 ? "Escreva sua nota..." : undefined}
+                                    // Chrome leaves a <br> in an emptied row; clear it so the placeholder (:empty) shows again.
+                                    onInput={(e) => { if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
+                                    onKeyDown={(e) => onKeyDown(e, index)}
+                                    onPaste={(e) => onPaste(e, index)}
+                                    onFocus={() => { activeRow.current = index; setFocused(true); }}
+                                    onBlur={onBlur}
+                                    className={`block w-full outline-none whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
+                                />
+                                {/* An invisible copy of the text over the row, whose background draws the strike line. */}
+                                {line.check !== undefined && (
+                                    <div aria-hidden className="strike absolute inset-0 pointer-events-none whitespace-pre-wrap break-words">
+                                        <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: line.text }} />
+                                    </div>
+                                )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-            </form>
+
+                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+            </div>
+
+            {toolbarShown && (
+                // onMouseDown preventDefault keeps the row focused (and the keyboard open).
+                <div className={`fixed left-0 right-0 z-10 flex justify-center px-2 ${focused ? "animate-slide-up" : "animate-slide-down"}`} style={{ bottom: bottom + 12 }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onAnimationEnd={(e) => { if (e.target === e.currentTarget && !focused) setToolbarShown(false); }}>
+                    <div ref={toolbarRef} className="relative w-full max-w-[375px] border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full shadow-lg gap-1">
+                        {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
+                            <button key={id} type="button" onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-light-bg-color-secondary"}`}>
+                                <Icon />
+                            </button>
+                        ))}
+                        {menuOpen && (
+                            // The heading menu spans the toolbar so its four labels fit one line on phones.
+                            <div className={`flex absolute left-0 bottom-full mb-2 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in ${menuOpen === "heading" ? "right-0" : ""}`}>
+                                {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
+                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} className="text-2xl py-3 px-5 bg-light-bg-color-secondary hover:opacity-70"><Icon /></button>
+                                ))}
+                                {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
+                                    <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} className="text-2xl py-3 px-5 bg-light-bg-color-secondary hover:opacity-70"><Icon /></button>
+                                ))}
+                                {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
+                                    <button key={prefix} type="button" onClick={() => applyList(prefix)} className={`flex-1 py-3 px-2 bg-light-bg-color-secondary hover:opacity-70 whitespace-nowrap ${menu}`}>{label}</button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

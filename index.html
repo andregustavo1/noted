@@ -5,6 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual" />
     <title>FavNotes</title>
+    <script>
+      // Apply the saved primary color before render so the + button doesn't flash.
+      try {
+        const root = document.documentElement.style;
+        const bg = localStorage.getItem("primaryColor");
+        const fg = localStorage.getItem("primaryColorFg");
+        if (bg) root.setProperty("--primary-color", bg);
+        if (fg) root.setProperty("--primary-color-fg", fg);
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

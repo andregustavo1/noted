@@ -1,23 +1,82 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer bbase {
+@layer base {
+    :root {
+        --primary-color: #00ff00;
+        --primary-color-fg: #000;
+
+        --light-text-color-primary: #000000;
+        --light-text-color-secondary: #222222;
+        --light-text-color-tertiary: #333555;
+
+        --light-bg-color-primary: #ffffff;
+        --light-bg-color-secondary: #f3f3f3;
+        --light-bg-color-tertiary: #dcdcdc;
+
+        --dark-text-color-primary: #ffffff;
+        --dark-text-color-secondary: #f3f3f3;
+        --dark-text-color-tertiary: #dcdcdc;
+
+        --dark-bg-color-primary: #111111;
+        --dark-bg-color-secondary: #222222;
+        --dark-bg-color-tertiary: #444444;
+    }
+
     html {
-        font-family: "poppins", "sans-serif";
+        font-family: "Roboto Mono", monospace;
         scrollbar-width:none;
-        scrollbar-color: #888 #f1f1f1;
     }
 
     body {
-        background-color: #f3f3f3;
+        background-color: var(--light-bg-color-secondary);
         overflow-x: clip;
+    }
+
+    /* Overlay-style scrollbar: thin translucent pill, no track, grows on hover */
+    @supports not selector(::-webkit-scrollbar) {
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: rgb(0 0 0 / 0.25) transparent;
+        }
+    }
+
+    ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: rgb(0 0 0 / 0.22);
+        background-clip: padding-box;
+        border: 4px solid transparent;
+        border-radius: 999px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: rgb(0 0 0 / 0.4);
+        border-width: 3px;
+    }
+
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+        background: transparent;
     }
 }
 
 @layer components {
+    .no-scrollbar {
+        scrollbar-width: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
     
 }
 
@@ -30,4 +89,98 @@ input[type="password"]::-ms-clear,
 input[type="password"]::-webkit-clear-button, 
 input[type="password"]::-webkit-inner-spin-button {
     display: none;
+}
+
+/* Cards glide to their new slot when the list reorders (pin, delete, duplicate); Home.jsx starts the transition
+   and names the cards only while it runs. Runs under prefers-reduced-motion too: the movement is what keeps
+   the list legible, and the alternative is cards teleporting with a crossfade. */
+.reordering .note-card {
+    view-transition-name: var(--vt);
+}
+
+::view-transition-group(*) {
+    animation-duration: 300ms;
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* The page around the cards doesn't change, so skip its crossfade. */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+}
+
+/* A card that changes size (pin/unpin) morphs its box while the content keeps its real size and is revealed,
+   instead of the old snapshot being stretched into a ghost. */
+::view-transition-image-pair(*) {
+    overflow: clip;
+    border-radius: 1.5rem;
+}
+
+::view-transition-image-pair(root) {
+    overflow: visible;
+    border-radius: 0;
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+    height: 100%;
+    object-fit: none;
+    object-position: top left;
+}
+
+/* A card that only exists after (duplicate) or before (delete) pops like the editor does. */
+::view-transition-new(*):only-child {
+    animation-name: pop-in;
+}
+
+::view-transition-old(*):only-child {
+    animation-name: pop-out;
+}
+
+/* Checked-task strike line: the text is hidden, its background is a thin line that grows left to right,
+   wrapping line by line. Transitions don't run on mount, so notes that open already checked don't animate.
+   .strike-done is the same line, already drawn, for the card previews. */
+.strike {
+    -webkit-text-fill-color: transparent;
+}
+
+.strike span,
+.strike-done {
+    background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 0 1.5px;
+    transition: background-size 350ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.strike span.done,
+.strike-done {
+    background-size: 100% 1.5px;
+}
+
+/* Raised a touch on the cards, where the editor's 55% reads low. */
+.strike-done {
+    background-position-y: 55%;
+}
+
+/* contentEditable rows have no placeholder of their own. */
+[data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Editor toolbar rises from below the screen (or the keyboard) when a row gets focus. */
+@keyframes slide-up {
+    from { transform: translateY(calc(100% + 12px)); }
+}
+
+.animate-slide-up {
+    animation: slide-up 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Leaves faster than it arrives; forwards keeps it offscreen until NoteEditor unmounts it. */
+@keyframes slide-down {
+    to { transform: translateY(calc(100% + 12px)); }
+}
+
+.animate-slide-down {
+    animation: slide-down 150ms cubic-bezier(0.55, 0, 1, 0.45) forwards;
 }

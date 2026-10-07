@@ -259,8 +259,8 @@ const Login = () => {
         <Navbar />
 
         <div className="px-4 mb-4 md:my-10 max-w-[450px] mx-auto md:max-w-[768px]">
-            <div className="bg-white rounded-lg custom-shadow h-[calc(var(--login-vh,100svh)-5.5rem)] min-h-[584px] max-h-[748px] md:h-[748px] overflow-hidden relative flex justify-between">
-                <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white z-10 duration-500 ease-in-out">
+            <div className="bg-light-bg-color-primary rounded-lg custom-shadow h-[calc(var(--login-vh,100svh)-5.5rem)] min-h-[584px] max-h-[748px] md:h-[748px] overflow-hidden relative flex justify-between">
+                <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-light-bg-color-primary z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
                         <h1 className="font-bold text-2xl md:text-3xl text-center">Entrar</h1>
 
@@ -268,7 +268,7 @@ const Login = () => {
                             type="email"
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="bg-slate-100 mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="bg-light-bg-color-secondary mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);
@@ -302,7 +302,7 @@ const Login = () => {
 
                         <p className="mt-4">Ainda não tem uma conta?</p>
 
-                        <button id="signup" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-white hover:text-primary duration-300">CRIAR CONTA</button>
+                        <button id="signup" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary duration-300">CRIAR CONTA</button>
                     </div>
                 </div>
 
@@ -312,11 +312,11 @@ const Login = () => {
 
                         <p className="mt-4">Já tem uma conta?</p>
 
-                        <button id="sigin" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-white hover:text-primary duration-300">ENTRAR</button>
+                        <button id="sigin" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary duration-300">ENTRAR</button>
                     </div>
                 </div>
 
-                <div id="panel-white-signup" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-white translate-y-[50%] md:translate-y-[0] md:translate-x-[50%] duration-500 ease-in-out opacity-0">
+                <div id="panel-white-signup" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-light-bg-color-primary translate-y-[50%] md:translate-y-[0] md:translate-x-[50%] duration-500 ease-in-out opacity-0">
                     <form noValidate onSubmit={handleSignUp} className="grid place-items-center">
                         <h1 className="font-bold text-2xl md:text-3xl text-center">Crie uma conta</h1>
 
@@ -324,7 +324,7 @@ const Login = () => {
                             type="email"
                             autoComplete="email"
                             placeholder="E-mail"
-                            className="input-box bg-slate-100 mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
+                            className="input-box bg-light-bg-color-secondary mt-4 md:mt-6 w-[280px] px-4 py-2 rounded-sm outline-none"
                             value={email}
                             onChange={(e) => {
                                 setEmail(e.target.value);

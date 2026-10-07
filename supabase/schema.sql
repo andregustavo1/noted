@@ -13,16 +13,21 @@ create table if not exists public.notes (
     updated_at timestamptz not null default now()
 );
 
+-- Card color on the dashboard ('' = white).
+alter table public.notes add column if not exists color text not null default '';
+
 create index if not exists notes_user_id_idx on public.notes (user_id);
 
--- Keep updated_at current on every edit.
+-- Keep updated_at current on content edits; color/pin changes keep the note's place in the list.
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
-    new.updated_at = now();
+    if (new.title, new.content, new.category) is distinct from (old.title, old.content, old.category) then
+        new.updated_at = now();
+    end if;
     return new;
 end;
 $$;

@@ -33,7 +33,7 @@ const App = () => {
         return (
             <div className="max-w-[480px] mx-auto px-4 py-20 text-center">
                 <h1 className="text-2xl font-bold">Supabase não configurado</h1>
-                <p className="mt-4 text-slate-700">
+                <p className="mt-4 text-light-text-color-secondary">
                     Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nas variáveis de ambiente.
                 </p>
             </div>

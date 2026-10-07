@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-const FIELDS = "id, title, content, category, is_pinned, created_at, updated_at";
+const FIELDS = "id, title, content, category, color, is_pinned, created_at, updated_at";
 
 export const fetchNotes = async () => {
     const { data, error } = await supabase
@@ -13,10 +13,10 @@ export const fetchNotes = async () => {
     return data;
 };
 
-export const createNote = async ({ title, content, category, is_pinned = false }) => {
+export const createNote = async ({ title, content, category, color = "", is_pinned = false }) => {
     const { data, error } = await supabase
         .from("notes")
-        .insert({ title, content, category, is_pinned })
+        .insert({ title, content, category, color, is_pinned })
         .select(FIELDS)
         .single();
 

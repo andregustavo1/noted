@@ -16,14 +16,14 @@ const PasswordInput = ({ value, onChange, placeholder }) => {
                 onChange={onChange}
                 type={isShowPassword ? "text" : "password"}
                 placeholder={placeholder || "Senha"}
-                className="bg-slate-100 w-[280px] px-4 py-2 rounded-sm outline-none"
+                className="bg-light-bg-color-secondary w-[280px] px-4 py-2 rounded-sm outline-none"
             />
 
             {isShowPassword ? (<IoMdEye 
                 className="text-red-500 cursor-pointer absolute right-0 text-xl mr-4 select-none"
                 onClick={() => toggleShowPassword()}
             />) : (<IoMdEyeOff 
-                className="text-[#888] cursor-pointer absolute right-0 text-xl mr-4 select-none"
+                className="text-light-text-color-tertiary cursor-pointer absolute right-0 text-xl mr-4 select-none"
                 onClick={() => toggleShowPassword()}
             />)}
         </div>
