@@ -239,6 +239,8 @@ const Home = () => {
     const handleDelete = async (note) => {
         setPendingDelete(null);
         try {
+            // Let an autosave still in flight (deleting from the open editor) land first, so it can't fail on a deleted note.
+            await saveQueue.current;
             await deleteNote(note.id);
             animateNotes(() => setNotes((prev) => prev.filter((n) => n.id !== note.id)));
             setEditor(null);
@@ -420,9 +422,15 @@ const Home = () => {
             {editor && (
                 <NoteEditor
                     note={editor.note}
+                    saved={notes.find((n) => n.id === editorNoteId.current) ?? null}
                     error={editorError}
                     onSave={handleSave}
                     onClose={closeEditor}
+                    onPin={handlePin}
+                    onCategory={(note) => openDialog({ type: "pick", note })}
+                    onDuplicate={handleDuplicate}
+                    onDelete={setPendingDelete}
+                    onMessage={setMessage}
                 />
             )}
 
