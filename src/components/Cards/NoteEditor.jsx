@@ -285,13 +285,18 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
         };
     }, [menuOpen]);
     const [, rerender] = useState(0);
-    // The overlay tracks the visual viewport: on phones the keyboard only shrinks and pans that (the layout viewport
-    // stays full height, especially in an iOS home-screen app), so the close button and toolbar would otherwise drift off screen.
-    const [vv, setVv] = useState(() => ({ height: window.visualViewport?.height ?? window.innerHeight, top: window.visualViewport?.offsetTop ?? 0 }));
+    // The overlay is sized to the visual viewport while typing: on phones the keyboard only shrinks that (the layout
+    // viewport stays full height, especially in an iOS home-screen app), so the toolbar would otherwise end up under it.
+    const [vvHeight, setVvHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight);
     useEffect(() => {
         const viewport = window.visualViewport;
         if (!viewport) return;
-        const update = () => setVv({ height: viewport.height, top: viewport.offsetTop });
+        const update = () => {
+            setVvHeight(viewport.height);
+            // iOS pans the whole page to reveal the focused row (the dashboard shows through and the screen jumps).
+            // Undo it: the overlay already fits the visible area and the row is scrolled into view inside it instead.
+            window.scrollTo(0, 0);
+        };
         update();
         viewport.addEventListener("resize", update);
         viewport.addEventListener("scroll", update);
@@ -303,7 +308,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
     // Keep the caret's row inside the resized overlay after the keyboard moves the viewport.
     useEffect(() => {
         if (focused) rows.current[activeRow.current]?.scrollIntoView({ block: "nearest" });
-    }, [vv, focused]);
+    }, [vvHeight, focused]);
     // Wait a tick on blur so moving between rows doesn't flicker the toolbar.
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
     const [typing, setTyping] = useState(false);
@@ -334,7 +339,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
         <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] bg-black/20 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
             // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
-            style={{ height: typing ? vv.height : "var(--app-height, 100dvh)", transform: `translateY(${typing ? vv.top : 0}px)` }}>
+            style={{ height: typing ? vvHeight : "var(--app-height, 100dvh)" }}>
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
@@ -420,7 +425,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                                     onInput={(e) => { if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
                                     onKeyDown={(e) => onKeyDown(e, index)}
                                     onPaste={(e) => onPaste(e, index)}
-                                    onFocus={() => { activeRow.current = index; setFocused(true); }}
+                                    onFocus={(e) => { activeRow.current = index; setFocused(true); e.currentTarget.scrollIntoView({ block: "nearest" }); }}
                                     onBlur={onBlur}
                                     className={`block w-full outline-none whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
                                 />
