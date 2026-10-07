@@ -240,7 +240,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const next = [...lines];
         const [start, end] = selectionIn(el) ?? [0, 0];
         const length = plain(line.text).length;
-        if (e.key === "Enter" || e.key === "Backspace") hideToolbar();
         if (e.key === "Enter") {
             e.preventDefault();
             if (line.marker && !length) {
@@ -278,7 +277,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Pasted text comes in plain; each of its lines becomes a row.
     const onPaste = (e, index) => {
         e.preventDefault();
-        hideToolbar();
         const parts = e.clipboardData.getData("text/plain").split(/\r?\n/).map(escapeHtml);
         const [before, after] = splitAt(e.currentTarget);
         const line = parseLine(lines[index]);
@@ -290,13 +288,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         update(next, { index: index + last, caret: plain(last ? parts[last] : before + parts[0]).length });
     };
 
-    // Toolbar pops up below the focused row while it has focus. Typing hides it until the user taps a line again.
+    // Toolbar pops up below the focused row while it has focus.
     const [focused, setFocused] = useState(false);
-    const [typedSinceTap, setTypedSinceTap] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
-    const toolbarShown = focused && !typedSinceTap;
-    const hideToolbar = () => { setTypedSinceTap(true); setMenuOpen(null); };
-    const showToolbar = () => setTypedSinceTap(false);
+    const toolbarShown = focused;
     // One toolbar for the whole note, moved under the focused row. (A toolbar per row unmounted and remounted on
     // every line change, and iOS left the old one's shadow and menu painted behind as ghosts.)
     const toolbarBoxRef = useRef(null);
@@ -487,7 +482,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     style={{ paddingBottom: focused ? (menuOpen ? 136 : 80) : 0, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the row on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
-                    onClick={(e) => { if (e.target === e.currentTarget) { showToolbar(); rows.current[lines.length - 1]?.focus(); } }}>
+                    onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
                     {lines.map((raw, index) => {
                         const line = parseLine(raw);
                         const icon = line.check !== undefined || (line.marker && !line.number && !line.heading);
@@ -519,12 +514,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     ref={(el) => { rows.current[index] = el; }}
                                     data-placeholder={index === 0 && lines.length === 1 ? "" : undefined}
                                     // Chrome leaves a <br> in an emptied row; clear it so the placeholder (:empty) shows again.
-                                    onInput={(e) => { hideToolbar(); if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
+                                    onInput={(e) => { if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
                                     onKeyDown={(e) => onKeyDown(e, index)}
                                     onPaste={(e) => onPaste(e, index)}
                                     onFocus={() => { activeRow.current = index; setActiveIndex(index); setFocused(true); shrinkForKeyboard(); }}
-                                    // A tap on a line (re)opens the toolbar; focus moved by Enter/Backspace doesn't.
-                                    onClick={showToolbar}
                                     onBlur={onBlur}
                                     // pt/-mt: when a row gets focus with the keyboard up, iOS scrolls the page to center a small element in
                                     // the area above the keyboard, so tapping a lower row jumps the screen. A tall element whose top edge is
