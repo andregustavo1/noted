@@ -146,6 +146,23 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
     const lines = content.split("\n");
     const rows = useRef([]);
     const bodyRef = useRef(null);
+    // Rows are keyed by stable ids so Enter/Backspace/paste can keep the caret in the DOM node that already has focus
+    // (the new line is inserted above it). Moving focus to another node makes iOS re-seat the keyboard and pan the
+    // whole page to it, which is the screen jumping on every line break.
+    const ids = useRef([]);
+    const seq = useRef(0);
+    const keys = lines.map((_, i) => (ids.current[i] ??= ++seq.current));
+    const newId = () => ++seq.current;
+
+    // Scroll the note body (never the page, iOS would pan it) so the row and the toolbar under it are in view.
+    const reveal = (el) => {
+        const box = bodyRef.current;
+        if (!el || !box) return;
+        const pad = parseFloat(box.style.scrollPaddingBottom) || 0;
+        const r = el.getBoundingClientRect(), b = box.getBoundingClientRect();
+        if (r.bottom > b.bottom - pad) box.scrollTop += r.bottom - (b.bottom - pad);
+        else if (r.top < b.top) box.scrollTop -= b.top - r.top;
+    };
 
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
     // (Enter, Backspace merges, list toggles, rows shifting under an inserted line).
@@ -161,6 +178,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
     const update = (nextLines, focus) => {
         setContent(nextLines.join("\n"));
         focusAfterRender.current = focus;
+        if (focus) { activeRow.current = focus.index; setActiveIndex(focus.index); }
     };
     useLayoutEffect(() => {
         if (!focusAfterRender.current) return;
@@ -168,8 +186,9 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
         focusAfterRender.current = null;
         const el = rows.current[index];
         if (!el) return;
-        el.focus();
+        if (document.activeElement !== el) el.focus();
         setSelection(el, caret);
+        reveal(el);
     });
 
     const setLineText = (index, html) => {
@@ -227,6 +246,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
             const [before, after] = splitAt(el);
             next[index] = line.marker + before;
             next.splice(index + 1, 0, (line.marker ? nextMarker(line) : "") + after);
+            ids.current.splice(index, 0, newId()); // the text before the caret goes to a new node above; focus stays put
             update(next, { index: index + 1, caret: 0 });
         } else if (e.key === "Backspace" && start === 0 && end === 0) {
             if (line.marker) {
@@ -238,6 +258,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                 const prevText = parseLine(lines[index - 1]).text;
                 next[index - 1] = lines[index - 1] + line.text;
                 next.splice(index, 1);
+                ids.current.splice(index - 1, 1); // the row above goes away; the focused node takes the merged line
                 update(next, { index: index - 1, caret: plain(prevText).length });
             }
         } else if (e.key === "ArrowUp" && start === 0 && index > 0) {
@@ -259,6 +280,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
         const last = parts.length - 1;
         next.splice(index, 1, line.marker + before + parts[0], ...parts.slice(1, last), ...(last ? [parts[last] + after] : []));
         if (!last) next[index] += after;
+        ids.current.splice(index, 0, ...Array.from({ length: last }, newId));
         update(next, { index: index + last, caret: plain(last ? parts[last] : before + parts[0]).length });
     };
 
@@ -287,16 +309,19 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
     // The overlay is sized to the visual viewport while typing: on phones the keyboard only shrinks that (the layout
     // viewport stays full height, especially in an iOS home-screen app), so the toolbar would otherwise end up under it.
     const [vvHeight, setVvHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight);
+    // The keyboard-free height, kept by index.html (window.innerHeight may stay short in an iOS home-screen app).
+    const appHeight = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-height")) || window.innerHeight;
     useEffect(() => {
         const viewport = window.visualViewport;
         if (!viewport) return;
         const update = () => {
             setVvHeight(viewport.height);
+            const keyboard = appHeight() - viewport.height;
+            if (keyboard > 100 && isField(document.activeElement)) localStorage.setItem("keyboardHeight", Math.round(keyboard));
             // iOS pans the whole page to reveal the focused row (the dashboard shows through and the screen jumps).
             // Undo it: the overlay already fits the visible area and the row is scrolled into view inside it instead.
             window.scrollTo(0, 0);
         };
-        update();
         viewport.addEventListener("resize", update);
         viewport.addEventListener("scroll", update);
         return () => {
@@ -304,9 +329,15 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
             viewport.removeEventListener("scroll", update);
         };
     }, []);
-    // Keep the caret's row inside the resized overlay after the keyboard moves the viewport.
+    // A row got focus and the keyboard is about to come up: shrink the overlay to the last known keyboard height right
+    // away, so by the time iOS looks, the row is already above the keyboard and there is nothing to pan the page to.
+    const shrinkForKeyboard = () => {
+        const keyboard = Number(localStorage.getItem("keyboardHeight"));
+        if (keyboard) setVvHeight((h) => Math.min(h, appHeight() - keyboard));
+    };
+    // Keep the caret's row in view inside the note body whenever the visible area changes.
     useEffect(() => {
-        if (focused) rows.current[activeRow.current]?.scrollIntoView({ block: "nearest" });
+        if (focused) reveal(rows.current[activeRow.current]);
     }, [vvHeight, focused]);
     // Wait a tick on blur so moving between rows doesn't flicker the toolbar.
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
@@ -386,7 +417,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                     {lines.map((raw, index) => {
                         const line = parseLine(raw);
                         return (
-                            <div key={index} className={`relative flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
+                            <div key={keys[index]} className={`relative flex items-start gap-2 ${index === 0 ? "" : line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5"}`}>
                                 {line.check !== undefined && (
                                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
                                         className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
@@ -412,7 +443,7 @@ const NoteEditor = ({ note, error, onSave, onClose }) => {
                                     onInput={(e) => { if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
                                     onKeyDown={(e) => onKeyDown(e, index)}
                                     onPaste={(e) => onPaste(e, index)}
-                                    onFocus={(e) => { activeRow.current = index; setActiveIndex(index); setFocused(true); e.currentTarget.scrollIntoView({ block: "nearest" }); }}
+                                    onFocus={() => { activeRow.current = index; setActiveIndex(index); setFocused(true); shrinkForKeyboard(); }}
                                     onBlur={onBlur}
                                     className={`block w-full outline-none whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
                                 />
