@@ -3,7 +3,7 @@ import { IoMdCheckmark, IoMdClose } from "react-icons/io";
 import { MdChecklist, MdFormatBold, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdRedo, MdTitle, MdUndo } from "react-icons/md";
 import { escapeHtml, plain, sanitize } from "../../lib/richtext";
 
-const EMPTY = JSON.stringify({ title: "", category: "", content: "" });
+const EMPTY = JSON.stringify({ title: "", content: "" });
 
 // A marker at the start of a line: indent, then "- ", "– ", "- [ ] ", "1. " or "# " (1-3 hashes).
 const MARKER = /^(\s*)(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] )?)/;
@@ -21,10 +21,10 @@ const LISTS = [
 ];
 // className styles the row; menu is the same look one step smaller so the four fit in one line.
 const HEADINGS = [
-    { label: "Título", prefix: "# ", className: "text-xl font-semibold text-light-text-color-primary", menu: "text-lg font-semibold" },
-    { label: "Cabeçalho", prefix: "## ", className: "text-lg font-semibold text-light-text-color-primary", menu: "text-base font-semibold" },
-    { label: "Subtítulo", prefix: "### ", className: "text-base font-medium text-light-text-color-primary", menu: "text-sm font-medium" },
-    { label: "Corpo", prefix: "", className: "", menu: "text-xs" },
+    { label: "Texto", prefix: "# ", className: "text-xl font-semibold text-light-text-color-primary", menu: "text-lg font-semibold" },
+    { label: "Texto", prefix: "## ", className: "text-lg font-semibold text-light-text-color-primary", menu: "text-base font-semibold" },
+    { label: "Texto", prefix: "### ", className: "text-base font-medium text-light-text-color-primary", menu: "text-sm font-medium" },
+    { label: "Texto", prefix: "", className: "", menu: "text-xs" },
 ];
 const headingClass = (hashes) => HEADINGS.find((h) => h.prefix.trim() === hashes)?.className ?? "";
 // Inline styles are the browser's own editing commands on the focused row (Ctrl+B/I/U work too).
@@ -87,16 +87,15 @@ const splitAt = (el) => {
     return [html(null, [range.startContainer, range.startOffset]), html([range.endContainer, range.endOffset], null)];
 };
 
-const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
+const NoteEditor = ({ note, error, onSave, onClose }) => {
     const [title, setTitle] = useState(note?.title ?? "");
-    const [category, setCategory] = useState(note?.category ?? "");
     const [content, setContent] = useState(note?.content ?? "");
 
     // Play the exit animation, then let Home unmount the editor (100ms = animate-pop-out).
     const [closing, setClosing] = useState(false);
     const close = () => { setClosing(true); setTimeout(onClose, 100); };
 
-    const lastSaved = useRef(note ? JSON.stringify({ title: note.title ?? "", category: note.category ?? "", content: note.content ?? "" }) : EMPTY);
+    const lastSaved = useRef(note ? JSON.stringify({ title: note.title ?? "", content: note.content ?? "" }) : EMPTY);
     const pending = useRef(null);
     const onSaveRef = useRef(onSave);
     onSaveRef.current = onSave;
@@ -110,7 +109,7 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
 
     // Autosave: debounce edits, and flush whatever is left when the editor closes.
     useEffect(() => {
-        const fields = { title: title.trim(), category: category.trim(), content };
+        const fields = { title: title.trim(), content };
         const json = JSON.stringify(fields);
         // A brand-new note isn't created until it has some text.
         if (json === lastSaved.current || (lastSaved.current === EMPTY && !fields.title && !plain(content).trim())) {
@@ -120,26 +119,25 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
         pending.current = fields;
         const timeout = setTimeout(flush, 600);
         return () => clearTimeout(timeout);
-    }, [title, category, content]);
+    }, [title, content]);
 
     useEffect(() => () => flush(), []);
 
     // Undo/redo history: every edit is its own step.
-    const [history, setHistory] = useState({ stack: [{ title, category, content }], i: 0 });
+    const [history, setHistory] = useState({ stack: [{ title, content }], i: 0 });
     useEffect(() => {
         setHistory(({ stack, i }) => {
             const cur = stack[i];
-            if (cur.title === title && cur.category === category && cur.content === content) return { stack, i };
-            return { stack: [...stack.slice(0, i + 1), { title, category, content }], i: i + 1 };
+            if (cur.title === title && cur.content === content) return { stack, i };
+            return { stack: [...stack.slice(0, i + 1), { title, content }], i: i + 1 };
         });
-    }, [title, category, content]);
+    }, [title, content]);
     const go = (step) => {
         const i = history.i + step;
         const snap = history.stack[i];
         if (!snap) return;
         setHistory({ ...history, i });
         setTitle(snap.title);
-        setCategory(snap.category);
         setContent(snap.content);
     };
 
@@ -376,18 +374,6 @@ const NoteEditor = ({ note, categories, error, onSave, onClose }) => {
                         </button>
                     )}
                 </div>
-
-                <input
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    placeholder="Categoria"
-                    autoComplete="off"
-                    list="note-categories"
-                    className="text-sm bg-light-bg-color-secondary rounded-full px-4 py-1 mt-3 w-[180px] outline-none"
-                />
-                <datalist id="note-categories">
-                    {categories.map((c) => <option key={c} value={c} />)}
-                </datalist>
 
                 <div
                     ref={bodyRef}
