@@ -54,6 +54,7 @@
     }
 
     .dark body {
+        background-color: var(--dark-bg-color-secondary);
         color: var(--dark-text-color-primary);
     }
 

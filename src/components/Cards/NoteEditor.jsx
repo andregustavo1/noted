@@ -589,7 +589,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     return (
         <>
             {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard. */}
-            <div className={`fixed inset-0 z-[60] bg-light-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
+            <div className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
         <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
@@ -598,7 +598,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6 caret-[var(--primary-color)]`}>
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6 caret-[var(--primary-color)]`}>
 
                 {/* relative z-10: the header's menu opens over the note body. */}
                 <div className="relative z-10 flex items-center justify-between gap-1.5">

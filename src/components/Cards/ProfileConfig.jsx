@@ -73,7 +73,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
 
     return (
         <>
-            <div className="h-full max-w-[100vw] flex flex-col shadow-md pt-4 px-5 bg-light-bg-color-secondary rounded-l-3xl">
+            <div className="h-full max-w-[100vw] flex flex-col shadow-md pt-4 px-5 bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-l-3xl">
                 <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                 {/* pl clears the 40px avatar that slides in over the panel's left padding. */}
                 <div className="grid pl-[52px] pr-2 h-10 min-w-0">
