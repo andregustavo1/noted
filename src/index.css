@@ -113,6 +113,15 @@ input[type="password"]::-webkit-inner-spin-button {
     display: none;
 }
 
+/* Theme switch: for the 200ms after it, every color (text, backgrounds, borders, shadows) moves at the same pace.
+   Other transitions pause for those 200ms (nothing else moves while the panel is open); the switch keeps its own slide. */
+.theme-switching *:not([data-theme-switch], [data-theme-switch] *),
+.theme-switching *::before,
+.theme-switching *::after {
+    transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease, fill 200ms ease,
+        stroke 200ms ease, box-shadow 200ms ease, -webkit-text-fill-color 200ms ease !important;
+}
+
 /* Cards glide to their new slot when the list reorders (pin, delete, duplicate); Home.jsx starts the transition
    and names the cards only while it runs. Runs under prefers-reduced-motion too: the movement is what keeps
    the list legible, and the alternative is cards teleporting with a crossfade. */

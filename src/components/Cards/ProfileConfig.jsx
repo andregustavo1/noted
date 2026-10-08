@@ -103,7 +103,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                     <div className="grid">
                         <p className="font-medium text-lg">Aparência</p>
 
-                        <button type="button" role="switch" aria-checked={dark} aria-label="Tema escuro" onClick={() => setDark((d) => !d)} className={`relative flex w-full gap-1 mt-3 p-1 rounded-full transition-[background-color,box-shadow] duration-300 ${dark ? "bg-dark-bg-color-primary" : "bg-light-bg-color-secondary"}`}
+                        <button type="button" role="switch" data-theme-switch aria-checked={dark} aria-label="Tema escuro" onClick={() => setDark((d) => !d)} className={`relative flex w-full gap-1 mt-3 p-1 rounded-full transition-[background-color,box-shadow] duration-200 ${dark ? "bg-dark-bg-color-primary" : "bg-light-bg-color-secondary"}`}
                             style={{
                                 boxShadow: dark
                                     ? "inset 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.45)"
@@ -116,13 +116,13 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                                 style={{
                                     transform: dark ? "translateX(calc(100% + 4px))" : "translateX(0)",
                                     backgroundColor: dark ? "var(--dark-bg-color-tertiary)" : "var(--light-bg-color-tertiary)",
-                                    transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1), background-color 350ms ease",
+                                    transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1), background-color 200ms ease",
                                 }}
                             />
-                            <span className={`relative flex flex-1 items-center justify-center h-9 transition-colors ${dark ? "text-dark-text-color-tertiary" : "text-light-text-color-primary"}`}>
+                            <span className={`relative flex flex-1 items-center justify-center h-9 transition-colors duration-200 ${dark ? "text-dark-text-color-tertiary" : "text-light-text-color-primary"}`}>
                                 <FiSun size={18} />
                             </span>
-                            <span className={`relative flex flex-1 items-center justify-center h-9 transition-colors ${dark ? "text-dark-text-color-primary" : "text-light-text-color-tertiary"}`}>
+                            <span className={`relative flex flex-1 items-center justify-center h-9 transition-colors duration-200 ${dark ? "text-dark-text-color-primary" : "text-light-text-color-tertiary"}`}>
                                 <FiMoon size={18} />
                             </span>
                         </button>

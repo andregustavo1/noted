@@ -132,8 +132,20 @@ const Home = () => {
         return () => { active = false; };
     }, []);
     // The dark theme only covers the signed-in app (the login stays light), so the class follows this page.
+    // A switch (not the first paint) moves every color at the same 200ms pace; see .theme-switching in index.css.
+    const themeApplied = useRef(false);
     useLayoutEffect(() => {
-        document.documentElement.classList.toggle("dark", settings.theme === "dark");
+        const root = document.documentElement;
+        const dark = settings.theme === "dark";
+        if (!themeApplied.current || root.classList.contains("dark") === dark) {
+            themeApplied.current = true;
+            root.classList.toggle("dark", dark);
+            return;
+        }
+        root.classList.add("theme-switching");
+        root.classList.toggle("dark", dark);
+        const t = setTimeout(() => root.classList.remove("theme-switching"), 200);
+        return () => { clearTimeout(t); root.classList.remove("theme-switching"); };
     }, [settings.theme]);
     const changeSettings = (changes) => {
         const next = { ...settings, ...changes };
