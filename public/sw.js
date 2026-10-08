@@ -1,6 +1,6 @@
 // Noted service worker: keeps the app's own files on the device so it opens without waiting on the network.
 // Only this site's files are handled; Supabase requests (notes, login) always go straight to the network.
-const CACHE = "noted-v1";
+const CACHE = "noted-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
