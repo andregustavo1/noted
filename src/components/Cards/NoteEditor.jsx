@@ -150,13 +150,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const newId = () => ++seq.current;
 
     // Scroll the note body (never the page, iOS would pan it) so the row and the toolbar under it are in view.
+    // The view follows the focus: this runs when the note gets focus (the keyboard then takes part of the screen),
+    // when the caret moves to another row and as a row grows while typing, and it glides there rather than jumping.
+    // Both rects are read as they are now, so a call during a glide just aims the same glide again.
     const reveal = (el) => {
         const box = bodyRef.current;
         if (!el || !box) return;
         const pad = parseFloat(box.style.scrollPaddingBottom) || 0;
         const r = el.parentElement.getBoundingClientRect(), b = box.getBoundingClientRect();
-        if (r.bottom > b.bottom - pad) box.scrollTop += r.bottom - (b.bottom - pad);
-        else if (r.top < b.top) box.scrollTop -= b.top - r.top;
+        let top = box.scrollTop;
+        if (r.bottom > b.bottom - pad) top += r.bottom - (b.bottom - pad);
+        else if (r.top < b.top) top -= b.top - r.top;
+        if (Math.abs(top - box.scrollTop) >= 1) box.scrollTo({ top, behavior: "smooth" });
     };
 
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
@@ -436,8 +441,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const beforeInputRef = useRef(null);
     beforeInputRef.current = onBeforeInput;
     // On every caret move: track the caret's row (the toolbar follows it), keep a collapsed caret inside a row's
-    // text (a tap between rows can drop it on the host, where typing would land outside every row), and refresh
-    // the open menu's highlights.
+    // text (a tap between rows can drop it on the host, where typing would land outside every row), bring the
+    // caret's row into view, and refresh the open menu's highlights.
     const selectionRef = useRef(null);
     selectionRef.current = () => {
         const sel = window.getSelection();
@@ -449,6 +454,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (sel.isCollapsed && tapped !== null && pos[0] !== tapped) return placeTapCaret();
         if (sel.isCollapsed && !rows.current[pos[0]]?.contains(sel.anchorNode)) setSelection(rows.current[pos[0]], pos[1]);
         if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
+        // Only a caret: while a selection is dragged the browser scrolls after the finger, and this would pull back.
+        if (sel.isCollapsed) reveal(rows.current[pos[0]]);
         setSelecting(!sel.isCollapsed);
         if (menuOpen) rerender((n) => n + 1);
     };
@@ -520,7 +527,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const viewport = window.visualViewport;
         if (keyboard && (!viewport || viewport.height > appHeight() - 100)) setVvHeight((h) => Math.min(h, appHeight() - keyboard));
     };
-    // Keep the caret's row in view inside the note body whenever the visible area changes.
+    // Keep the caret's row in view inside the note body when the note gets focus and whenever the visible area
+    // changes (the keyboard coming up or going away).
     useEffect(() => {
         if (focused) reveal(rows.current[activeRow.current]);
     }, [vvHeight, focused]);
@@ -683,7 +691,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         contentEditable
                         suppressContentEditableWarning
                         className="outline-none"
-                        onInput={syncFromDom}
+                        onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
                         onCopy={(e) => onCopy(e, false)}

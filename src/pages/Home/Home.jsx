@@ -12,11 +12,13 @@ import ProfileConfig from "../../components/Cards/ProfileConfig.jsx";
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../../lib/supabase";
 import { getUserName, useAuth } from "../../context/AuthContext";
-import { createNote, deleteNote, fetchNotes, updateNote } from "../../lib/notes";
-import { createCategory, deleteCategory, fetchCategories, renameCategory } from "../../lib/categories";
+import { fetchNotes } from "../../lib/notes";
+import { fetchCategories } from "../../lib/categories";
 import Modal, { ModalButtons } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
-import { applySettings, fetchSettings, readLocalSettings, saveSettings, sortNotes } from "../../lib/settings";
+import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
+import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
+import { flush, flushedSince } from "../../lib/sync";
 
 
 const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
@@ -96,6 +98,18 @@ const ease = (t) => {
     return bez(u, 0, 1);
 };
 
+// Changes land on the device at once and reach Supabase from the queue (lib/queue.js, lib/sync.js): this long after
+// the last change, so a burst (the theme switched twenty times, a note being typed) goes out as one request per
+// note or setting. Also when the connection is back and when the app returns to the foreground; after a failed
+// pass the wait grows up to a minute.
+const FLUSH_DELAY = 1500;
+const FAILURE_MESSAGE = {
+    note: "Não foi possível salvar a nota",
+    deleteNote: "Não foi possível excluir a nota",
+    settings: "Não foi possível salvar as configurações",
+};
+const now = () => new Date().toISOString();
+
 const Home = () => {
     const categoryScroll = useDragScroll();
 
@@ -116,21 +130,126 @@ const Home = () => {
 
     const navigate = useNavigate();
     const { user } = useAuth();
+    const userId = user?.id ?? ""; // RequireAuth only renders Home with a session
 
-    // Settings (color, theme, note order) are kept on the account. The local copy paints first; the account's
-    // version wins once it loads, and an account without any yet gets this device's.
+    const [message, setMessage] = useState("");
+    const [editorError, setEditorError] = useState("");
+    // Id of the note being autosaved (set as soon as a new note is created).
+    const editorNoteId = useRef(null);
+
+    // The notes and categories, from the device's copy first (so the dashboard works offline and paints at once),
+    // then fresh from the server with whatever is still queued laid over them. Every change is written back.
+    const cache = useMemo(() => readCache(userId), [userId]);
+    const [notes, setNotes] = useState(() => cache?.notes ?? []);
+    const [categoryList, setCategoryList] = useState(() => cache?.categories ?? []); // { id, name } rows
+    const loaded = useRef(Boolean(cache)); // something on screen: a failed fetch is then just logged
+    const [loading, setLoading] = useState(!cache);
+    const [loadError, setLoadError] = useState(false);
+    useEffect(() => {
+        if (loaded.current) writeCache(userId, { notes, categories: categoryList });
+    }, [userId, notes, categoryList]);
+
+    const replaceNote = useCallback((saved) => {
+        setNotes((prev) => sortNotes(prev.map((note) => (note.id === saved.id ? saved : note))));
+    }, []);
+
+    const fetchAll = useCallback(async () => {
+        if (!loaded.current) setLoading(true);
+        setLoadError(false);
+        const started = Date.now();
+        try {
+            // Categories are a side dish: if the table is missing (schema.sql not run yet) the names on notes still show.
+            const [fetched, cats] = await Promise.all([fetchNotes(), fetchCategories().catch((e) => { console.error(e); return []; })]);
+            // Changes sent while this was in flight, then the ones still queued, over the server's (older) answer.
+            const applied = applyQueue({ notes: fetched, categories: cats }, [...flushedSince(userId, started), ...readQueue(userId)]);
+            loaded.current = true;
+            setNotes(applied.notes);
+            setCategoryList(applied.categories);
+        } catch (error) {
+            console.error(error);
+            if (!loaded.current) setLoadError(true);
+        }
+        setLoading(false);
+    }, [userId]);
+
+    // One pass over the queue at a time; the result lands in the notes (server timestamps) or as a message.
+    // A pass is given up after a while (a request can hang after iOS suspended the app) and tried again later;
+    // every op is safe to send twice.
+    const flushTimer = useRef(null);
+    const flushing = useRef(null);
+    const retryDelay = useRef(0);
+    const flushNow = useCallback(() => {
+        if (flushing.current) return flushing.current;
+        clearTimeout(flushTimer.current);
+        const gaveUp = new Promise((resolve) => setTimeout(() => resolve({ saved: [], dropped: [], remaining: readQueue(userId).length, offline: true }), 30000));
+        flushing.current = Promise.race([flush(userId), gaveUp])
+            .then(({ saved, dropped, remaining, offline }) => {
+                saved.forEach(replaceNote);
+                dropped.forEach(({ op }) => {
+                    const text = FAILURE_MESSAGE[op.type] ?? "Não foi possível salvar a categoria";
+                    setMessage(text);
+                    if (op.type === "note" && op.id === editorNoteId.current) setEditorError(text);
+                });
+                if (dropped.length) fetchAll(); // back to what the server has
+                if (!remaining) retryDelay.current = 0;
+                else {
+                    retryDelay.current = offline ? Math.min(60000, retryDelay.current ? retryDelay.current * 2 : 5000) : FLUSH_DELAY;
+                    flushTimer.current = setTimeout(() => flushNowRef.current(), retryDelay.current);
+                }
+            })
+            .catch(console.error)
+            .finally(() => { flushing.current = null; });
+        return flushing.current;
+    }, [userId, replaceNote, fetchAll]);
+    const flushNowRef = useRef(flushNow);
+    flushNowRef.current = flushNow;
+    const queueOp = (op) => {
+        writeQueue(userId, addOp(readQueue(userId), op));
+        clearTimeout(flushTimer.current);
+        flushTimer.current = setTimeout(() => flushNowRef.current(), FLUSH_DELAY);
+    };
+
+    // Pending changes first, so the server's answer already has them.
+    const loadNotes = useCallback(async () => {
+        await flushNow();
+        await fetchAll();
+    }, [flushNow, fetchAll]);
+
+    useEffect(() => {
+        loadNotes();
+    }, [loadNotes]);
+
+    // Back online or back in the foreground (a home-screen app keeps running in the background): send what's
+    // queued and pick up what changed elsewhere. Leaving for the background sends what's queued while it can.
+    useEffect(() => {
+        const onOnline = () => { retryDelay.current = 0; loadNotes(); };
+        const onVisibility = () => { if (document.visibilityState === "visible") loadNotes(); else flushNow(); };
+        window.addEventListener("online", onOnline);
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            window.removeEventListener("online", onOnline);
+            document.removeEventListener("visibilitychange", onVisibility);
+            clearTimeout(flushTimer.current);
+        };
+    }, [loadNotes, flushNow]);
+
+    // Settings (color, theme, note order, selected category) are kept on the account. The local copy paints first;
+    // the account's version wins once it loads, unless a change made here hasn't reached it yet, and an account
+    // without any yet gets this device's.
     const [settings, setSettings] = useState(readLocalSettings);
     useEffect(() => {
         let active = true;
+        const started = Date.now();
         fetchSettings()
             .then((remote) => {
-                if (!active) return;
+                if (!active || pendingSettings([...flushedSince(userId, started), ...readQueue(userId)])) return;
                 if (remote) { setSettings(remote); applySettings(remote); }
-                else saveSettings(readLocalSettings()).catch(console.error);
+                else queueOp({ type: "settings", settings: readLocalSettings() });
             })
             .catch(console.error);
         return () => { active = false; };
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]);
     // The dark theme only covers the signed-in app (the login stays light), so the class follows this page.
     useLayoutEffect(() => {
         document.documentElement.classList.toggle("dark", settings.theme === "dark");
@@ -141,41 +260,20 @@ const Home = () => {
         // A new order moves the cards, so let them glide like a pin does.
         if ("sortBy" in changes || "sortDir" in changes) animateNotes(() => setSettings(next));
         else setSettings(next);
-        saveSettings(next).catch((error) => { console.error(error); setMessage("Não foi possível salvar as configurações"); });
+        queueOp({ type: "settings", settings: next });
     };
     const userName = getUserName(user);
 
     const onLogout = async () => {
+        // What's queued goes out if it can; otherwise it waits on the device for this account's next sign-in.
+        await flushNow();
+        clearCache(userId);
         await supabase.auth.signOut();
         navigate("/login", { replace: true });
     };
 
-    const [notes, setNotes] = useState([]);
-    const [categoryList, setCategoryList] = useState([]); // { id, name } rows
-    const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("");
-    const [message, setMessage] = useState("");
-
-    const loadNotes = useCallback(async () => {
-        setLoading(true);
-        setLoadError(false);
-        try {
-            // Categories are a side dish: if the table is missing (schema.sql not run yet) the names on notes still show.
-            const [fetched, cats] = await Promise.all([fetchNotes(), fetchCategories().catch((e) => { console.error(e); return []; })]);
-            setNotes(fetched);
-            setCategoryList(cats);
-        } catch (error) {
-            console.error(error);
-            setLoadError(true);
-        }
-        setLoading(false);
-    }, []);
-
-    useEffect(() => {
-        loadNotes();
-    }, [loadNotes]);
+    const setActiveCategory = (name) => changeSettings({ activeCategory: name });
 
     useEffect(() => {
         if (!message) return;
@@ -229,7 +327,7 @@ const Home = () => {
         return Object.values(byName).sort((a, b) => a.name.localeCompare(b.name));
     }, [notes, categoryList]);
 
-    const currentCategory = categories.some((c) => c.name === activeCategory) ? activeCategory : "";
+    const currentCategory = categories.some((c) => c.name === settings.activeCategory) ? settings.activeCategory : "";
 
     const visibleNotes = useMemo(() => {
         return sortNotes(notes.filter((note) =>
@@ -239,17 +337,12 @@ const Home = () => {
 
     // Editor: null when closed, { note: null } for a new note, { note } to edit one.
     const [editor, setEditor] = useState(null);
-    const [editorError, setEditorError] = useState("");
     const [pendingDelete, setPendingDelete] = useState(null);
     // Long-press menu on a category chip, and the dialog it (or the "+" / card menu) opens.
     const [categoryMenu, setCategoryMenu] = useState(null); // { category, rect }
     const [dialog, setDialog] = useState(null); // { type: "add" } | { type: "rename" | "delete", category } | { type: "pick", note }
     const [dialogName, setDialogName] = useState("");
     const openDialog = (next) => { setCategoryMenu(null); setDialogName(next.category?.name ?? ""); setDialog(next); };
-    // Id of the note being autosaved (set once a new note is created). Saves run one at a
-    // time so a fast second edit can't create the same new note twice.
-    const editorNoteId = useRef(null);
-    const saveQueue = useRef(Promise.resolve());
 
     const openEditor = (note = null) => {
         setEditorError("");
@@ -282,107 +375,69 @@ const Home = () => {
         />
     );
 
-    const replaceNote = (saved) => {
-        setNotes((prev) => sortNotes(prev.map((note) => (note.id === saved.id ? saved : note))));
+    // Every change goes into the notes right away and into the queue for the server.
+    const addNote = ({ title = "", content = "", category = "" }) => {
+        const note = { id: uuid(), title, content, category, color: "", is_pinned: false, created_at: now(), updated_at: now() };
+        setNotes((prev) => sortNotes([note, ...prev]));
+        queueOp({ type: "note", id: note.id, create: true, changes: note });
+        return note;
+    };
+    const changeNote = (id, changes) => {
+        // The server moves updated_at when these change (schema.sql); mirror it so the card takes its new place now.
+        const full = ["title", "content", "category"].some((k) => k in changes) ? { ...changes, updated_at: now() } : changes;
+        setNotes((prev) => sortNotes(prev.map((note) => (note.id === id ? { ...note, ...full } : note))));
+        queueOp({ type: "note", id, changes: full });
     };
 
     const handleSave = (fields) => {
-        saveQueue.current = saveQueue.current.then(async () => {
-            try {
-                if (editorNoteId.current) {
-                    replaceNote(await updateNote(editorNoteId.current, fields));
-                } else {
-                    // A note started while a category is filtered lands in that category, so it stays in view.
-                    const created = await createNote({ ...fields, category: currentCategory });
-                    editorNoteId.current = created.id;
-                    setNotes((prev) => sortNotes([created, ...prev]));
-                }
-                setEditorError("");
-            } catch (error) {
-                console.error(error);
-                setEditorError("Não foi possível salvar a nota");
-                setMessage("Não foi possível salvar a nota");
-            }
-        });
+        if (editorNoteId.current) return changeNote(editorNoteId.current, fields);
+        // A note started while a category is filtered lands in that category, so it stays in view.
+        editorNoteId.current = addNote({ ...fields, category: currentCategory }).id;
     };
 
-    const handleDelete = async (note) => {
+    // A save the closing editor still sends for this note is ignored by the queue (and finds no card to change).
+    const handleDelete = (note) => {
         setPendingDelete(null);
-        try {
-            // Let an autosave still in flight (deleting from the open editor) land first, so it can't fail on a deleted note.
-            await saveQueue.current;
-            await deleteNote(note.id);
-            animateNotes(() => setNotes((prev) => prev.filter((n) => n.id !== note.id)));
-            setEditor(null);
-        } catch (error) {
-            console.error(error);
-            setMessage("Não foi possível excluir a nota");
-        }
+        animateNotes(() => setNotes((prev) => prev.filter((n) => n.id !== note.id)));
+        queueOp({ type: "deleteNote", id: note.id });
+        setEditor(null);
     };
 
-    // Optimistic: the card moves on tap, the server just confirms (pinning doesn't touch updated_at).
-    const handlePin = async (note) => {
-        animateNotes(() => replaceNote({ ...note, is_pinned: !note.is_pinned }));
-        try {
-            replaceNote(await updateNote(note.id, { is_pinned: !note.is_pinned }));
-        } catch (error) {
-            console.error(error);
-            animateNotes(() => replaceNote(note));
-            setMessage("Não foi possível fixar a nota");
-        }
+    // The card moves on tap (pinning doesn't touch updated_at).
+    const handlePin = (note) => {
+        animateNotes(() => changeNote(note.id, { is_pinned: !note.is_pinned }));
     };
 
-    const handleDuplicate = async (note) => {
-        try {
-            const copy = await createNote({
-                title: note.title ? `${note.title} (cópia)` : "",
-                content: note.content,
-                category: note.category,
-            });
-            animateNotes(() => setNotes((prev) => sortNotes([copy, ...prev])));
-        } catch (error) {
-            console.error(error);
-            setMessage("Não foi possível duplicar a nota");
-        }
+    const handleDuplicate = (note) => {
+        animateNotes(() => addNote({ title: note.title ? `${note.title} (cópia)` : "", content: note.content, category: note.category }));
     };
 
-    const handleSetCategory = async (note, category) => {
+    const handleSetCategory = (note, category) => {
         setDialog(null);
         if (category === note.category) return;
-        animateNotes(() => replaceNote({ ...note, category }));
-        try {
-            replaceNote(await updateNote(note.id, { category }));
-        } catch (error) {
-            console.error(error);
-            animateNotes(() => replaceNote(note));
-            setMessage("Não foi possível alterar a categoria");
-        }
+        animateNotes(() => changeNote(note.id, { category }));
     };
 
     // Add / rename / delete a category. The name dialogs submit here; an empty or duplicate name is ignored.
-    const handleCategoryDialog = async () => {
+    const handleCategoryDialog = () => {
         const name = dialogName.trim();
         const { type, category } = dialog;
         setDialog(null);
-        try {
-            if (type === "add") {
-                if (!name || categories.some((c) => c.name === name)) return;
-                const created = await createCategory(name);
-                setCategoryList((prev) => [...prev, created]);
-            } else if (type === "rename") {
-                if (!name || name === category.name || categories.some((c) => c.name === name)) return;
-                await renameCategory(category.id, category.name, name);
-                setCategoryList((prev) => prev.map((c) => (c.name === category.name ? { ...c, name } : c)));
-                setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: name } : n)));
-                if (activeCategory === category.name) setActiveCategory(name);
-            } else if (type === "delete") {
-                await deleteCategory(category.id, category.name);
-                setCategoryList((prev) => prev.filter((c) => c.name !== category.name));
-                setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: "" } : n)));
-            }
-        } catch (error) {
-            console.error(error);
-            setMessage("Não foi possível salvar a categoria");
+        if (type === "add") {
+            if (!name || categories.some((c) => c.name === name)) return;
+            const created = { id: uuid(), name };
+            setCategoryList((prev) => [...prev, created]);
+            queueOp({ type: "createCategory", category: created });
+        } else if (type === "rename") {
+            if (!name || name === category.name || categories.some((c) => c.name === name)) return;
+            setCategoryList((prev) => prev.map((c) => (c.name === category.name ? { ...c, name } : c)));
+            setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: name } : n)));
+            queueOp({ type: "renameCategory", id: category.id, from: category.name, to: name });
+            if (settings.activeCategory === category.name) setActiveCategory(name);
+        } else if (type === "delete") {
+            setCategoryList((prev) => prev.filter((c) => c.name !== category.name));
+            setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: "" } : n)));
+            queueOp({ type: "deleteCategory", id: category.id, name: category.name });
         }
     };
 

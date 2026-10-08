@@ -2,7 +2,8 @@ import { supabase } from "./supabase";
 
 // User settings live on the account (Supabase user_metadata.settings), so every device gets the same ones.
 // localStorage keeps a copy so the page can paint with them before the account loads (see index.html).
-export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", sortBy: "date", sortDir: "desc" };
+// activeCategory is the chip selected on the dashboard, kept so the app reopens on the same one.
+export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", sortBy: "date", sortDir: "desc", activeCategory: "" };
 
 export const readLocalSettings = () => {
     try {
