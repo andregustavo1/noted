@@ -163,6 +163,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const key = keys[index];
         const [from, to] = headingSection(lines, index);
         setFolded((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+        setFoldClosed(true);
+        setMenuOpen(null);
         // Folding the section the caret is in: the caret moves to the heading's end.
         if (!folded.has(key) && activeRow.current >= from && activeRow.current < to) {
             activeRow.current = index;
@@ -437,6 +439,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const commitTap = (x, y) => {
         const row = rowAtY(y);
         tap.current = { x, y, row, time: Date.now() };
+        setFoldClosed(false);
         activeRow.current = row;
         setActiveIndex(row);
     };
@@ -510,6 +513,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Toolbar pops up below the caret's row while the note body has focus.
     const [focused, setFocused] = useState(false);
+    // Folding or unfolding a heading closes the toolbar until the next tap on a row (the same one or another).
+    const [foldClosed, setFoldClosed] = useState(false);
+    const showToolbar = focused && !foldClosed;
     // One toolbar for the whole note, moved under the caret's row. While text is selected it docks at the bottom of
     // the visible note instead: under the row it covered the selection and clashed with the phone's own
     // Cut/Copy/Paste menu, which appears right by the selection.
@@ -521,14 +527,17 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const placeToolbar = () => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
-        const glide = focused && !selecting && toolbarWasShown.current;
+        const glide = showToolbar && !selecting && toolbarWasShown.current;
         // Opening and closing always animate (the toolbar emerges from its corner by the row, and shrinks back).
         const ease = "cubic-bezier(0.23, 1, 0.32, 1)";
         const fade = `opacity 150ms ${ease}, transform 150ms ${ease}`;
         box.style.transition = glide ? `${fade}, top 150ms ${ease}, left 150ms ${ease}` : fade;
+        toolbarWasShown.current = showToolbar;
+        // Hidden: stay put while shrinking away (a fold moves the caret to the heading); placed again when it reopens.
+        if (!showToolbar) return;
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
         box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
-        toolbarWasShown.current = focused;
+        toolbarWasShown.current = showToolbar;
     };
     useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
@@ -751,7 +760,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     // Blank room under the last row, always (like Apple Notes): the toolbar and its open menu fit there,
                     // and a tap on it puts the caret at the end. The room reveal() keeps under the caret's row is only
                     // what the toolbar needs right now.
-                    style={{ paddingBottom: 136, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
+                    style={{ paddingBottom: 136, scrollPaddingBottom: showToolbar ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
                     // A press on the blank area under the text puts the caret at the end. The last row is made the
@@ -846,12 +855,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
                         between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
                     <div ref={toolbarBoxRef}
-                        className={`absolute z-10 origin-top-left ${focused ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
+                        className={`absolute z-10 origin-top-left ${showToolbar ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
-                                <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                <button key={id} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] "}`}>
                                     <Icon />
                                 </button>
@@ -859,7 +868,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             {/* Indent: one pill split in two, less on the left and more on the right (Tab / Shift+Tab too). */}
                             <div className="flex h-11 rounded-full overflow-hidden gap-px">
                                 {[[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
-                                    <button key={step} type="button" tabIndex={focused ? 0 : -1} onClick={() => changeIndent(step)} disabled={off} aria-label={label} title={label}
+                                    <button key={step} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => changeIndent(step)} disabled={off} aria-label={label} title={label}
                                         className="w-11 grid place-items-center text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] dark:hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:hover:text-inherit disabled:hover:bg-light-bg-color-secondary dark:disabled:hover:bg-dark-bg-color-tertiary disabled:cursor-default [&:disabled>svg]:opacity-30">
                                         <Icon />
                                     </button>
