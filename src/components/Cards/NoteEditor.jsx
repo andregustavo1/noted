@@ -838,15 +838,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
-                                            className={`text-2xl py-3 px-5 transition-colors ${option(activeList === prefix)}`}><Icon /></button>
+                                            className={`text-2xl py-3 px-5 ${option(activeList === prefix)}`}><Icon /></button>
                                     ))}
                                     {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
                                         <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
-                                            className={`text-2xl py-3 px-5 transition-colors ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                            className={`text-2xl py-3 px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
                                     ))}
                                     {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
-                                            className={`flex-1 py-3 px-3 transition-colors whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
+                                            className={`flex-1 py-3 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
                                     ))}
                                 </div>
                             )}
