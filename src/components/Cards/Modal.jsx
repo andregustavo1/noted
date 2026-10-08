@@ -10,7 +10,7 @@ const Modal = ({ title, onClose, children, label = "modal-title" }) => (
             onMouseDown={(e) => e.stopPropagation()}
             // Stop Escape here so the editor's document listener doesn't close the note too.
             onKeyDown={(e) => { if (e.key === "Escape") { e.nativeEvent.stopPropagation(); onClose(); } }}
-            className="bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-6 text-center animate-pop-in">
+            className="bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+110px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-6 text-center animate-pop-in">
             <p id={label} className="font-medium text-lg">{title}</p>
             {children}
         </div>
