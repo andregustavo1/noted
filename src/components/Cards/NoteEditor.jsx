@@ -494,7 +494,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const box = toolbarBoxRef.current;
         const at = focused ? `${activeIndex}|${selecting}` : null; // not the position: a wrapping line or a scroll moves it too
         if (box && at && at !== shownAt.current) {
-            box.animate([{ opacity: 0, transform: "scale(0.96)" }, { opacity: 1, transform: "scale(1)" }], { duration: 100, easing: "ease-out" });
+            box.animate([{ opacity: 0, transform: "translateY(-6px) scale(0.96)" }, { opacity: 1, transform: "none" }], { duration: 100, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
         }
         shownAt.current = at;
     });
