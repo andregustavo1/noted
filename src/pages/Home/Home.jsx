@@ -512,7 +512,7 @@ const Home = () => {
                     <div
                         style={{ left: Math.min(categoryMenu.rect.left, document.documentElement.clientWidth - 158), top: categoryMenu.rect.bottom + 4 }}
                         onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
-                        className="fixed w-[150px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
+                        className="fixed w-[150px] grid bg-light-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
                         <button className={`${menuItem} rounded-t-3xl`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
                             <p>Editar</p>
                             <MdOutlineCreate />
