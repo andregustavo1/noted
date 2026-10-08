@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdTitle, MdUndo } from "react-icons/md";
+import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
@@ -484,7 +484,17 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
         box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
     };
-    useLayoutEffect(placeToolbar);
+    // Each time the toolbar shows up or moves to another line it pops in (100ms) instead of jumping; hiding is instant.
+    const shownAt = useRef(null);
+    useLayoutEffect(() => {
+        placeToolbar();
+        const box = toolbarBoxRef.current;
+        const at = focused ? `${activeIndex}|${selecting}` : null; // not the position: a wrapping line or a scroll moves it too
+        if (box && at && at !== shownAt.current) {
+            box.animate([{ opacity: 0, transform: "scale(0.96)" }, { opacity: 1, transform: "scale(1)" }], { duration: 100, easing: "ease-out" });
+        }
+        shownAt.current = at;
+    });
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
@@ -555,6 +565,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // The "..." menu in the header: the card menu's actions plus copying the whole note.
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [reset, setReset] = useState(false);
     const optionsRef = useRef(null);
     useEffect(() => {
         if (!optionsOpen) return;
@@ -568,6 +579,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const timeout = setTimeout(() => setCopied(false), 2000);
         return () => clearTimeout(timeout);
     }, [copied]);
+    // "Resetar checklist" unticks every task (routines done again each day) and answers like "Copiar tudo".
+    useEffect(() => {
+        if (!reset) return;
+        const timeout = setTimeout(() => setReset(false), 2000);
+        return () => clearTimeout(timeout);
+    }, [reset]);
+    const hasDone = lines.some((raw) => parseLine(raw).done);
+    const resetChecks = () => {
+        setJustChecked(null);
+        setContent(lines.map((raw) => (parseLine(raw).done ? raw.replace(/\[[xX]\]/, "[ ]") : raw)).join("\n"));
+        setReset(true);
+    };
     const copyAll = async () => {
         try {
             await navigator.clipboard.writeText(noteText(title, content));
@@ -583,6 +606,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         { label: "Categoria", icon: MdLabelOutline, run: () => onCategory(saved), needsSaved: true },
         { label: "Duplicar", icon: HiOutlineDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
         copied ? { label: "Copiado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Copiar tudo", icon: MdContentCopy, run: copyAll, stayOpen: true },
+        reset ? { label: "Resetado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Resetar checklist", icon: MdRestartAlt, run: resetChecks, stayOpen: true, off: !hasDone },
         { label: "Excluir", icon: BsTrash3, run: () => onDelete(saved), needsSaved: true, danger: true },
     ];
 
@@ -637,8 +661,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         {optionsOpen && (
                             <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
-                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen }) => (
-                                    <button key={label} type="button" disabled={needsSaved && !saved}
+                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
+                                    <button key={label} type="button" disabled={(needsSaved && !saved) || off}
                                         onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
                                         className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
                                         <span>{label}</span>
@@ -745,7 +769,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
                         between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
                     <div ref={toolbarBoxRef}
-                        className={`absolute z-10 origin-top-left transition-[opacity,transform] duration-150 ease-out ${focused ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
+                        className={`absolute z-10 origin-top-left ${focused ? "" : "opacity-0 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
