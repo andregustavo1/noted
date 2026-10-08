@@ -655,7 +655,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6 caret-[var(--primary-color)]`}>
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
 
                 {/* relative z-10: the header's menu opens over the note body. */}
                 <div className="relative z-10 flex items-center justify-between gap-1.5">
@@ -706,7 +706,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         </button>
                     ) : (
                         <button type="button" onClick={close} disabled={closing} aria-label="Fechar"
-                            className={`${headerButton} text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
+                            className={`${headerButton} text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-secondary dark:hover:bg-dark-bg-color-secondary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
                             <IoMdClose />
                         </button>
                     )}

@@ -144,7 +144,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                         </div>
                     </div>
 
-                    <div className="grid mt-8">
+                    <div className="grid mt-6">
                         <p className="font-medium text-lg">Ordenar notas</p>
                         <div className="flex gap-2 mt-3">
                             {choices("Ordenar por", SORT_BY, settings.sortBy, "sortBy", "flex-1")}
