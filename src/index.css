@@ -46,9 +46,15 @@
         -webkit-touch-callout: default;
     }
 
+    /* Text without a color of its own inherits the theme's primary text color. */
     body {
         background-color: var(--light-bg-color-secondary);
+        color: var(--light-text-color-primary);
         overflow-x: clip;
+    }
+
+    .dark body {
+        color: var(--dark-text-color-primary);
     }
 
     /* Overlay-style scrollbar: thin translucent pill, no track, grows on hover */
