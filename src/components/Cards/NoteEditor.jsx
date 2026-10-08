@@ -851,7 +851,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             const foldable = line.heading && (isFolded || headingSection(lines, index)[1] > index + 1);
                             return (
                                 <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
-                                    className={`relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
+                                    className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
                                     {line.heading && (
                                         // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
                                         // so nothing is clipped). The glyph of MdChevronRight ends 5px before its 20px box, so the box ends 5px into
