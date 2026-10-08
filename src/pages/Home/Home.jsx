@@ -329,7 +329,7 @@ const Home = () => {
                 </div>
             </div>
 
-            <div {...categoryScroll} className="flex gap-2 px-4 py-2 -my-2 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
+            <div {...categoryScroll} className="flex items-center gap-2 px-4 py-2 -my-2 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
                 <CategoryBar
                     title={"Todas"}
                     quantity={notes.length}

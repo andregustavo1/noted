@@ -8,7 +8,7 @@ export const COLORS = [
     { name: "Vermelho", bg: "#ff0000", fg: "#fff" },
     { name: "Laranja", bg: "#fe6802", fg: "#fff" },
     { name: "Amarelo", bg: "#edce00", fg: "#000" },
-    { name: "Ciano", bg: "#00ffff", fg: "#000" },
+    { name: "Ciano", bg: "#2575a2", fg: "#fff" },
     { name: "Azul escuro", bg: "#0044ff", fg: "#fff" },
     { name: "Roxo", bg: "#aa00ff", fg: "#fff" },
 ];
