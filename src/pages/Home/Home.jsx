@@ -261,11 +261,13 @@ const Home = () => {
             root.classList.toggle("dark", dark);
             return;
         }
+        root.classList.add("theme-fade");
         if (!document.startViewTransition) {
+            // No fade: switch at once, then hand transitions back once the new colors have painted.
             root.classList.toggle("dark", dark);
+            requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("theme-fade")));
             return;
         }
-        root.classList.add("theme-fade");
         const fade = document.startViewTransition(() => root.classList.toggle("dark", dark));
         fade.finished.finally(() => root.classList.remove("theme-fade"));
     }, [settings.theme]);

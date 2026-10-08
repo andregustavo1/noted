@@ -120,6 +120,12 @@ input[type="password"]::-webkit-inner-spin-button {
     view-transition-name: theme-switch;
 }
 
+/* The new page under the fade is live: elements with color transitions of their own (cards, the panel's
+   inherited text) would still be changing after the fade ends. Paint the new theme at once instead. */
+.theme-fade *:not([data-theme-switch], [data-theme-switch] *) {
+    transition: none !important;
+}
+
 /* The + button keeps its own layer for card reorders; in a theme fade it would float over the side panel. */
 .theme-fade [style*="view-transition-name: fab"] {
     view-transition-name: none !important;
