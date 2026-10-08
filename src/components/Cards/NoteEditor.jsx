@@ -500,10 +500,22 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const box = toolbarBoxRef.current;
         const at = focused ? `${activeIndex}|${selecting}` : null; // not the position: a wrapping line or a scroll moves it too
         if (box && at && at !== shownAt.current) {
-            box.animate([{ opacity: 0, transform: "translateY(-6px) scale(0.96)" }, { opacity: 1, transform: "none" }], { duration: 100, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+            // On iOS the tap that moves the caret also does heavy work (selection, scrolling, the keyboard) in the same
+            // frame; an animation started now was already over by the first frame drawn. So hide the toolbar at once
+            // and start the 100ms entrance two frames later, after that frame is on screen.
+            cancelAnimationFrame(entrance.current);
+            box.style.opacity = "0";
+            entrance.current = requestAnimationFrame(() => {
+                entrance.current = requestAnimationFrame(() => {
+                    box.style.opacity = "";
+                    box.animate([{ opacity: 0, transform: "translateY(-6px) scale(0.96)" }, { opacity: 1, transform: "none" }], { duration: 100, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+                });
+            });
         }
+        if (!at && box) { cancelAnimationFrame(entrance.current); box.style.opacity = ""; } // hidden: no late entrance
         shownAt.current = at;
     });
+    const entrance = useRef(0);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
