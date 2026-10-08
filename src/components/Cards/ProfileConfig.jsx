@@ -128,7 +128,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                         </button>
 
                         {/* Same sunken track as the theme switch, with the colors inside it. */}
-                        <div className="flex items-center justify-between gap-1.5 h-11 mt-3 px-3 rounded-full bg-light-bg-color-secondary" role="radiogroup" aria-label="Cor primária"
+                        <div className="flex items-center justify-between gap-1.5 h-11 mt-3 px-3 rounded-full bg-light-bg-color-secondary dark:bg-dark-bg-color-primary" role="radiogroup" aria-label="Cor primária"
                             style={{ boxShadow: "inset 0 3px 6px rgba(15, 23, 42, 0.09), inset 0 -2px 4px rgba(15, 23, 42, 0.06)" }}>
                             {COLORS.map((c) => (
                                 <button

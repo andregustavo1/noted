@@ -400,7 +400,7 @@ const Home = () => {
                         {/* With the panel open the avatar sits at the start of the name: a pencil there shows the name is editable. */}
                         <button type="button" aria-label="Editar nome" tabIndex={onConfig ? 0 : -1}
                             onClick={(e) => { e.stopPropagation(); setEditNameSignal((n) => n + 1); }}
-                            className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary text-light-text-color-secondary dark:text-dark-text-color-secondary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
+                            className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-secondary dark:text-dark-text-color-tertiary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
                             <MdOutlineCreate />
                         </button>
                     </div>
