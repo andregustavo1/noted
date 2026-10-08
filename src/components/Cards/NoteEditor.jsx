@@ -1,13 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
+import { MdChevronRight, MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
 import { BsTrash3 } from "react-icons/bs";
-import { escapeHtml, plain, sanitize } from "../../lib/richtext";
-import { HEADINGS, MAX_INDENT, headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
+import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
+import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
@@ -150,6 +150,27 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const keys = lines.map((_, i) => (ids.current[i] ??= ++seq.current));
     const newId = () => ++seq.current;
 
+    // Headings fold the lines under them (lib/lines.js headingSection); folded holds the keys of the folded ones,
+    // hidden the rows they hide. A row the caret must land on (Enter on a folded heading, a merge into it) unfolds
+    // what hides it first, in the same render.
+    const [folded, setFolded] = useState(() => new Set());
+    const hidden = foldedRows(lines, keys, folded);
+    const unfoldFor = (nextLines, index) => {
+        const by = foldedRows(nextLines, ids.current, folded).get(index);
+        if (by) setFolded((prev) => new Set([...prev].filter((k) => !by.includes(k))));
+    };
+    const toggleFold = (index) => {
+        const key = keys[index];
+        const [from, to] = headingSection(lines, index);
+        setFolded((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+        // Folding the section the caret is in: the caret moves to the heading's end.
+        if (!folded.has(key) && activeRow.current >= from && activeRow.current < to) {
+            activeRow.current = index;
+            setActiveIndex(index);
+            if (document.activeElement === hostRef.current) setSelection(rows.current[index], rowLength(index));
+        }
+    };
+
     // Scroll the note body (never the page, iOS would pan it) so the row and the toolbar under it are in view.
     // The view follows the focus: it glides to the caret's row when the caret moves to another row and as a row
     // grows while typing. Both rects are read as they are now, so a call during a glide just aims the same glide again.
@@ -189,7 +210,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         tap.current = null;
         setContent(nextLines.join("\n"));
         focusAfterRender.current = focus;
-        if (focus) { activeRow.current = focus.index; setActiveIndex(focus.index); }
+        if (focus) { activeRow.current = focus.index; setActiveIndex(focus.index); unfoldFor(nextLines, focus.index); }
     };
     useLayoutEffect(() => {
         if (!focusAfterRender.current) return;
@@ -403,7 +424,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const rowAtY = (y) => {
         let best = 0, bestDistance = Infinity;
         rowBoxes.current.slice(0, lines.length).forEach((box, i) => {
-            if (!box) return;
+            if (!box || hidden.has(i)) return;
             const r = box.getBoundingClientRect();
             const distance = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
             if (distance < bestDistance) { best = i; bestDistance = distance; }
@@ -757,7 +778,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         spellCheck
                         contentEditable
                         suppressContentEditableWarning
-                        className="outline-none"
+                        className="outline-none pl-5"
                         onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
@@ -772,9 +793,21 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         {lines.map((raw, index) => {
                             const line = parseLine(raw);
                             const icon = line.check !== undefined || (line.list && !line.number && !line.heading);
+                            const isFolded = folded.has(keys[index]);
+                            const foldable = line.heading && (isFolded || headingSection(lines, index)[1] > index + 1);
                             return (
                                 <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
-                                    className={`relative flex items-start gap-2 ${index === 0 ? "" : lineGap(line)}`}>
+                                    className={`relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
+                                    {line.heading && (
+                                        // Fold chevron in the gutter, one line tall at the heading's size. Shown while folded; otherwise only
+                                        // on hover or while the caret is on the heading, and not at all with nothing under it to fold.
+                                        <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
+                                            onMouseDown={(e) => e.preventDefault()} onClick={() => toggleFold(index)} tabIndex={-1}
+                                            style={{ height: "1lh" }}
+                                            className={`absolute -left-5 top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-[opacity,transform] duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : "rotate-90"} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
+                                            <MdChevronRight size="0.9em" />
+                                        </button>
+                                    )}
                                     {line.check !== undefined && (
                                         // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
                                         // The hit area grows up, down and to the left, not to the right: a tap near the text's start is for the text.
@@ -801,7 +834,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                         {/* An invisible copy of the text over the row, whose background draws the strike line. */}
                                         {line.check !== undefined && (
                                             <div aria-hidden contentEditable={false} className="strike absolute inset-0 pointer-events-none select-none whitespace-pre-wrap break-words">
-                                                <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: line.text }} />
+                                                <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: trimEnd(line.text) }} />
                                             </div>
                                         )}
                                     </div>
