@@ -151,20 +151,26 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const newId = () => ++seq.current;
 
     // Scroll the note body (never the page, iOS would pan it) so the row and the toolbar under it are in view.
-    // The view follows the focus: when the caret moves to another row and as a row grows while typing it glides
-    // there. When the keyboard is the reason (it just took part of the screen) the scroll is instant: iOS looks for
-    // the caret right after focusing and, finding it under the keyboard mid-glide, pans the whole page (which the
-    // viewport handler then undoes: a visible jump). Both rects are read as they are now, so a call during a glide
-    // just aims the same glide again.
-    const reveal = (el, { instant = false } = {}) => {
+    // The view follows the focus: it glides to the caret's row when the caret moves to another row and as a row
+    // grows while typing. Both rects are read as they are now, so a call during a glide just aims the same glide again.
+    // pad is the room to keep under the row (the toolbar's); instant skips the glide.
+    const reveal = (el, { pad = parseFloat(bodyRef.current?.style.scrollPaddingBottom) || 0, instant = false } = {}) => {
         const box = bodyRef.current;
         if (!el || !box) return;
-        const pad = parseFloat(box.style.scrollPaddingBottom) || 0;
         const r = el.parentElement.getBoundingClientRect(), b = box.getBoundingClientRect();
         let top = box.scrollTop;
         if (r.bottom > b.bottom - pad) top += r.bottom - (b.bottom - pad);
         else if (r.top < b.top) top -= b.top - r.top;
         if (Math.abs(top - box.scrollTop) >= 1) box.scrollTo({ top, behavior: instant ? "auto" : "smooth" });
+    };
+    // Reveal when the keyboard is the reason (it just took part of the screen). iOS looks for the caret right after
+    // the focus and, if it is under the keyboard, pans the whole page (which the viewport handler then undoes: a
+    // visible jump). So first, instantly, just enough for the row to clear the keyboard: what iOS would do itself,
+    // and nothing at all for a row that already clears it. Then the rest, the toolbar's room, glides: the caret is
+    // in view the whole way, so there is nothing for iOS to pan to.
+    const revealForKeyboard = (el) => {
+        reveal(el, { pad: 0, instant: true });
+        reveal(el);
     };
 
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
@@ -535,29 +541,29 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // The note body got focus and the keyboard is about to come up: shrink the overlay to the last known keyboard
     // height right away, so by the time iOS looks, the caret is already above the keyboard and there is nothing to
     // pan the page to. Only before the keyboard is up, so it never leaves a gap under the note.
-    // Before the first keyboard on an iPhone there is no measured height; a typical one keeps the first focus from
-    // panning too (too tall only leaves a gap under the note until the real height arrives, a moment later).
+    // Before the first keyboard on an iPhone there is no measured height; a tall typical one keeps the first focus
+    // from panning too (too tall only leaves a gap under the note until the real height arrives, a moment later;
+    // too short would leave the row under the keyboard).
     const shrinkForKeyboard = () => {
-        const keyboard = Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 300 : 0);
+        const keyboard = Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 340 : 0);
         const viewport = window.visualViewport;
         if (keyboard && (!viewport || viewport.height > appHeight() - 100)) setVvHeight((h) => Math.min(h, appHeight() - keyboard));
     };
     // Keep the caret's row in view inside the note body whenever the visible area changes (the keyboard's real
-    // height arriving, or a different keyboard). Instant for the same reason as above.
+    // height arriving, or a different keyboard).
     useEffect(() => {
-        if (focused) reveal(rows.current[activeRow.current], { instant: true });
+        if (focused) revealForKeyboard(rows.current[activeRow.current]);
     }, [vvHeight, focused]);
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
     const [typing, setTyping] = useState(false);
     const isField = (el) => el?.matches("input, textarea, [contenteditable]") ?? false;
-    // The note body got focus: the keyboard is about to come up. Everything the caret's row needs to end up above
-    // it (the overlay shrunk to the keyboard's height, the toolbar's room under the row, the scroll) is done right
-    // here, synchronously and without a glide, so when iOS looks for the caret an instant later it is already in
-    // view and there is nothing to pan the page to. typing is set here too (the outer onFocus sets it again, later
-    // in the same event), as the overlay's height depends on it.
+    // The note body got focus: the keyboard is about to come up. The overlay is shrunk to the keyboard's height and
+    // the row brought clear of it right here, synchronously, so when iOS looks for the caret an instant later it is
+    // already in view. typing is set here too (the outer onFocus sets it again, later in the same event), as the
+    // overlay's height depends on it.
     const onBodyFocus = () => {
         flushSync(() => { setFocused(true); setTyping(true); shrinkForKeyboard(); });
-        reveal(rows.current[activeRow.current], { instant: true });
+        revealForKeyboard(rows.current[activeRow.current]);
     };
     // Wait a tick on blur so a press on the toolbar doesn't flicker it.
     const onBlur = () => setTimeout(() => {
