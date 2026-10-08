@@ -176,6 +176,17 @@ const Home = () => {
         return () => { document.documentElement.style.overflow = prev; };
     }, [onConfig]);
 
+    // iOS paints the status bar from theme-color, which the backdrop can't cover; darken it to match
+    // (#f3f3f3 under the 20% black backdrop = #c2c2c2).
+    useEffect(() => {
+        if (!onConfig) return;
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) return;
+        const prev = meta.content;
+        meta.content = "#c2c2c2";
+        return () => { meta.content = prev; };
+    }, [onConfig]);
+
     // Stored categories plus any name still only on notes (before the schema migration ran), with note counts.
     const categories = useMemo(() => {
         const byName = Object.fromEntries(categoryList.map((c) => [c.name, { ...c, count: 0 }]));
