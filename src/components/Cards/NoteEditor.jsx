@@ -724,8 +724,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     onScroll={() => { if (selecting) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
                     className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
-                    // Room under the last row for the toolbar (and its open menu) below it.
-                    style={{ paddingBottom: focused ? (menuOpen ? 136 : 80) : 0, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
+                    // Blank room under the last row, always (like Apple Notes): the toolbar and its open menu fit there,
+                    // and a tap on it puts the caret at the end. The room reveal() keeps under the caret's row is only
+                    // what the toolbar needs right now.
+                    style={{ paddingBottom: 136, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
                     onClick={(e) => {
