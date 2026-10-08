@@ -27,7 +27,7 @@ export const headingSize = (hashes) => HEADINGS.find((h) => h.prefix.trim() === 
 
 // Space above a row, by kind, so the editor and the card previews space lines the same way.
 // Plain and list lines 4px apart, checkboxes 6px, headings more.
-export const lineGap = (line) => (line.heading ? "mt-1" : line.check !== undefined ? "mt-1" : "mt-0");
+export const lineGap = (line) => (line.heading ? "mt-1" : line.check !== undefined ? "mt-1.5" : "mt-0");
 
 // Nothing written on the line: no marker and no text (contentEditable leaves tags and nbsp behind).
 const isBlank = (line) => {
