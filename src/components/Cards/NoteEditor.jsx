@@ -494,7 +494,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
         const glide = focused && !selecting && toolbarWasShown.current;
-        box.style.transition = glide ? "top 150ms cubic-bezier(0.23, 1, 0.32, 1), left 150ms cubic-bezier(0.23, 1, 0.32, 1)" : "none";
+        // Opening and closing always animate (the toolbar emerges from its corner by the row, and shrinks back).
+        const ease = "cubic-bezier(0.23, 1, 0.32, 1)";
+        const fade = `opacity 150ms ${ease}, transform 150ms ${ease}`;
+        box.style.transition = glide ? `${fade}, top 150ms ${ease}, left 150ms ${ease}` : fade;
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
         box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
         toolbarWasShown.current = focused;
@@ -723,9 +726,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     style={{ paddingBottom: 136, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
+                    // A press on the blank area under the text puts the caret at the end. The last row is made the
+                    // active one before focusing: the focus reveals the active row, and with the previous one (row 0
+                    // on a freshly opened note) it scrolled up there, then glided back down to the caret.
                     onClick={(e) => {
                         if (e.target !== e.currentTarget) return;
                         const last = lines.length - 1;
+                        tap.current = null;
+                        activeRow.current = last;
+                        setActiveIndex(last);
                         hostRef.current.focus({ preventScroll: true });
                         setSelection(rows.current[last], rowLength(last));
                     }}>
@@ -797,7 +806,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
                         between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
                     <div ref={toolbarBoxRef}
-                        className={`absolute z-10 origin-top-left ${focused ? "" : "opacity-0 pointer-events-none"}`}
+                        className={`absolute z-10 origin-top-left ${focused ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
