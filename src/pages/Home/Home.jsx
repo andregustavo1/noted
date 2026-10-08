@@ -251,7 +251,7 @@ const Home = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
     // The dark theme only covers the signed-in app (the login stays light), so the class follows this page.
-    // A switch (not the first paint) moves every color at the same 200ms pace; see .theme-switching in index.css.
+    // A switch (not the first paint) crossfades the page in 200ms; see .theme-fade in index.css.
     const themeApplied = useRef(false);
     useLayoutEffect(() => {
         const root = document.documentElement;
@@ -261,10 +261,13 @@ const Home = () => {
             root.classList.toggle("dark", dark);
             return;
         }
-        root.classList.add("theme-switching");
-        root.classList.toggle("dark", dark);
-        const t = setTimeout(() => root.classList.remove("theme-switching"), 200);
-        return () => { clearTimeout(t); root.classList.remove("theme-switching"); };
+        if (!document.startViewTransition) {
+            root.classList.toggle("dark", dark);
+            return;
+        }
+        root.classList.add("theme-fade");
+        const fade = document.startViewTransition(() => root.classList.toggle("dark", dark));
+        fade.finished.finally(() => root.classList.remove("theme-fade"));
     }, [settings.theme]);
     const changeSettings = (changes) => {
         const next = { ...settings, ...changes };

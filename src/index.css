@@ -113,13 +113,47 @@ input[type="password"]::-webkit-inner-spin-button {
     display: none;
 }
 
-/* Theme switch: for the 200ms after it, every color (text, backgrounds, borders, shadows) moves at the same pace.
-   Other transitions pause for those 200ms (nothing else moves while the panel is open); the switch keeps its own slide. */
-.theme-switching *:not([data-theme-switch], [data-theme-switch] *),
-.theme-switching *::before,
-.theme-switching *::after {
-    transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease, fill 200ms ease,
-        stroke 200ms ease, box-shadow 200ms ease, -webkit-text-fill-color 200ms ease !important;
+/* Theme switch: the whole page crossfades to the other theme in 200ms (Home.jsx), so every color moves together.
+   Per-element color transitions can't do that: inherited text color lags behind its parent's. The switch is left
+   out of the snapshot and animates live, keeping its own 350ms slide. */
+.theme-fade [data-theme-switch] {
+    view-transition-name: theme-switch;
+}
+
+/* The + button keeps its own layer for card reorders; in a theme fade it would float over the side panel. */
+.theme-fade [style*="view-transition-name: fab"] {
+    view-transition-name: none !important;
+}
+
+.theme-fade::view-transition-group(*),
+.theme-fade::view-transition-old(*),
+.theme-fade::view-transition-new(*) {
+    animation-duration: 200ms;
+    animation-timing-function: ease;
+}
+
+.theme-fade::view-transition-old(root) {
+    animation-name: theme-fade-out;
+}
+
+.theme-fade::view-transition-new(root) {
+    animation-name: theme-fade-in;
+}
+
+.theme-fade::view-transition-old(theme-switch) {
+    display: none;
+}
+
+.theme-fade::view-transition-new(theme-switch) {
+    animation: none;
+}
+
+@keyframes theme-fade-out {
+    to { opacity: 0; }
+}
+
+@keyframes theme-fade-in {
+    from { opacity: 0; }
 }
 
 /* Cards glide to their new slot when the list reorders (pin, delete, duplicate); Home.jsx starts the transition
