@@ -320,6 +320,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 next[index] = line.indent;
                 return update(next, { index, caret: 0 });
             }
+            if (span.collapsed && offset === 0 && line.done) {
+                // Enter at the start of a ticked item: the new empty (unticked) item goes above, and the ticked
+                // text stays ticked where it is. A plain split would move the text to an unticked line instead.
+                next.splice(index, 0, nextMarker(line));
+                ids.current.splice(index, 0, newId());
+                return update(next, { index: index + 1, caret: 0 });
+            }
             replaceSpan(span, ["", ""], [null, nextMarker(line)]);
         } else if (type.startsWith("delete")) {
             if (span.multi) {
