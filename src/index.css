@@ -181,10 +181,11 @@ input[type="password"]::-webkit-inner-spin-button {
 }
 
 /* A card that changes size (pin/unpin) morphs its box while the content keeps its real size and is revealed,
-   instead of the old snapshot being stretched into a ghost. */
+   instead of the old snapshot being stretched into a ghost. The radius is only a fallback: Home.jsx animates it
+   from the card's old corners to its new ones. */
 ::view-transition-image-pair(*) {
     overflow: clip;
-    border-radius: 1.5rem;
+    border-radius: 1.75rem;
 }
 
 ::view-transition-image-pair(root) {

@@ -4,7 +4,7 @@ import Navbar from "../../components/Navbar/Navbar";
 import NoteCard from "../../components/Cards/NoteCard";
 import NoteEditor from "../../components/Cards/NoteEditor";
 import { TfiPlus } from "react-icons/tfi";
-import { MdOutlineCreate, MdLabelOutline } from "react-icons/md";
+import { MdOutlineCreate, MdLabelOutline, MdDoNotDisturbAlt } from "react-icons/md";
 import { BsTrash3 } from "react-icons/bs";
 import CategoryBar from "../../components/Cards/CategoryBar";
 import ProfileInfo from "../../components/Cards/ProfileInfo";
@@ -37,7 +37,20 @@ const animateNotes = (update) => {
     reorders++;
     document.documentElement.classList.add("reordering");
     const done = () => { if (--reorders === 0) document.documentElement.classList.remove("reordering"); };
-    document.startViewTransition(() => flushSync(update)).finished.then(done, done);
+    // The snapshots are flat images clipped by the image pair, so a card whose corners change (pin/unpin, column
+    // change) would jump at the end; the pair's clip is tweened from the old corners to the new ones instead.
+    const corners = () => [...document.querySelectorAll(".note-card")].map((el) => {
+        const c = getComputedStyle(el);
+        return [el.style.getPropertyValue("--vt"), `${c.borderTopLeftRadius} ${c.borderTopRightRadius} ${c.borderBottomRightRadius} ${c.borderBottomLeftRadius}`];
+    });
+    const before = new Map(corners());
+    let after = [];
+    const t = document.startViewTransition(() => { flushSync(update); after = corners(); });
+    t.ready.then(() => after.forEach(([name, to]) => document.documentElement.animate(
+        { borderRadius: [before.get(name) ?? to, to] },
+        { duration: 300, easing: EASE, fill: "both", pseudoElement: `::view-transition-image-pair(${name})` },
+    )), () => {}).catch(() => {}); // a browser without pseudo-element animations keeps the fixed clip
+    t.finished.then(done, done);
 };
 
 // The pointer gestures of the category row, in one place so they can't fight each other:
@@ -632,7 +645,7 @@ const Home = () => {
                 <button
                     aria-label="Nova categoria"
                     onClick={() => openDialog({ type: "add" })}
-                    className="w-10 h-10 shrink-0 grid place-items-center rounded-full bg-[var(--primary-color)] text-[var(--primary-color-fg)] shadow-sm hover:brightness-95 duration-300">
+                    className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-[var(--primary-color)] text-[var(--primary-color-fg)] shadow-sm hover:brightness-95 duration-300">
                     <TfiPlus />
                 </button>
             </div>
@@ -711,6 +724,7 @@ const Home = () => {
                     onDuplicate={handleDuplicate}
                     onDelete={setPendingDelete}
                     onMessage={setMessage}
+                    fixedToolbar={settings.fixedToolbar}
                 />
             )}
 
@@ -755,9 +769,9 @@ const Home = () => {
                         {[{ name: "" }, ...categories].map(({ name }) => {
                             const on = dialogShown.note.category === name;
                             return (
-                                <button key={name} type="button" onClick={() => handleSetCategory(dialogShown.note, name)} aria-pressed={on}
-                                    className={`rounded-full px-4 py-2 text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95"} ${name ? "" : ""}`}>
-                                    {name || "Nenhuma"}
+                                <button key={name} type="button" onClick={() => handleSetCategory(dialogShown.note, name)} aria-pressed={on} aria-label={name ? undefined : "Nenhuma"}
+                                    className={`h-11 rounded-full ${name ? "px-4" : "w-11 grid place-items-center"} text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95"}`}>
+                                    {name || <MdDoNotDisturbAlt size={18} />}
                                 </button>
                             );
                         })}

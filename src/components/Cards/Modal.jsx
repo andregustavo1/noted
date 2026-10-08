@@ -26,7 +26,7 @@ const Modal = ({ title, onClose, children, label = "modal-title", closing = fals
 
 // The two-button row every dialog ends with; the confirm is red when `danger`.
 export const ModalButtons = ({ onCancel, onConfirm, confirm, danger, disabled }) => (
-    <div className={`flex gap-2 mt-8`}>
+    <div className="flex gap-2 mt-6">
         <button type="button" autoFocus={danger} onClick={onCancel} className="flex-1 min-w-0 h-11 rounded-full font-semibold bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95 duration-200">
             Cancelar
         </button>

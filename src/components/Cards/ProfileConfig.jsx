@@ -18,6 +18,17 @@ export const COLORS = [
 const SORT_BY = [{ value: "date", label: "Data", name: "Data" }, { value: "name", label: "Nome", name: "Nome" }];
 const SORT_DIR = [{ value: "desc", label: <BsSortDown size={18} />, name: "Decrescente" }, { value: "asc", label: <BsSortUp size={18} />, name: "Crescente" }];
 
+// Toolbar toggle icons: a bar hovering over a dotted ground (floating) and one resting on a solid ground (static).
+// Drawn centred in the 24-grid and shown at 22px (the Tabler icons next to them are 18px but carry less ink).
+const barIcon = (y, ground) => () => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+        <rect x="5" y={y} width="14" height="6" rx="3" />
+        {ground}
+    </svg>
+);
+const FloatingBar = barIcon(6, <path d="M5 18h2M11 18h2M17 18h2" />);
+const StaticBar = barIcon(8, <path d="M3 16h18" />);
+
 // Two-way switch: a sunken track whose knob slides under the chosen icon; the track darkens with the theme.
 const Switch = ({ on, onToggle, label, icons: [Off, On], dark, ...rest }) => {
     return (
@@ -106,7 +117,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
             <div className="h-full max-w-[100vw] flex flex-col shadow-md pt-4 px-5 bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-l-3xl">
                 <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                 {/* pl clears the 40px avatar that slides in over the panel's left padding. */}
-                <div className="grid pl-[52px] pr-2 h-10 min-w-0">
+                <div className="grid pl-[52px] pr-2 h-11 min-w-0">
                     {editing ? (
                         <input
                             autoFocus
@@ -153,6 +164,9 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
 
                         {/* Cut corners: cards get a bigger radius with one corner squared (Home.jsx). */}
                         <Switch dark={dark} on={Boolean(settings.cutCorners)} onToggle={() => onChange({ cutCorners: !settings.cutCorners })} label="Cantos recortados" icons={[TbSquareRounded, TbBorderCornerSquare]} />
+
+                        {/* Editor toolbar: follows the caret's row, or stays docked above the keyboard (NoteEditor.jsx). */}
+                        <Switch dark={dark} on={Boolean(settings.fixedToolbar)} onToggle={() => onChange({ fixedToolbar: !settings.fixedToolbar })} label="Barra de ferramentas fixa" icons={[FloatingBar, StaticBar]} />
                     </div>
 
                     <div className="grid mt-6">

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChevronRight, MdChecklist, MdContentCopy, MdFormatAlignCenter, MdFormatAlignJustify, MdFormatAlignLeft, MdFormatAlignRight, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
+import { MdChevronRight, MdKeyboardArrowDown, MdChecklist, MdContentCopy, MdFormatAlignCenter, MdFormatAlignJustify, MdFormatAlignLeft, MdFormatAlignRight, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo, MdAccessTime } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
@@ -104,7 +104,7 @@ const splitAt = (el, offset) => {
 };
 
 // saved is the note as stored (null until a new note is first saved); the "..." menu acts on it.
-const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, onDuplicate, onDelete, onMessage }) => {
+const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, onDuplicate, onDelete, onMessage, fixedToolbar }) => {
     const [title, setTitle] = useState(note?.title ?? "");
     const [content, setContent] = useState(note?.content ?? "");
 
@@ -167,6 +167,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const rowBoxes = useRef([]); // each row (marker + text)
     const hostRef = useRef(null);
     const bodyRef = useRef(null);
+    const blankPress = useRef(false); // the last press began on the body's blank area, not on a row
     const ids = useRef([]);
     const seq = useRef(0);
     const keys = lines.map((_, i) => (ids.current[i] ??= ++seq.current));
@@ -215,7 +216,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const key = keys[index];
         const [from, to] = headingSection(lines, index);
         setFolded((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-        setFoldClosed(true);
+        setToolbarClosed(true);
         setMenuOpen(null);
         // Folding the section the caret is in: the caret moves to the heading's end.
         if (!folded.has(key) && activeRow.current >= from && activeRow.current < to) {
@@ -492,7 +493,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const commitTap = (x, y) => {
         const row = rowAtY(y);
         tap.current = { x, y, row, time: Date.now() };
-        setFoldClosed(false);
+        setToolbarClosed(false);
         activeRow.current = row;
         setActiveIndex(row);
     };
@@ -546,6 +547,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const tapped = tap.current && Date.now() - tap.current.time < 1000 ? tap.current.row : null;
         if (sel.isCollapsed && tapped !== null && pos[0] !== tapped) return placeTapCaret();
         if (sel.isCollapsed && !rows.current[pos[0]]?.contains(sel.anchorNode)) setSelection(rows.current[pos[0]], pos[1]);
+        // A selection dragged past a row's text (onto its checkbox or marker, or between rows) has an end on
+        // non-editable content, and the browser then ignores typing into it: snap that end to the row's text.
+        // The anchor keeps its side, so the drag (and Shift+arrows) goes on from where it started.
+        const inRow = (node) => rows.current.some((el) => el?.contains(node));
+        if (!sel.isCollapsed && !(inRow(sel.anchorNode) && inRow(sel.focusNode))) {
+            const range = sel.getRangeAt(0);
+            const backwards = sel.focusNode !== range.endContainer || sel.focusOffset !== range.endOffset;
+            const anchor = locate(sel.anchorNode, sel.anchorOffset, backwards), focus = locate(sel.focusNode, sel.focusOffset, !backwards);
+            if (anchor && focus) {
+                sel.setBaseAndExtent(...pointAt(rows.current[anchor[0]], anchor[1]), ...pointAt(rows.current[focus[0]], focus[1]));
+                return; // the selectionchange this causes runs the rest
+            }
+        }
         if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
         // Only a caret: while a selection is dragged the browser scrolls after the finger, and this would pull back.
         if (sel.isCollapsed) reveal(rows.current[pos[0]]);
@@ -566,21 +580,27 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Toolbar pops up below the caret's row while the note body has focus.
     const [focused, setFocused] = useState(false);
-    // Folding or unfolding a heading closes the toolbar until the next tap on a row (the same one or another).
-    const [foldClosed, setFoldClosed] = useState(false);
-    const showToolbar = focused && !foldClosed;
+    // Folding a heading or the toolbar's own close button hides it until the next tap on a row (the same one or another;
+    // Enter doesn't reopen it).
+    const [toolbarClosed, setToolbarClosed] = useState(false);
+    const showToolbar = focused && !toolbarClosed;
     // One toolbar for the whole note, moved under the caret's row. While text is selected it docks at the bottom of
     // the visible note instead: under the row it covered the selection and clashed with the phone's own
     // Cut/Copy/Paste menu, which appears right by the selection.
     const [selecting, setSelecting] = useState(false);
+    // The "Barra de ferramentas fixa" setting keeps it docked there the whole time, just above the keyboard.
+    const docked = selecting || Boolean(fixedToolbar);
     const toolbarBoxRef = useRef(null);
-    // While shown under the caret's row, the toolbar glides (150ms) up or down to the new row instead of jumping.
-    // It appears in place (no glide from wherever it was hidden) and follows a scroll while docked without lag.
+    // While shown, the toolbar glides (150ms) to its new place instead of jumping: to the next row, down to the dock
+    // when a selection starts, and back up to the row when it ends. It appears in place (no glide from wherever it
+    // was hidden), and while docked it follows a scroll without lag (placed again on every scroll, no glide).
     const toolbarWasShown = useRef(false);
+    const toolbarWasDocked = useRef(false);
     const placeToolbar = () => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
-        const glide = showToolbar && !selecting && toolbarWasShown.current;
+        const glide = showToolbar && toolbarWasShown.current && (!docked || !toolbarWasDocked.current);
+        toolbarWasDocked.current = docked;
         // Opening and closing always animate (the toolbar emerges from its corner by the row, and shrinks back).
         const ease = "cubic-bezier(0.23, 1, 0.32, 1)";
         const fade = `opacity 150ms ${ease}, transform 150ms ${ease}`;
@@ -588,8 +608,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         toolbarWasShown.current = showToolbar;
         // Hidden: stay put while shrinking away (a fold moves the caret to the heading); placed again when it reopens.
         if (!showToolbar) return;
-        box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
-        box.style.left = `${selecting ? parseFloat(getComputedStyle(body).paddingLeft) : row.offsetLeft}px`;
+        box.style.top = `${docked ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
+        box.style.left = `${docked ? (body.clientWidth - box.offsetWidth) / 2 : row.offsetLeft}px`;
     };
     useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | "align" | null
@@ -730,7 +750,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]");
 
     // Header buttons share one size; undo/redo/options sit on the secondary background.
-    const headerButton = "w-10 h-10 shrink-0 grid place-items-center rounded-full transition-[transform,background-color,color,opacity] duration-150 active:scale-90";
+    const headerButton = "w-11 h-11 shrink-0 grid place-items-center rounded-full transition-[transform,background-color,color,opacity] duration-150 active:scale-90";
 
     return (
         <>
@@ -806,7 +826,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
                 <div
                     ref={bodyRef}
-                    onScroll={() => { if (selecting) placeToolbar(); }}
+                    onScroll={() => { if (docked) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
                     className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-4 px-4 md:-mx-8 md:px-8 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Blank room under the last row, always (like Apple Notes): the toolbar and its open menu fit there,
@@ -814,12 +834,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     // what the toolbar needs right now.
                     style={{ paddingBottom: 136, scrollPaddingBottom: showToolbar ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
-                    onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
+                    onMouseDown={(e) => { blankPress.current = e.target === e.currentTarget; if (blankPress.current) e.preventDefault(); }}
                     // A press on the blank area under the text puts the caret at the end. The last row is made the
                     // active one before focusing: the focus reveals the active row, and with the previous one (row 0
                     // on a freshly opened note) it scrolled up there, then glided back down to the caret.
+                    // A drag-select released over the padding also lands its click here (the click goes to the common
+                    // ancestor of press and release), and must keep its selection: only a press that began here counts.
                     onClick={(e) => {
-                        if (e.target !== e.currentTarget) return;
+                        if (e.target !== e.currentTarget || !blankPress.current) return;
                         const last = lines.length - 1;
                         tap.current = null;
                         activeRow.current = last;
@@ -897,8 +919,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                             className={`min-h-[1.625em] whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
                                         />
                                         {/* An invisible copy of the text over the row, whose background draws the strike line. */}
+                                        {/* overflow-hidden: a space where the text wraps hangs past the box, and the line (the span's background) would paint it into the padding. */}
                                         {line.check !== undefined && (
-                                            <div aria-hidden contentEditable={false} className="strike absolute inset-0 pointer-events-none select-none whitespace-pre-wrap break-words">
+                                            <div aria-hidden contentEditable={false} className="strike absolute inset-0 overflow-hidden pointer-events-none select-none whitespace-pre-wrap break-words">
                                                 <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: trimEnd(line.text) }} />
                                             </div>
                                         )}
@@ -914,7 +937,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         className={`absolute z-10 origin-top-left ${showToolbar ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
+                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle], ["align", "Alinhamento", MdFormatAlignLeft]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] "}`}>
@@ -930,10 +953,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     </button>
                                 ))}
                             </div>
+                            {/* ponytail: UI only, no action yet. */}
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} aria-label="Lembrete" title="Lembrete"
+                                className="w-11 h-11 grid place-items-center rounded-full text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)]">
+                                <MdAccessTime />
+                            </button>
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label="Fechar barra" title="Fechar barra"
+                                className="w-11 h-11 grid place-items-center rounded-full text-2xl transition-opacity bg-[var(--primary-color)] text-[var(--primary-color-fg)] hover:opacity-80">
+                                <MdKeyboardArrowDown />
+                            </button>
                             {menuOpen && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward.
-                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
+                                <div className={`flex absolute left-0 ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
                                             className={`text-2xl py-3 px-5 ${option(activeList === prefix)}`}><Icon /></button>
