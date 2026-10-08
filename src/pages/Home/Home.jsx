@@ -110,6 +110,17 @@ const FAILURE_MESSAGE = {
 };
 const now = () => new Date().toISOString();
 
+// Keeps the last non-null value for `ms` after it clears, so a popup can play its exit; true while it does.
+const useLinger = (value, ms = 100) => {
+    const [shown, setShown] = useState(value);
+    useEffect(() => {
+        if (value) { setShown(value); return; }
+        const t = setTimeout(() => setShown(null), ms);
+        return () => clearTimeout(t);
+    }, [value, ms]);
+    return [value ?? shown, !value && !!shown];
+};
+
 const Home = () => {
     const categoryScroll = useDragScroll();
 
@@ -359,6 +370,10 @@ const Home = () => {
     const [categoryMenu, setCategoryMenu] = useState(null); // { category, rect }
     const [dialog, setDialog] = useState(null); // { type: "add" } | { type: "rename" | "delete", category } | { type: "pick", note }
     const [dialogName, setDialogName] = useState("");
+    // Each popup stays mounted for its 100ms exit (pop-out) after its state clears; closing marks that stretch.
+    const [menuShown, menuClosing] = useLinger(categoryMenu);
+    const [dialogShown, dialogClosing] = useLinger(dialog);
+    const [deleteShown, deleteClosing] = useLinger(pendingDelete);
     const openDialog = (next) => { setCategoryMenu(null); setDialogName(next.category?.name ?? ""); setDialog(next); };
 
     const openEditor = (note = null) => {
@@ -506,18 +521,18 @@ const Home = () => {
                 </button>
             </div>
 
-            {categoryMenu && (
+            {menuShown && (
                 // Same menu as the card's, narrower; fixed so the scrolling chip row can't clip it. The backdrop closes it.
-                <div className="fixed inset-0 z-[60]" onMouseDown={() => setCategoryMenu(null)} onTouchStart={() => setCategoryMenu(null)}>
+                <div className={`fixed inset-0 z-[60] ${menuClosing ? "pointer-events-none" : ""}`} onMouseDown={() => setCategoryMenu(null)} onTouchStart={() => setCategoryMenu(null)}>
                     <div
-                        style={{ left: Math.min(categoryMenu.rect.left, document.documentElement.clientWidth - 158), top: categoryMenu.rect.bottom + 4 }}
+                        style={{ left: Math.min(menuShown.rect.left, document.documentElement.clientWidth - 158), top: menuShown.rect.bottom + 4 }}
                         onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
-                        className="fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
-                        <button className={`${menuItem} rounded-t-3xl dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
+                        className={`fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-pop-out" : "animate-pop-in"} origin-top-left`}>
+                        <button className={`${menuItem} rounded-t-3xl dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary`} onClick={() => openDialog({ type: "rename", category: menuShown.category })}>
                             <p>Editar</p>
                             <MdOutlineCreate />
                         </button>
-                        <button className={`${menuItem} rounded-b-3xl text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: categoryMenu.category })}>
+                        <button className={`${menuItem} rounded-b-3xl text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: menuShown.category })}>
                             <p>Excluir</p>
                             <BsTrash3 />
                         </button>
@@ -583,15 +598,15 @@ const Home = () => {
                 />
             )}
 
-            {pendingDelete && (
-                <Modal title="Excluir nota?" onClose={() => setPendingDelete(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{pendingDelete.title || "Noted"}"<br />será excluída.</p>
-                    <ModalButtons danger confirm="Excluir" onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(pendingDelete)} />
+            {deleteShown && (
+                <Modal closing={deleteClosing} title="Excluir nota?" onClose={() => setPendingDelete(null)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{deleteShown.title || "Noted"}"<br />será excluída.</p>
+                    <ModalButtons danger confirm="Excluir" onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(deleteShown)} />
                 </Modal>
             )}
 
-            {(dialog?.type === "add" || dialog?.type === "rename") && (
-                <Modal title={dialog.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
+            {(dialogShown?.type === "add" || dialogShown?.type === "rename") && (
+                <Modal closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
                     <form onSubmit={(e) => { e.preventDefault(); handleCategoryDialog(); }}>
                         <input
                             autoFocus
@@ -610,21 +625,21 @@ const Home = () => {
                 </Modal>
             )}
 
-            {dialog?.type === "delete" && (
-                <Modal title="Excluir categoria?" onClose={() => setDialog(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{dialog.category.name}" <br />será excluída.</p>
+            {dialogShown?.type === "delete" && (
+                <Modal closing={dialogClosing} title="Excluir categoria?" onClose={() => setDialog(null)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{dialogShown.category.name}" <br />será excluída.</p>
                     <ModalButtons danger confirm="Excluir" onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
                 </Modal>
             )}
 
-            {dialog?.type === "pick" && (
+            {dialogShown?.type === "pick" && (
                 // The note's current category is the one in the primary color; tapping another moves the note.
-                <Modal title="Categoria" onClose={() => setDialog(null)}>
+                <Modal closing={dialogClosing} title="Categoria" onClose={() => setDialog(null)}>
                     <div className="flex flex-wrap justify-center gap-2 mt-4">
                         {[{ name: "" }, ...categories].map(({ name }) => {
-                            const on = dialog.note.category === name;
+                            const on = dialogShown.note.category === name;
                             return (
-                                <button key={name} type="button" onClick={() => handleSetCategory(dialog.note, name)} aria-pressed={on}
+                                <button key={name} type="button" onClick={() => handleSetCategory(dialogShown.note, name)} aria-pressed={on}
                                     className={`rounded-full px-4 py-2 text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95"} ${name ? "" : ""}`}>
                                     {name || "Nenhuma"}
                                 </button>

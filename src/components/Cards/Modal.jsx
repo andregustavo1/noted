@@ -1,8 +1,9 @@
 import React from "react";
 
 // Centered dialog card, the width of an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 60px.
-const Modal = ({ title, onClose, children, label = "modal-title" }) => (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/20" onMouseDown={onClose}>
+// closing plays the exit (fade + pop-out) while the parent keeps it mounted for 100ms.
+const Modal = ({ title, onClose, children, label = "modal-title", closing = false }) => (
+    <div className={`fixed inset-0 z-[80] grid place-items-center bg-black/20 ${closing ? "animate-fade-out pointer-events-none" : "animate-fade-in"}`} onMouseDown={onClose}>
         <div
             role="dialog"
             aria-modal="true"
@@ -10,7 +11,7 @@ const Modal = ({ title, onClose, children, label = "modal-title" }) => (
             onMouseDown={(e) => e.stopPropagation()}
             // Stop Escape here so the editor's document listener doesn't close the note too.
             onKeyDown={(e) => { if (e.key === "Escape") { e.nativeEvent.stopPropagation(); onClose(); } }}
-            className="bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+110px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-6 text-center animate-pop-in">
+            className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+110px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-6 text-center ${closing ? "animate-pop-out" : "animate-pop-in"}`}>
             <p id={label} className="font-medium text-lg">{title}</p>
             {children}
         </div>
