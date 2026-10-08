@@ -23,7 +23,7 @@ const PasswordInput = ({ value, onChange, placeholder }) => {
                 className="text-red-500 cursor-pointer absolute right-0 text-xl mr-4 select-none"
                 onClick={() => toggleShowPassword()}
             />) : (<IoMdEyeOff 
-                className="text-light-text-color-tertiary cursor-pointer absolute right-0 text-xl mr-4 select-none"
+                className="text-light-text-color-tertiary dark:text-dark-text-color-tertiary cursor-pointer absolute right-0 text-xl mr-4 select-none"
                 onClick={() => toggleShowPassword()}
             />)}
         </div>

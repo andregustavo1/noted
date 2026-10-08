@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -21,21 +20,42 @@
         --dark-text-color-secondary: #f3f3f3;
         --dark-text-color-tertiary: #dcdcdc;
 
-        --dark-bg-color-primary: #111111;
-        --dark-bg-color-secondary: #222222;
+        --dark-bg-color-primary: #222222;
+        --dark-bg-color-secondary: #111111;
         --dark-bg-color-tertiary: #444444;
     }
 
     html {
-        font-family: "Roboto Mono", monospace;
+        font-family: "Roboto Mono Variable", "Roboto Mono", monospace;
         scrollbar-width:none;
         touch-action: pan-x pan-y; /* no pinch or double-tap zoom (iOS ignores user-scalable=no) */
         -webkit-tap-highlight-color: transparent; /* press feedback comes from :active instead */
+        /* No text selection or long-press callout on the app's UI (dashboard, menus, side panel); only where
+           text is written: the note editor and the input fields. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
     }
 
+    input,
+    textarea,
+    [contenteditable="true"],
+    [contenteditable="true"] * {
+        -webkit-user-select: text;
+        user-select: text;
+        -webkit-touch-callout: default;
+    }
+
+    /* Text without a color of its own inherits the theme's primary text color. */
     body {
         background-color: var(--light-bg-color-secondary);
+        color: var(--light-text-color-primary);
         overflow-x: clip;
+    }
+
+    .dark body {
+        background-color: var(--dark-bg-color-secondary);
+        color: var(--dark-text-color-primary);
     }
 
     /* Overlay-style scrollbar: thin translucent pill, no track, grows on hover */
@@ -91,6 +111,55 @@ input[type="password"]::-ms-clear,
 input[type="password"]::-webkit-clear-button, 
 input[type="password"]::-webkit-inner-spin-button {
     display: none;
+}
+
+/* Theme switch: the whole page crossfades to the other theme in 300ms (Home.jsx), so every color moves together.
+   Per-element color transitions can't do that: inherited text color lags behind its parent's. The switch is left
+   out of the snapshot and animates live, keeping its own 350ms slide. */
+.theme-fade [data-theme-switch] {
+    view-transition-name: theme-switch;
+}
+
+/* The new page under the fade is live: elements with color transitions of their own (cards, the panel's
+   inherited text) would still be changing after the fade ends. Paint the new theme at once instead. */
+.theme-fade *:not([data-theme-switch], [data-theme-switch] *) {
+    transition: none !important;
+}
+
+/* The + button keeps its own layer for card reorders; in a theme fade it would float over the side panel. */
+.theme-fade [style*="view-transition-name: fab"] {
+    view-transition-name: none !important;
+}
+
+.theme-fade::view-transition-group(*),
+.theme-fade::view-transition-old(*),
+.theme-fade::view-transition-new(*) {
+    animation-duration: 300ms;
+    animation-timing-function: ease;
+}
+
+.theme-fade::view-transition-old(root) {
+    animation-name: theme-fade-out;
+}
+
+.theme-fade::view-transition-new(root) {
+    animation-name: theme-fade-in;
+}
+
+.theme-fade::view-transition-old(theme-switch) {
+    display: none;
+}
+
+.theme-fade::view-transition-new(theme-switch) {
+    animation: none;
+}
+
+@keyframes theme-fade-out {
+    to { opacity: 0; }
+}
+
+@keyframes theme-fade-in {
+    from { opacity: 0; }
 }
 
 /* Cards glide to their new slot when the list reorders (pin, delete, duplicate); Home.jsx starts the transition
@@ -149,7 +218,7 @@ input[type="password"]::-webkit-inner-spin-button {
 .strike span,
 .strike-done {
     background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 0 1.5px;
-    transition: background-size 350ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: background-size 600ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .strike span.done,

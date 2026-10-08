@@ -8,9 +8,12 @@ import { HiOutlineDuplicate } from "react-icons/hi";
 import { IoMdCheckmark } from "react-icons/io";
 import { MdLabelOutline } from "react-icons/md";
 import { sanitize } from "../../lib/richtext";
+import { headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
+import LineMarker from "./LineMarker";
 
-const CHECK = /^(\s*)- \[([ xX])\] (.*)$/;
-const BULLET = /^(\s*)[-*] (.*)$/;
+// When a press closed an open card menu. The click that follows that press only closes the menu, on this card or
+// any other, instead of also opening a note.
+let menuClosedAt = 0;
 
 const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, onPinNote, onCategory, onDuplicate, onDelete }) => {
     const [isNoteOptionsVisible, setNoteOptionsVisible] = useState(false);
@@ -18,18 +21,21 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
     const noteOptionsRef = useRef(null);
     const cardRef = useRef(null);
     const [openRight, setOpenRight] = useState(false);
+    const openRef = useRef(false);
+    openRef.current = isNoteOptionsVisible;
 
     useEffect(() => {
         function handleClickOutside(event) {
             if (noteOptionsRef.current && !noteOptionsRef.current.contains(event.target) &&
                 noteOptionsBtnRef.current && !noteOptionsBtnRef.current.contains(event.target)) {
+                if (openRef.current) menuClosedAt = Date.now();
                 setNoteOptionsVisible(false);
             }
         }
 
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('pointerdown', handleClickOutside);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('pointerdown', handleClickOutside);
         };
     }, []);
 
@@ -46,46 +52,70 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
     const size = tall
         ? { previewLength: 90 + jitter, minHeight: 170 + jitter }
         : { previewLength: 45 + jitter, minHeight: 112 + jitter };
-    const previewLength = isPinned ? 80 : size.previewLength;
-    // Cap lines too: list and checkbox notes break every few characters, so a char cap alone runs very tall.
-    const maxLines = isPinned ? 4 : tall ? 5 : 3;
-    const lines = content.slice(0, previewLength).split("\n");
-    const cut = content.length > previewLength || lines.length > maxLines;
-    // The cut may land inside an inline tag; drop that tail before the lines are rendered as HTML.
-    const preview = lines.slice(0, maxLines).join("\n").replace(/<\/?[a-z]*$/, "") + (cut ? "..." : "");
+    // A pinned card spans the row, so it keeps one line less than a tall card (budget ~20 chars a line, like list lines).
+    const previewLength = isPinned ? 60 : size.previewLength;
+    // Lines up to maxLines. List and heading lines stay on one line and end in "..." on their own, so a long one never
+    // hides the lines under it; plain text wraps, so it spends the character budget and is cut where that runs out.
+    const maxLines = isPinned ? 3 : tall ? 5 : 3;
+    const all = content.split("\n");
+    const shown = [];
+    let budget = previewLength;
+    for (const raw of all) {
+        if (shown.length === maxLines || budget <= 0) break;
+        const { list, text } = parseLine(raw);
+        if (list) {
+            shown.push(raw);
+            budget -= Math.min(text.length, 20);
+        } else {
+            // The cut may land inside an inline tag; drop that tail before the line is rendered as HTML.
+            shown.push(raw.slice(0, budget).replace(/<\/?[a-z]*$/, ""));
+            budget -= raw.length;
+        }
+    }
+    const cut = budget < 0 || shown.length < all.length;
+    const preview = shown.join("\n") + (cut ? "..." : "");
     const html = (text) => ({ __html: sanitize(text) });
 
+    // Each line renders like the open note does (same markers, heading sizes and spacing), cut to fit the card.
     // Checklist lines are display only here; they are ticked inside the open note.
-    const renderLine = (line, index) => {
-        const check = line.match(CHECK);
-        if (check) {
-            const done = check[2] !== " ";
-            const fill = isPinned ? "bg-[var(--primary-color-fg)] text-[var(--primary-color)]" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)]";
-            return (
-                <span key={index} className={`flex items-center gap-2 ${index ? "mt-2" : ""}`}>
-                    <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${done ? fill : "border-2 border-current opacity-60"}`}>
-                        {done && <IoMdCheckmark />}
+    const renderLine = (raw, index) => {
+        const line = parseLine(raw);
+        const check = line.check !== undefined;
+        const icon = check || (line.list && !line.number && !line.heading);
+        const fill = isPinned ? "bg-[var(--primary-color-fg)] text-[var(--primary-color)]" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)]";
+        return (
+            <div key={index} style={indentStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line) : ""}`}>
+                {check && (
+                    <span className="h-[1.625em] shrink-0 flex items-center">
+                        <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-60"}`}>
+                            {line.done && <IoMdCheckmark />}
+                        </span>
                     </span>
-                    <span className={`truncate min-w-0 ${done ? "opacity-60" : ""}`}><span className={done ? "strike-done" : ""} dangerouslySetInnerHTML={html(check[3])} /></span>
+                )}
+                {line.list && !check && !line.heading && <LineMarker line={line} />}
+                {/* Lists and headings stay on one line and end in "..."; plain text still wraps. -top-px matches the editor. */}
+                <span className={`relative min-w-0 flex-1 ${icon ? "-top-px" : ""} ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-60" : ""}`}>
+                    <span className={line.done ? "strike-done" : ""} dangerouslySetInnerHTML={html(line.text)} />
                 </span>
-            );
-        }
-        const heading = line.match(/^#{1,3} /);
-        if (heading) return <span key={index} className={`block truncate font-medium ${index ? "mt-2" : ""}`} dangerouslySetInnerHTML={html(line.slice(heading[0].length))} />;
-        const bullet = line.match(BULLET);
-        // List items stay on one line and end in "..."; plain text still wraps.
-        return <span key={index} className={`block ${bullet ? "whitespace-pre overflow-hidden text-ellipsis" : ""} ${index ? "mt-1.5" : ""}`} dangerouslySetInnerHTML={html(bullet ? `${bullet[1]}• ${bullet[2]}` : line)} />;
+            </div>
+        );
     };
 
     return (
         <div
             ref={cardRef}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] active:scale-[0.98] relative ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary"}`}
-            onClick={onOpen}>
+            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "active:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
+            // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
+            // would shrink the card and the menu with it.
+            onClick={() => {
+                const closing = Date.now() - menuClosedAt < 1500;
+                menuClosedAt = 0;
+                if (!closing) onOpen();
+            }}>
             <div className="">
                 <div className='flex items-center justify-between gap-2'>
-                    <h1 className="font-medium truncate min-w-0">{title || "Noted"}</h1>
+                    <h1 className={`${headingSize("#")} truncate min-w-0`}>{title || "Noted"}</h1>
                     <button
                         ref={noteOptionsBtnRef}
                         onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
@@ -108,30 +138,30 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
                 </button>
             </div>
 
-            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-3xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 <button
-                    className='flex items-center justify-between rounded-t-xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary'
+                    className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>
                     <p>Editar</p>
                     <MdOutlineCreate />
                 </button>
 
                 <button
-                    className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary'
+                    className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onPinNote(); }}>
                     <p>{isPinned ? "Desfixar" : "Fixar"}</p>
                     {isPinned ? <RiPushpin2Fill /> : <RiUnpinLine />}
                 </button>
 
                 <button
-                    className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary'
+                    className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onCategory(); }}>
                     <p>Categoria</p>
                     <MdLabelOutline />
                 </button>
 
                 <button
-                    className='flex items-center justify-between text-sm  py-3 px-4 hover:bg-light-bg-color-secondary'
+                    className='flex items-center justify-between text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDuplicate(); }}>
                     <p>Duplicar</p>
                     <HiOutlineDuplicate />
@@ -139,7 +169,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
 
                 <button
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDelete(); }}
-                    className='flex items-center justify-between text-sm text-red-600 py-3 px-4 rounded-b-xl hover:bg-red-500 hover:text-white duration-200'>
+                    className='flex items-center justify-between text-sm text-red-600 py-3 px-4 rounded-b-3xl hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500 duration-200'>
                     <p>Excluir</p>
                     <BsTrash3></BsTrash3>
                 </button>

@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Dark theme follows the app's own setting (the `dark` class on <html>, see lib/settings.js), not the OS.
+  darkMode: "class",
   // hover: only applies on devices that can hover, so taps don't leave sticky hover states.
   future: { hoverOnlyWhenSupported: true },
   content: [
@@ -21,8 +23,8 @@ export default {
         'pop-in': 'pop-in 200ms ease-out',
         'fade-out': 'fade-out 100ms ease-in forwards',
         'pop-out': 'pop-out 100ms ease-in forwards',
-        'check-pop': 'check-pop 300ms cubic-bezier(0.23, 1, 0.32, 1)',
-        'check-draw': 'check-draw 250ms 80ms ease-out backwards',
+        'check-pop': 'check-pop 450ms cubic-bezier(0.23, 1, 0.32, 1)',
+        'check-draw': 'check-draw 400ms 120ms ease-out backwards',
       },
       screens: {
         'ml': '425px',
