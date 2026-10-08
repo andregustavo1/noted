@@ -674,6 +674,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         ref={hostRef}
                         role="textbox"
                         aria-multiline="true"
+                        // Mark the body as plain writing (not a login field), so iOS keeps word suggestions and has less
+                        // reason to offer Passwords on the keyboard bar. iOS decides that bar; these are hints only.
+                        autoComplete="off"
+                        autoCorrect="on"
+                        autoCapitalize="sentences"
+                        spellCheck
                         contentEditable
                         suppressContentEditableWarning
                         className="outline-none"
