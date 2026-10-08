@@ -168,7 +168,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
 
                 {/* Last in the column, so it sits at the panel's bottom whatever the keyboard does. */}
                 <div className="-mx-5 px-5 py-2 border-t border-light-bg-color-tertiary dark:border-dark-bg-color-tertiary">
-                    <button onClick={onLogout} className="w-full font-semibold rounded-full py-2 h-10 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><FiLogOut size={20} />Desconectar</button>
+                    <button onClick={onLogout} className="w-full font-semibold rounded-full h-11 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><FiLogOut size={20} />Desconectar</button>
                 </div>
             </div>
         </>

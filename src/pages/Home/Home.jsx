@@ -4,7 +4,7 @@ import Navbar from "../../components/Navbar/Navbar";
 import NoteCard from "../../components/Cards/NoteCard";
 import NoteEditor from "../../components/Cards/NoteEditor";
 import { TfiPlus } from "react-icons/tfi";
-import { MdOutlineCreate } from "react-icons/md";
+import { MdOutlineCreate, MdLabelOutline } from "react-icons/md";
 import { BsTrash3 } from "react-icons/bs";
 import CategoryBar from "../../components/Cards/CategoryBar";
 import ProfileInfo from "../../components/Cards/ProfileInfo";
@@ -722,7 +722,7 @@ const Home = () => {
             )}
 
             {(dialogShown?.type === "add" || dialogShown?.type === "rename") && (
-                <Modal closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
+                <Modal icon={MdLabelOutline} closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
                     <form onSubmit={(e) => { e.preventDefault(); handleCategoryDialog(); }}>
                         <input
                             autoFocus
@@ -734,7 +734,7 @@ const Home = () => {
                             value={dialogName}
                             onChange={(e) => setDialogName(e.target.value)}
                             placeholder="Categoria"
-                            className="mt-4 w-full text-sm bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-full px-4 py-2 outline-none text-center caret-[var(--primary-color)]"
+                            className="mt-4 w-full h-11 text-sm bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-full px-4 outline-none text-center caret-[var(--primary-color)]"
                         />
                         <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} />
                     </form>
@@ -750,7 +750,7 @@ const Home = () => {
 
             {dialogShown?.type === "pick" && (
                 // The note's current category is the one in the primary color; tapping another moves the note.
-                <Modal closing={dialogClosing} title="Categoria" onClose={() => setDialog(null)}>
+                <Modal icon={MdLabelOutline} closing={dialogClosing} title="Categoria" onClose={() => setDialog(null)}>
                     <div className="flex flex-wrap justify-center gap-2 mt-4">
                         {[{ name: "" }, ...categories].map(({ name }) => {
                             const on = dialogShown.note.category === name;
