@@ -89,6 +89,7 @@ const Home = () => {
     const categoryScroll = useDragScroll();
 
     const [onConfig, setOnConfig] = useState(false)
+    const [editNameSignal, setEditNameSignal] = useState(0); // bumped by the pencil on the avatar
     const [avatarShift, setAvatarShift] = useState(0)
     const avatarRef = useRef(null)
     const panelRef = useRef(null)
@@ -352,8 +353,14 @@ const Home = () => {
 
                 <div className="absolute top-0 right-0 py-4 pr-4 pl-2 z-50 transition-transform duration-300 ease-in-out"
                     style={{ transform: `translateX(${onConfig ? avatarShift : 0}px)` }}>
-                    <div ref={avatarRef}>
+                    <div ref={avatarRef} className="relative">
                         <ProfileInfo name={userName} onConfigClick={toggleConfig}></ProfileInfo>
+                        {/* With the panel open the avatar sits at the start of the name: a pencil there shows the name is editable. */}
+                        <button type="button" aria-label="Editar nome" tabIndex={onConfig ? 0 : -1}
+                            onClick={(e) => { e.stopPropagation(); setEditNameSignal((n) => n + 1); }}
+                            className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary text-light-text-color-secondary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
+                            <MdOutlineCreate />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -440,9 +447,10 @@ const Home = () => {
                 )}
             </div>
 
-            <div className={`absolute overflow-hidden w-full h-full top-0 right-0 duration-300 ${onConfig ? "visible" : "invisible"}`}>
+            {/* The keyboard-free screen height (index.html), so the keyboard never shortens the panel. */}
+            <div className={`absolute overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 duration-300 ${onConfig ? "visible" : "invisible"}`}>
                 <div ref={panelRef} className={`absolute top-0 right-0 h-full overflow-hidden duration-300 ease-in-out transform z-40 ${onConfig ? "translate-x-0" : "translate-x-full"}`}>
-                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} />
+                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
                 </div>
             </div>
 

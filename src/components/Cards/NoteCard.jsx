@@ -11,24 +11,31 @@ import { sanitize } from "../../lib/richtext";
 import { headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
+// When a press closed an open card menu. The click that follows that press only closes the menu, on this card or
+// any other, instead of also opening a note.
+let menuClosedAt = 0;
+
 const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, onPinNote, onCategory, onDuplicate, onDelete }) => {
     const [isNoteOptionsVisible, setNoteOptionsVisible] = useState(false);
     const noteOptionsBtnRef = useRef(null);
     const noteOptionsRef = useRef(null);
     const cardRef = useRef(null);
     const [openRight, setOpenRight] = useState(false);
+    const openRef = useRef(false);
+    openRef.current = isNoteOptionsVisible;
 
     useEffect(() => {
         function handleClickOutside(event) {
             if (noteOptionsRef.current && !noteOptionsRef.current.contains(event.target) &&
                 noteOptionsBtnRef.current && !noteOptionsBtnRef.current.contains(event.target)) {
+                if (openRef.current) menuClosedAt = Date.now();
                 setNoteOptionsVisible(false);
             }
         }
 
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('pointerdown', handleClickOutside);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('pointerdown', handleClickOutside);
         };
     }, []);
 
@@ -97,8 +104,14 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
         <div
             ref={cardRef}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] active:scale-[0.98] relative ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary"}`}
-            onClick={onOpen}>
+            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "active:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary"}`}
+            // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
+            // would shrink the card and the menu with it.
+            onClick={() => {
+                const closing = Date.now() - menuClosedAt < 1500;
+                menuClosedAt = 0;
+                if (!closing) onOpen();
+            }}>
             <div className="">
                 <div className='flex items-center justify-between gap-2'>
                     <h1 className={`${headingSize("#")} truncate min-w-0`}>{title || "Noted"}</h1>

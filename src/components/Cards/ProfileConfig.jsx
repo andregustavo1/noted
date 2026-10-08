@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { FiLogOut, FiSun, FiMoon } from "react-icons/fi";
 import { BsSortDown, BsSortUp } from "react-icons/bs";
@@ -18,7 +18,7 @@ const SORT_BY = [{ value: "date", label: "Data", name: "Data" }, { value: "name"
 const SORT_DIR = [{ value: "desc", label: <BsSortDown size={18} />, name: "Decrescente" }, { value: "asc", label: <BsSortUp size={18} />, name: "Crescente" }];
 
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
-const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
+const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSignal }) => {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(name);
     const primary = settings.primaryColor;
@@ -29,6 +29,10 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
         setDraft(name);
         setEditing(true);
     };
+    // The pencil on the avatar (rendered by Home, above the panel) asks to edit the name.
+    useEffect(() => {
+        if (editNameSignal) startEditing();
+    }, [editNameSignal]);
 
     const saveName = async () => {
         if (!editing) return;
@@ -69,7 +73,8 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
 
     return (
         <>
-            <div className="h-full max-w-[100vw] shadow-md pt-4 pb-8 px-5 bg-light-bg-color-secondary rounded-l-3xl">
+            <div className="h-full max-w-[100vw] flex flex-col shadow-md pt-4 px-5 bg-light-bg-color-secondary rounded-l-3xl">
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                 {/* pl clears the 40px avatar that slides in over the panel's left padding. */}
                 <div className="grid pl-[52px] pr-2 h-10 min-w-0">
                     {editing ? (
@@ -145,9 +150,12 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
                         </div>
                     </div>
 
-                    <div className="absolute bottom-0 left-5 right-5 py-8">
-                        <button onClick={onLogout} className="w-full font-semibold rounded-full py-3 h-[44px] text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><FiLogOut size={20} />Desconectar</button>
-                    </div>
+                </div>
+                </div>
+
+                {/* Last in the column, so it sits at the panel's bottom whatever the keyboard does. */}
+                <div className="-mx-5 px-5 py-4 border-t border-light-bg-color-tertiary">
+                    <button onClick={onLogout} className="w-full font-semibold rounded-full py-3 h-[44px] text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><FiLogOut size={20} />Desconectar</button>
                 </div>
             </div>
         </>
