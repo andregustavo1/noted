@@ -11,7 +11,7 @@ export const COLORS = [
     { name: "Amarelo", bg: "#edbb07", fg: "#000" },
     { name: "Ciano", bg: "#2575a2", fg: "#fff" },
     { name: "Azul escuro", bg: "#142b59", fg: "#fff" },
-    { name: "Roxo", bg: "#481674", fg: "#fff" },
+    { name: "Roxo", bg: "#691392", fg: "#fff" },
 ];
 
 const SORT_BY = [{ value: "date", label: "Data", name: "Data" }, { value: "name", label: "Nome", name: "Nome" }];
