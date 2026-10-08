@@ -487,11 +487,17 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Cut/Copy/Paste menu, which appears right by the selection.
     const [selecting, setSelecting] = useState(false);
     const toolbarBoxRef = useRef(null);
+    // While shown under the caret's row, the toolbar glides (150ms) up or down to the new row instead of jumping.
+    // It appears in place (no glide from wherever it was hidden) and follows a scroll while docked without lag.
+    const toolbarWasShown = useRef(false);
     const placeToolbar = () => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
+        const glide = focused && !selecting && toolbarWasShown.current;
+        box.style.transition = glide ? "top 150ms cubic-bezier(0.23, 1, 0.32, 1), left 150ms cubic-bezier(0.23, 1, 0.32, 1)" : "none";
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
         box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
+        toolbarWasShown.current = focused;
     };
     useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
