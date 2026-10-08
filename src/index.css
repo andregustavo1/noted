@@ -31,6 +31,20 @@
         scrollbar-width:none;
         touch-action: pan-x pan-y; /* no pinch or double-tap zoom (iOS ignores user-scalable=no) */
         -webkit-tap-highlight-color: transparent; /* press feedback comes from :active instead */
+        /* No text selection or long-press callout on the app's UI (dashboard, menus, side panel); only where
+           text is written: the note editor and the input fields. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+    input,
+    textarea,
+    [contenteditable="true"],
+    [contenteditable="true"] * {
+        -webkit-user-select: text;
+        user-select: text;
+        -webkit-touch-callout: default;
     }
 
     body {

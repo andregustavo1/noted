@@ -389,12 +389,25 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         });
         return best;
     };
-    const onPointerDown = (e) => {
-        if (e.target.closest("[contenteditable=false]")) return; // checkboxes and markers
-        const row = rowAtY(e.clientY);
-        tap.current = { x: e.clientX, y: e.clientY, row, time: Date.now() };
+    // A touch only counts as a tap when the finger lifts where it went down: a drag is a scroll, and moving the toolbar
+    // to the row under the finger then made it follow the finger. A mouse press counts at once (desktop focuses on press).
+    const press = useRef(null);
+    const commitTap = (x, y) => {
+        const row = rowAtY(y);
+        tap.current = { x, y, row, time: Date.now() };
         activeRow.current = row;
         setActiveIndex(row);
+    };
+    const onPointerDown = (e) => {
+        press.current = null;
+        if (e.target.closest("[contenteditable=false]")) return; // checkboxes and markers
+        if (e.pointerType === "mouse") return commitTap(e.clientX, e.clientY);
+        press.current = { x: e.clientX, y: e.clientY };
+    };
+    const onPointerUp = (e) => {
+        const p = press.current;
+        press.current = null;
+        if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 10) commitTap(e.clientX, e.clientY);
     };
     const placeTapCaret = () => {
         const t = tap.current;
@@ -670,6 +683,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         onCopy={(e) => onCopy(e, false)}
                         onCut={(e) => onCopy(e, true)}
                         onPointerDown={onPointerDown}
+                        onPointerUp={onPointerUp}
+                        onPointerCancel={() => { press.current = null; }}
                         onClick={placeTapCaret}
                         onFocus={() => { setFocused(true); shrinkForKeyboard(); }}
                         onBlur={onBlur}>
