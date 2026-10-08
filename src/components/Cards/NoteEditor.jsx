@@ -501,6 +501,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     };
     useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
+    // A menu opens under the toolbar, often off the visible part of the note (behind the keyboard): glide to it.
+    // The room reveal() keeps under the row already counts the menu by now (scrollPaddingBottom, above).
+    useEffect(() => {
+        if (menuOpen) reveal(rows.current[activeRow.current]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [menuOpen]);
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
     useEffect(() => {
@@ -675,7 +681,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
                                     <button key={label} type="button" disabled={(needsSaved && !saved) || off}
@@ -752,9 +758,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     className={`relative flex items-start gap-2 ${index === 0 ? "" : lineGap(line)}`}>
                                     {line.check !== undefined && (
                                         // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
+                                        // The hit area grows up, down and to the left, not to the right: a tap near the text's start is for the text.
                                         <span contentEditable={false} suppressContentEditableWarning className="h-[1.625em] shrink-0 flex items-center select-none">
                                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
-                                            className={`relative after:absolute after:-inset-2 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
+                                            className={`relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
                                             {line.done && (
                                                 // The card preview's IoMdCheckmark traced as a stroke, so it can draw in.
                                                 <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1">

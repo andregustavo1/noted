@@ -138,9 +138,9 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
                 </button>
             </div>
 
-            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-3xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 <button
-                    className='flex items-center justify-between rounded-t-xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
+                    className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>
                     <p>Editar</p>
                     <MdOutlineCreate />
@@ -169,7 +169,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
 
                 <button
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDelete(); }}
-                    className='flex items-center justify-between text-sm text-red-600 py-3 px-4 rounded-b-xl hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500 duration-200'>
+                    className='flex items-center justify-between text-sm text-red-600 py-3 px-4 rounded-b-3xl hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500 duration-200'>
                     <p>Excluir</p>
                     <BsTrash3></BsTrash3>
                 </button>

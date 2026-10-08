@@ -512,12 +512,12 @@ const Home = () => {
                     <div
                         style={{ left: Math.min(categoryMenu.rect.left, document.documentElement.clientWidth - 158), top: categoryMenu.rect.bottom + 4 }}
                         onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
-                        className="fixed w-[150px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
-                        <button className={`${menuItem} rounded-t-xl`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
+                        className="fixed w-[150px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
+                        <button className={`${menuItem} rounded-t-3xl`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
                             <p>Editar</p>
                             <MdOutlineCreate />
                         </button>
-                        <button className={`${menuItem} rounded-b-xl text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: categoryMenu.category })}>
+                        <button className={`${menuItem} rounded-b-3xl text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: categoryMenu.category })}>
                             <p>Excluir</p>
                             <BsTrash3 />
                         </button>
