@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Navbar from "../../components/Navbar/Navbar";
 import NoteCard from "../../components/Cards/NoteCard";
@@ -131,6 +131,10 @@ const Home = () => {
             .catch(console.error);
         return () => { active = false; };
     }, []);
+    // The dark theme only covers the signed-in app (the login stays light), so the class follows this page.
+    useLayoutEffect(() => {
+        document.documentElement.classList.toggle("dark", settings.theme === "dark");
+    }, [settings.theme]);
     const changeSettings = (changes) => {
         const next = { ...settings, ...changes };
         applySettings(next);

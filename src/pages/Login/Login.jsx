@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Navbar from "../../components/Navbar/Navbar";
 import { useNavigate } from "react-router-dom";
 import PasswordInput from "../../components/Input/PasswordInput";
@@ -26,6 +26,11 @@ const authErrorMessage = (error) => {
 }
 
 const Login = () => {
+    // The login has no dark theme: drop the class index.html (or the app, after a logout) may have set.
+    useLayoutEffect(() => {
+        document.documentElement.classList.remove("dark");
+    }, []);
+
     // The login fits the screen, so a downward swipe has nothing to scroll and the
     // browser turns it into pull-to-refresh. Disable that while this page is open.
     useEffect(() => {
