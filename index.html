@@ -2,9 +2,22 @@
 <html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="" />
+    <link rel="icon" type="image/svg+xml" href="/icon-black.svg" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="/icon-white.svg" media="(prefers-color-scheme: dark)" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual" />
     <title>Noted</title>
+
+    <!-- Home-screen app: full screen without Safari's bars, its own icon and name. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Noted" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#f3f3f3" />
+
+    <!-- Start connecting to Supabase while the app loads, so the first request for notes is quicker. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <script>
       // Apply the saved primary color before render so the + button doesn't flash.
       try {
@@ -35,21 +48,5 @@
   <body ontouchstart=""><!-- iOS only fires :active when a touchstart listener exists -->
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-    function updateFavicon() {
-        const darkBrowser = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const favicon = document.querySelector('link[rel="icon"]');
-
-        if (darkBrowser) {
-          favicon.href = "./src/assets/icon-white.svg";
-        } else {
-          favicon.href = "./src/assets/icon-black.svg";
-        }
-      }
-
-      updateFavicon();
-
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", updateFavicon);
-    </script>
   </body>
 </html>

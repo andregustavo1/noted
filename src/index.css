@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -27,7 +26,7 @@
     }
 
     html {
-        font-family: "Roboto Mono", monospace;
+        font-family: "Roboto Mono Variable", "Roboto Mono", monospace;
         scrollbar-width:none;
         touch-action: pan-x pan-y; /* no pinch or double-tap zoom (iOS ignores user-scalable=no) */
         -webkit-tap-highlight-color: transparent; /* press feedback comes from :active instead */
