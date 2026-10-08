@@ -23,7 +23,7 @@ const LISTS = [
     { label: "Lista numerada", icon: MdFormatListNumbered, prefix: "1. " },
     { label: "Lista de tarefas", icon: MdChecklist, prefix: "- [ ] " },
 ];
-const headingClass = (hashes) => (hashes ? `${headingSize(hashes)} text-light-text-color-primary` : "");
+const headingClass = (hashes) => (hashes ? `${headingSize(hashes)} text-light-text-color-primary dark:text-dark-text-color-primary` : "");
 // Inline styles are the browser's own editing commands on the selection (Ctrl+B/I/U work too).
 const STYLES = [
     { label: "Negrito", icon: MdFormatBold, command: "bold" },
@@ -610,24 +610,24 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Título"
                         // Styled like the big heading inside the note.
-                        className={`${headingSize("#")} text-light-text-color-primary outline-none w-full min-w-0`}
+                        className={`${headingSize("#")} text-light-text-color-primary dark:text-dark-text-color-primary outline-none w-full min-w-0`}
                     />
 
                     {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). */}
                     {[[-1, "Desfazer", MdUndo, history.i === 0], [1, "Refazer", MdRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
                         <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => go(step)} disabled={off} aria-label={label} title={label}
-                            className={`${headerButton} text-xl bg-light-bg-color-secondary text-light-text-color-primary hover:bg-light-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
+                            className={`${headerButton} text-xl bg-light-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
                             <Icon />
                         </button>
                     ))}
 
                     <div ref={optionsRef} className="relative shrink-0">
                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOptionsOpen((o) => !o); setCopied(false); }} aria-label="Opções" aria-expanded={optionsOpen}
-                            className={`${headerButton} text-base bg-light-bg-color-secondary text-light-text-color-primary hover:bg-light-bg-color-tertiary`}>
+                            className={`${headerButton} text-base bg-light-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary`}>
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen }) => (
                                     <button key={label} type="button" disabled={needsSaved && !saved}
@@ -649,7 +649,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         </button>
                     ) : (
                         <button type="button" onClick={close} disabled={closing} aria-label="Fechar"
-                            className={`${headerButton} text-2xl text-light-text-color-tertiary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary`}>
+                            className={`${headerButton} text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
                             <IoMdClose />
                         </button>
                     )}
@@ -659,7 +659,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     ref={bodyRef}
                     onScroll={() => { if (selecting) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
-                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
+                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Room under the last row for the toolbar (and its open menu) below it.
                     style={{ paddingBottom: focused ? (menuOpen ? 136 : 80) : 0, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
@@ -740,7 +740,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         className={`absolute z-10 origin-top-left transition-[opacity,transform] duration-150 ease-out ${focused ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
+                        <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
@@ -759,7 +759,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             {menuOpen && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward.
-                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in`}>
+                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
                                             className={`text-2xl py-3 px-5 transition-colors ${option(activeList === prefix)}`}><Icon /></button>

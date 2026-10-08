@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Dark theme follows the app's own setting (the `dark` class on <html>, see lib/settings.js), not the OS.
+  darkMode: "class",
   // hover: only applies on devices that can hover, so taps don't leave sticky hover states.
   future: { hoverOnlyWhenSupported: true },
   content: [

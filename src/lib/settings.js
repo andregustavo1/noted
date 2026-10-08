@@ -20,6 +20,7 @@ const legacyColor = () => {
 };
 
 export const applySettings = (settings) => {
+    document.documentElement.classList.toggle("dark", settings.theme === "dark");
     const root = document.documentElement.style;
     root.setProperty("--primary-color", settings.primaryColor);
     root.setProperty("--primary-color-fg", settings.primaryColorFg);

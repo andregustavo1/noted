@@ -18,7 +18,7 @@ const Navbar = ({ searchQuery, onSearchChange }) => {
         <header className="grid place-items-center py-4">
             <div className="flex items-center w-full md:px-4 min-h-10">
                 <div id="logo" className={`absolute items-center pl-4 md:pl-0 flex duration-300 ${logoToggle ? "opacity-0 md:opacity-100" : "opacity-100"}`}>
-                    <h2 className="text-3xl text-light-text-color-primary">Noted.</h2>
+                    <h2 className="text-3xl text-light-text-color-primary dark:text-dark-text-color-primary">Noted.</h2>
                 </div>
 
                 {showSearch && (

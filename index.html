@@ -17,8 +17,9 @@
     <meta name="theme-color" content="#f3f3f3" />
 
     <script>
-      // Apply the saved primary color before render so the + button doesn't flash.
+      // Apply the saved primary color and theme before render so the + button and the page don't flash.
       try {
+        if (JSON.parse(localStorage.getItem("settings") || "{}").theme === "dark") document.documentElement.classList.add("dark");
         const root = document.documentElement.style;
         const bg = localStorage.getItem("primaryColor");
         const fg = localStorage.getItem("primaryColorFg");

@@ -94,7 +94,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                     ) : (
                         <button onClick={startEditing} title="Editar nome" className="font-medium text-sm truncate text-left">{name}</button>
                     )}
-                    <p className="text-light-text-color-tertiary text-sm truncate">{email}</p>
+                    <p className="text-light-text-color-tertiary dark:text-dark-text-color-tertiary text-sm truncate">{email}</p>
                 </div>
 
                 <p className="font-semibold text-xl mt-8">Configurações</p>

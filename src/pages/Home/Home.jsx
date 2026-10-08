@@ -396,7 +396,7 @@ const Home = () => {
                         {/* With the panel open the avatar sits at the start of the name: a pencil there shows the name is editable. */}
                         <button type="button" aria-label="Editar nome" tabIndex={onConfig ? 0 : -1}
                             onClick={(e) => { e.stopPropagation(); setEditNameSignal((n) => n + 1); }}
-                            className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary text-light-text-color-secondary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
+                            className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary text-light-text-color-secondary dark:text-dark-text-color-secondary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
                             <MdOutlineCreate />
                         </button>
                     </div>
@@ -436,7 +436,7 @@ const Home = () => {
                     <div
                         style={{ left: Math.min(categoryMenu.rect.left, document.documentElement.clientWidth - 158), top: categoryMenu.rect.bottom + 4 }}
                         onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
-                        className="fixed w-[150px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary animate-pop-in origin-top-left">
+                        className="fixed w-[150px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
                         <button className={`${menuItem} rounded-t-xl`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
                             <p>Editar</p>
                             <MdOutlineCreate />
@@ -453,21 +453,21 @@ const Home = () => {
             <div onClick={toggleConfig} className={`bg-black w-screen h-screen absolute top-0 z-30 duration-300 ${onConfig ? "opacity-20 visible" : "opacity-0 invisible"}`}></div>
 
             <div id="container" className={`flex flex-wrap justify-between mb-28 mt-4 px-4 gap-2 max-w-[768px] mx-auto relative `}>
-                {loading && <p className="w-full text-center text-light-text-color-tertiary mt-10">Carregando...</p>}
+                {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">Carregando...</p>}
 
                 {!loading && loadError && (
                     <div className="w-full text-center mt-10">
-                        <p className="text-light-text-color-secondary">Não foi possível carregar suas notas.</p>
+                        <p className="text-light-text-color-secondary dark:text-dark-text-color-secondary">Não foi possível carregar suas notas.</p>
                         <button onClick={loadNotes} className="mt-3 font-medium underline">Tentar novamente</button>
                     </div>
                 )}
 
                 {!loading && !loadError && notes.length === 0 && (
-                    <p className="w-full text-center text-light-text-color-tertiary mt-10"></p>
+                    <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10"></p>
                 )}
 
                 {!loading && !loadError && notes.length > 0 && visibleNotes.length === 0 && (
-                    <p className="w-full text-center text-light-text-color-tertiary mt-10"></p>
+                    <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10"></p>
                 )}
 
                 {!loading && visibleNotes.filter((n) => n.is_pinned).map((n) => renderCard(n))}
@@ -509,7 +509,7 @@ const Home = () => {
 
             {pendingDelete && (
                 <Modal title="Excluir nota?" onClose={() => setPendingDelete(null)}>
-                    <p className="text-sm text-light-text-color-tertiary mt-2 break-words">"{pendingDelete.title || "Noted"}"<br />será excluída.</p>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{pendingDelete.title || "Noted"}"<br />será excluída.</p>
                     <ModalButtons danger confirm="Excluir" onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(pendingDelete)} />
                 </Modal>
             )}
@@ -536,7 +536,7 @@ const Home = () => {
 
             {dialog?.type === "delete" && (
                 <Modal title="Excluir categoria?" onClose={() => setDialog(null)}>
-                    <p className="text-sm text-light-text-color-tertiary mt-2 break-words">"{dialog.category.name}" será excluída.<br />Suas notas ficam em "Todas".</p>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{dialog.category.name}" será excluída.<br />Suas notas ficam em "Todas".</p>
                     <ModalButtons danger confirm="Excluir" onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
                 </Modal>
             )}

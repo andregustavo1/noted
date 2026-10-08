@@ -36,7 +36,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
                     
                 }}>
                     <BsSearch
-                        className={`text-light-text-color-primary text-xl`}
+                        className={`text-light-text-color-primary dark:text-dark-text-color-primary text-xl`}
                     />
                 </div>
 
@@ -63,7 +63,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
 
                     {value && (
                         <IoMdClose
-                            className="text-light-text-color-tertiary absolute right-0 mr-4 w-5 h-5 text-xl hover:text-light-text-color-primary cursor-pointer"
+                            className="text-light-text-color-tertiary dark:text-dark-text-color-tertiary absolute right-0 mr-4 w-5 h-5 text-xl hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary cursor-pointer"
                             onClick={onClearSearch}
                         ></IoMdClose>
                     )}
