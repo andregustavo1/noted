@@ -716,7 +716,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     )}
                                     {line.list && line.check === undefined && !line.heading && <LineMarker line={line} contentEditable={false} suppressContentEditableWarning />}
                                     {/* -top-px: the font sits its letters a touch low in the line, so lift them level with the icon. */}
-                                    <div className={`relative flex-1 min-w-0 transition-opacity duration-300 ${icon ? "-top-px" : ""} ${line.done ? "opacity-60" : ""}`}>
+                                    <div className={`relative flex-1 min-w-0 transition-opacity duration-500 ${icon ? "-top-px" : ""} ${line.done ? "opacity-60" : ""}`}>
                                         <div
                                             ref={(el) => { rows.current[index] = el; }}
                                             data-placeholder={index === 0 && lines.length === 1 ? "" : undefined}
