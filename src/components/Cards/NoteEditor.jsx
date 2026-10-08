@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdTitle, MdUndo } from "react-icons/md";
+import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
@@ -150,13 +151,26 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const newId = () => ++seq.current;
 
     // Scroll the note body (never the page, iOS would pan it) so the row and the toolbar under it are in view.
-    const reveal = (el) => {
+    // The view follows the focus: it glides to the caret's row when the caret moves to another row and as a row
+    // grows while typing. Both rects are read as they are now, so a call during a glide just aims the same glide again.
+    // pad is the room to keep under the row (the toolbar's); instant skips the glide.
+    const reveal = (el, { pad = parseFloat(bodyRef.current?.style.scrollPaddingBottom) || 0, instant = false } = {}) => {
         const box = bodyRef.current;
         if (!el || !box) return;
-        const pad = parseFloat(box.style.scrollPaddingBottom) || 0;
         const r = el.parentElement.getBoundingClientRect(), b = box.getBoundingClientRect();
-        if (r.bottom > b.bottom - pad) box.scrollTop += r.bottom - (b.bottom - pad);
-        else if (r.top < b.top) box.scrollTop -= b.top - r.top;
+        let top = box.scrollTop;
+        if (r.bottom > b.bottom - pad) top += r.bottom - (b.bottom - pad);
+        else if (r.top < b.top) top -= b.top - r.top;
+        if (Math.abs(top - box.scrollTop) >= 1) box.scrollTo({ top, behavior: instant ? "auto" : "smooth" });
+    };
+    // Reveal when the keyboard is the reason (it just took part of the screen). iOS looks for the caret right after
+    // the focus and, if it is under the keyboard, pans the whole page (which the viewport handler then undoes: a
+    // visible jump). So first, instantly, just enough for the row to clear the keyboard: what iOS would do itself,
+    // and nothing at all for a row that already clears it. Then the rest, the toolbar's room, glides: the caret is
+    // in view the whole way, so there is nothing for iOS to pan to.
+    const revealForKeyboard = (el) => {
+        reveal(el, { pad: 0, instant: true });
+        reveal(el);
     };
 
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
@@ -436,8 +450,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const beforeInputRef = useRef(null);
     beforeInputRef.current = onBeforeInput;
     // On every caret move: track the caret's row (the toolbar follows it), keep a collapsed caret inside a row's
-    // text (a tap between rows can drop it on the host, where typing would land outside every row), and refresh
-    // the open menu's highlights.
+    // text (a tap between rows can drop it on the host, where typing would land outside every row), bring the
+    // caret's row into view, and refresh the open menu's highlights.
     const selectionRef = useRef(null);
     selectionRef.current = () => {
         const sel = window.getSelection();
@@ -449,6 +463,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (sel.isCollapsed && tapped !== null && pos[0] !== tapped) return placeTapCaret();
         if (sel.isCollapsed && !rows.current[pos[0]]?.contains(sel.anchorNode)) setSelection(rows.current[pos[0]], pos[1]);
         if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
+        // Only a caret: while a selection is dragged the browser scrolls after the finger, and this would pull back.
+        if (sel.isCollapsed) reveal(rows.current[pos[0]]);
         setSelecting(!sel.isCollapsed);
         if (menuOpen) rerender((n) => n + 1);
     };
@@ -477,7 +493,29 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
         box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
     };
-    useLayoutEffect(placeToolbar);
+    // Each time the toolbar shows up or moves to another line it pops in (100ms) instead of jumping; hiding is instant.
+    const shownAt = useRef(null);
+    useLayoutEffect(() => {
+        placeToolbar();
+        const box = toolbarBoxRef.current;
+        const at = focused ? `${activeIndex}|${selecting}` : null; // not the position: a wrapping line or a scroll moves it too
+        if (box && at && at !== shownAt.current) {
+            // On iOS the tap that moves the caret also does heavy work (selection, scrolling, the keyboard) in the same
+            // frame; an animation started now was already over by the first frame drawn. So hide the toolbar at once
+            // and start the 100ms entrance two frames later, after that frame is on screen.
+            cancelAnimationFrame(entrance.current);
+            box.style.opacity = "0";
+            entrance.current = requestAnimationFrame(() => {
+                entrance.current = requestAnimationFrame(() => {
+                    box.style.opacity = "";
+                    box.animate([{ opacity: 0, transform: "translateY(-6px) scale(0.96)" }, { opacity: 1, transform: "none" }], { duration: 100, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+                });
+            });
+        }
+        if (!at && box) { cancelAnimationFrame(entrance.current); box.style.opacity = ""; } // hidden: no late entrance
+        shownAt.current = at;
+    });
+    const entrance = useRef(0);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
@@ -515,18 +553,30 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // The note body got focus and the keyboard is about to come up: shrink the overlay to the last known keyboard
     // height right away, so by the time iOS looks, the caret is already above the keyboard and there is nothing to
     // pan the page to. Only before the keyboard is up, so it never leaves a gap under the note.
+    // Before the first keyboard on an iPhone there is no measured height; a tall typical one keeps the first focus
+    // from panning too (too tall only leaves a gap under the note until the real height arrives, a moment later;
+    // too short would leave the row under the keyboard).
     const shrinkForKeyboard = () => {
-        const keyboard = Number(localStorage.getItem("keyboardHeight"));
+        const keyboard = Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 340 : 0);
         const viewport = window.visualViewport;
         if (keyboard && (!viewport || viewport.height > appHeight() - 100)) setVvHeight((h) => Math.min(h, appHeight() - keyboard));
     };
-    // Keep the caret's row in view inside the note body whenever the visible area changes.
+    // Keep the caret's row in view inside the note body whenever the visible area changes (the keyboard's real
+    // height arriving, or a different keyboard).
     useEffect(() => {
-        if (focused) reveal(rows.current[activeRow.current]);
+        if (focused) revealForKeyboard(rows.current[activeRow.current]);
     }, [vvHeight, focused]);
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
     const [typing, setTyping] = useState(false);
     const isField = (el) => el?.matches("input, textarea, [contenteditable]") ?? false;
+    // The note body got focus: the keyboard is about to come up. The overlay is shrunk to the keyboard's height and
+    // the row brought clear of it right here, synchronously, so when iOS looks for the caret an instant later it is
+    // already in view. typing is set here too (the outer onFocus sets it again, later in the same event), as the
+    // overlay's height depends on it.
+    const onBodyFocus = () => {
+        flushSync(() => { setFocused(true); setTyping(true); shrinkForKeyboard(); });
+        revealForKeyboard(rows.current[activeRow.current]);
+    };
     // Wait a tick on blur so a press on the toolbar doesn't flicker it.
     const onBlur = () => setTimeout(() => {
         if (document.activeElement !== hostRef.current) { setFocused(false); setMenuOpen(null); }
@@ -547,6 +597,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // The "..." menu in the header: the card menu's actions plus copying the whole note.
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [reset, setReset] = useState(false);
     const optionsRef = useRef(null);
     useEffect(() => {
         if (!optionsOpen) return;
@@ -560,6 +611,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const timeout = setTimeout(() => setCopied(false), 2000);
         return () => clearTimeout(timeout);
     }, [copied]);
+    // "Resetar checklist" unticks every task (routines done again each day) and answers like "Copiar tudo".
+    useEffect(() => {
+        if (!reset) return;
+        const timeout = setTimeout(() => setReset(false), 2000);
+        return () => clearTimeout(timeout);
+    }, [reset]);
+    const hasDone = lines.some((raw) => parseLine(raw).done);
+    const resetChecks = () => {
+        setJustChecked(null);
+        setContent(lines.map((raw) => (parseLine(raw).done ? raw.replace(/\[[xX]\]/, "[ ]") : raw)).join("\n"));
+        setReset(true);
+    };
     const copyAll = async () => {
         try {
             await navigator.clipboard.writeText(noteText(title, content));
@@ -575,6 +638,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         { label: "Categoria", icon: MdLabelOutline, run: () => onCategory(saved), needsSaved: true },
         { label: "Duplicar", icon: HiOutlineDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
         copied ? { label: "Copiado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Copiar tudo", icon: MdContentCopy, run: copyAll, stayOpen: true },
+        reset ? { label: "Resetado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Resetar checklist", icon: MdRestartAlt, run: resetChecks, stayOpen: true, off: !hasDone },
         { label: "Excluir", icon: BsTrash3, run: () => onDelete(saved), needsSaved: true, danger: true },
     ];
 
@@ -629,8 +693,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         {optionsOpen && (
                             <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
-                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen }) => (
-                                    <button key={label} type="button" disabled={needsSaved && !saved}
+                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
+                                    <button key={label} type="button" disabled={(needsSaved && !saved) || off}
                                         onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
                                         className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
                                         <span>{label}</span>
@@ -683,7 +747,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         contentEditable
                         suppressContentEditableWarning
                         className="outline-none"
-                        onInput={syncFromDom}
+                        onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
                         onCopy={(e) => onCopy(e, false)}
@@ -692,7 +756,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         onPointerUp={onPointerUp}
                         onPointerCancel={() => { press.current = null; }}
                         onClick={placeTapCaret}
-                        onFocus={() => { setFocused(true); shrinkForKeyboard(); }}
+                        onFocus={onBodyFocus}
                         onBlur={onBlur}>
                         {lines.map((raw, index) => {
                             const line = parseLine(raw);
@@ -737,7 +801,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
                         between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
                     <div ref={toolbarBoxRef}
-                        className={`absolute z-10 origin-top-left transition-[opacity,transform] duration-150 ease-out ${focused ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
+                        className={`absolute z-10 origin-top-left ${focused ? "" : "opacity-0 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
