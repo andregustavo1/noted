@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { FiLogOut, FiSun, FiMoon } from "react-icons/fi";
+import { BsSortDown, BsSortUp } from "react-icons/bs";
 
 // fg is the + icon color that stays readable on bg.
 export const COLORS = [
@@ -14,7 +15,7 @@ export const COLORS = [
 ];
 
 const SORT_BY = [{ value: "date", label: "Data" }, { value: "name", label: "Nome" }];
-const SORT_DIR = [{ value: "desc", label: "Decrescente" }, { value: "asc", label: "Crescente" }];
+const SORT_DIR = [{ value: "desc", label: <BsSortDown size={18} />, name: "Decrescente" }, { value: "asc", label: <BsSortUp size={18} />, name: "Crescente" }];
 
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
 const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
@@ -41,17 +42,26 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
 
     const choose = ({ bg, fg }) => onChange({ primaryColor: bg, primaryColorFg: fg });
 
-    // A row of pill options, the chosen one in the primary color.
-    const choices = (label, options, value, key) => (
-        <div className="flex gap-1 mt-2 p-1 rounded-full bg-light-bg-color-primary" role="radiogroup" aria-label={label}>
-            {options.map((o) => (
-                <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange({ [key]: o.value })}
-                    className={`flex-1 h-9 rounded-full text-sm font-medium transition-colors duration-200 ${value === o.value ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-light-bg-color-secondary"}`}>
-                    {o.label}
-                </button>
-            ))}
-        </div>
-    );
+    // A segmented toggle on the primary color: a light knob slides under the chosen option.
+    const choices = (label, options, value, key, className) => {
+        const index = Math.max(0, options.findIndex((o) => o.value === value));
+        return (
+            <div className={`relative flex p-1 rounded-full bg-[var(--primary-color)] ${className}`} role="radiogroup" aria-label={label}>
+                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-light-bg-color-primary shadow-sm"
+                    style={{
+                        width: `calc((100% - 0.5rem) / ${options.length})`,
+                        transform: `translateX(${index * 100}%)`,
+                        transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1)",
+                    }} />
+                {options.map((o) => (
+                    <button key={o.value} type="button" role="radio" aria-checked={value === o.value} aria-label={o.name} title={o.name} onClick={() => onChange({ [key]: o.value })}
+                        className={`relative flex-1 h-9 grid place-items-center rounded-full text-sm font-semibold transition-colors duration-300 ${value === o.value ? "text-[var(--primary-color)]" : "text-[var(--primary-color-fg)]"}`}>
+                        {o.label}
+                    </button>
+                ))}
+            </div>
+        );
+    };
 
     return (
         <>
@@ -125,10 +135,10 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
 
                     <div className="grid mt-8">
                         <p className="font-medium text-lg">Ordenar notas</p>
-                        <p className="font-medium text-sm mt-3 text-light-text-color-secondary">Por</p>
-                        {choices("Ordenar por", SORT_BY, settings.sortBy, "sortBy")}
-                        <p className="font-medium text-sm mt-3 text-light-text-color-secondary">Ordem</p>
-                        {choices("Ordem", SORT_DIR, settings.sortDir, "sortDir")}
+                        <div className="flex gap-2 mt-3">
+                            {choices("Ordenar por", SORT_BY, settings.sortBy, "sortBy", "flex-1")}
+                            {choices("Ordem", SORT_DIR, settings.sortDir, "sortDir", "w-[104px] shrink-0")}
+                        </div>
                         <p className="text-xs mt-2 text-light-text-color-tertiary">As notas fixadas ficam no topo, na mesma ordem.</p>
                     </div>
 

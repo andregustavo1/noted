@@ -26,9 +26,12 @@ const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 // trap the card menu under the next card. flushSync so the DOM is already updated inside the callback.
 // Browsers without the API just apply the update.
 // ponytail: every card is snapshotted, offscreen ones too; fine for dozens of notes, revisit past a few hundred.
+// While the side panel or a note is open the cards are hidden under it, and the transition would draw them on top
+// of it (its layers sit above the whole page), so the update just applies. Home sets this flag on every render.
 let reorders = 0;
+let notesCovered = false;
 const animateNotes = (update) => {
-    if (!document.startViewTransition) return update();
+    if (!document.startViewTransition || notesCovered) return update();
     reorders++;
     document.documentElement.classList.add("reordering");
     const done = () => { if (--reorders === 0) document.documentElement.classList.remove("reordering"); };
@@ -212,6 +215,8 @@ const Home = () => {
     };
 
     const closeEditor = useCallback(() => setEditor(null), []);
+
+    notesCovered = onConfig || Boolean(editor);
 
     // Which parity starts tall is rolled once per page load, so the pattern changes on refresh only.
     const [flip] = useState(() => Math.round(Math.random()));

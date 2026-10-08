@@ -501,7 +501,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // "Copiar tudo" answers in place: the item turns into "Copiado" with a check, then back; the menu stays open.
     useEffect(() => {
         if (!copied) return;
-        const timeout = setTimeout(() => setCopied(false), 1200);
+        const timeout = setTimeout(() => setCopied(false), 2000);
         return () => clearTimeout(timeout);
     }, [copied]);
     const copyAll = async () => {
@@ -552,7 +552,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Título"
-                        className="font-medium text-lg outline-none w-full min-w-0"
+                        // Styled like the big heading inside the note.
+                        className={`${headingSize("#")} text-light-text-color-primary outline-none w-full min-w-0`}
                     />
 
                     {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). */}

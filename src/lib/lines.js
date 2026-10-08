@@ -26,4 +26,5 @@ export const HEADINGS = [
 export const headingSize = (hashes) => HEADINGS.find((h) => h.prefix.trim() === hashes)?.size ?? "";
 
 // Space above a row, by kind, so the editor and the card previews space lines the same way.
-export const lineGap = (line) => (line.heading ? "mt-3" : line.check !== undefined ? "mt-2" : "mt-1.5");
+// Plain and list lines 4px apart, checkboxes 6px, headings more.
+export const lineGap = (line) => (line.heading ? "mt-3" : line.check !== undefined ? "mt-1.5" : "mt-1");

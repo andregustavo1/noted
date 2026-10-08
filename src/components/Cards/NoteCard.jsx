@@ -101,7 +101,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
             onClick={onOpen}>
             <div className="">
                 <div className='flex items-center justify-between gap-2'>
-                    <h1 className="font-medium truncate min-w-0">{title || "Noted"}</h1>
+                    <h1 className={`${headingSize("#")} truncate min-w-0`}>{title || "Noted"}</h1>
                     <button
                         ref={noteOptionsBtnRef}
                         onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
