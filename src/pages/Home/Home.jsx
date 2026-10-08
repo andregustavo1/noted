@@ -512,8 +512,8 @@ const Home = () => {
                     <div
                         style={{ left: Math.min(categoryMenu.rect.left, document.documentElement.clientWidth - 158), top: categoryMenu.rect.bottom + 4 }}
                         onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
-                        className="fixed w-[150px] grid bg-light-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
-                        <button className={`${menuItem} rounded-t-3xl`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
+                        className="fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in origin-top-left">
+                        <button className={`${menuItem} rounded-t-3xl dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary`} onClick={() => openDialog({ type: "rename", category: categoryMenu.category })}>
                             <p>Editar</p>
                             <MdOutlineCreate />
                         </button>
@@ -612,7 +612,7 @@ const Home = () => {
 
             {dialog?.type === "delete" && (
                 <Modal title="Excluir categoria?" onClose={() => setDialog(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{dialog.category.name}" será excluída.<br />Suas notas ficam em "Todas".</p>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{dialog.category.name}" <br />será excluída.</p>
                     <ModalButtons danger confirm="Excluir" onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
                 </Modal>
             )}
@@ -625,8 +625,8 @@ const Home = () => {
                             const on = dialog.note.category === name;
                             return (
                                 <button key={name} type="button" onClick={() => handleSetCategory(dialog.note, name)} aria-pressed={on}
-                                    className={`rounded-full px-4 py-2 text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary hover:brightness-95"} ${name ? "" : "italic"}`}>
-                                    {name || "Sem categoria"}
+                                    className={`rounded-full px-4 py-2 text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95"} ${name ? "" : ""}`}>
+                                    {name || "Nenhuma"}
                                 </button>
                             );
                         })}
