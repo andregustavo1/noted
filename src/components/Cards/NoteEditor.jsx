@@ -632,7 +632,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen }) => (
                                     <button key={label} type="button" disabled={needsSaved && !saved}
                                         onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
-                                        className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white" : "hover:bg-light-bg-color-secondary"}`}>
+                                        className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary"}`}>
                                         <span>{label}</span>
                                         <Icon />
                                     </button>
