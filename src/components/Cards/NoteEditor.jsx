@@ -644,6 +644,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         <>
             {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard. */}
             <div className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
+            {/* iOS tints the status bar from a bar fixed at the top of the page (theme-color is ignored), or else from
+                the content scrolled under it, which could be a pinned card's color. This strip gives it the editor's. */}
+            <div aria-hidden="true" className={`fixed top-0 inset-x-0 h-3 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
         <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
