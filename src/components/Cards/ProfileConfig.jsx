@@ -55,7 +55,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
             <button type="button" role="switch" aria-checked={index === 1} aria-label={`${label}: ${options[index].name}`} title={options[index].name}
                 onClick={() => onChange({ [key]: other.value })}
                 className={`relative flex p-1 rounded-full bg-[var(--primary-color)] ${className}`}>
-                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-light-bg-color-primary shadow-sm"
+                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-[var(--primary-color-fg)] shadow-sm"
                     style={{
                         width: `calc((100% - 0.5rem) / ${options.length})`,
                         transform: `translateX(${index * 100}%)`,
