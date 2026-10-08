@@ -42,17 +42,16 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
 
     const choose = ({ bg, fg }) => onChange({ primaryColor: bg, primaryColorFg: fg });
 
-    // A two-way toggle in the neutral colors of the theme switch: a knob slides under the chosen option, and a press
-    // anywhere on it picks the other one.
+    // A two-way toggle on the primary color: a light knob slides under the chosen option, and a press anywhere on it
+    // picks the other one.
     const choices = (label, options, value, key, className) => {
         const index = Math.max(0, options.findIndex((o) => o.value === value));
         const other = options[(index + 1) % options.length];
         return (
             <button type="button" role="switch" aria-checked={index === 1} aria-label={`${label}: ${options[index].name}`} title={options[index].name}
                 onClick={() => onChange({ [key]: other.value })}
-                className={`relative flex p-1 rounded-full bg-light-bg-color-secondary ${className}`}
-                style={{ boxShadow: "inset 0 3px 6px rgba(15, 23, 42, 0.09), inset 0 -2px 4px rgba(15, 23, 42, 0.06)" }}>
-                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-light-bg-color-tertiary"
+                className={`relative flex p-1 rounded-full bg-[var(--primary-color)] ${className}`}>
+                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-light-bg-color-primary shadow-sm"
                     style={{
                         width: `calc((100% - 0.5rem) / ${options.length})`,
                         transform: `translateX(${index * 100}%)`,
@@ -60,7 +59,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
                     }} />
                 {options.map((o) => (
                     <span key={o.value} aria-hidden="true"
-                        className={`relative flex-1 h-9 grid place-items-center text-sm font-semibold transition-colors duration-300 ${o.value === value ? "text-light-text-color-primary" : "text-light-text-color-tertiary"}`}>
+                        className={`relative flex-1 h-9 grid place-items-center text-sm font-semibold transition-colors duration-300 ${o.value === value ? "text-[var(--primary-color)]" : "text-[var(--primary-color-fg)]"}`}>
                         {o.label}
                     </span>
                 ))}
