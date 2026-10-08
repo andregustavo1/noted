@@ -627,12 +627,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary border border-light-bg-color-secondary dark:border-dark-bg-color-primary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen }) => (
                                     <button key={label} type="button" disabled={needsSaved && !saved}
                                         onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
-                                        className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-primary dark:active:bg-dark-bg-color-primary"}`}>
+                                        className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
                                         <span>{label}</span>
                                         <Icon />
                                     </button>
@@ -704,7 +704,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                         // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
                                         <span contentEditable={false} suppressContentEditableWarning className="h-[1.625em] shrink-0 flex items-center select-none">
                                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
-                                            className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
+                                            className={`relative after:absolute after:-inset-2 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
                                             {line.done && (
                                                 // The card preview's IoMdCheckmark traced as a stroke, so it can draw in.
                                                 <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1">
@@ -740,7 +740,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         className={`absolute z-10 origin-top-left transition-[opacity,transform] duration-150 ease-out ${focused ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
+                        <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
@@ -759,7 +759,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             {menuOpen && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward.
-                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
+                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:border dark:border-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
                                             className={`text-2xl py-3 px-5 transition-colors ${option(activeList === prefix)}`}><Icon /></button>
