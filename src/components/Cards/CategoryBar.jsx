@@ -1,31 +1,17 @@
-import React, { useRef } from "react";
+import React from "react";
 
-// Click selects; press and hold (500ms) calls onHold with the chip's rect so Home can open a menu under it.
-// Native scroll fires pointercancel, and a mouse drag moves the pointer, so either cancels the hold.
-const CategoryBar = ({ title, quantity, isActive, onClick, onHold }) => {
-    const timer = useRef(null);
-    const held = useRef(false);
-    const cancel = () => clearTimeout(timer.current);
-    const start = (e) => {
-        if (!onHold) return;
-        held.current = false;
-        const rect = e.currentTarget.getBoundingClientRect();
-        timer.current = setTimeout(() => { held.current = true; onHold(rect); }, 500);
-    };
-    return (
-        <button
-            onPointerDown={start}
-            onPointerMove={cancel}
-            onPointerUp={cancel}
-            onPointerCancel={cancel}
-            onContextMenu={(e) => e.preventDefault()}
-            onClick={(e) => { if (held.current) { e.preventDefault(); return; } onClick(); }}
-            style={{ WebkitTouchCallout: "none" }}
-            className={`rounded-full px-4 py-2 gap-2 flex cursor-pointer items-center justify-between font-medium shadow-sm whitespace-nowrap [transition:transform_150ms_ease-out,background-color_300ms,color_300ms] active:scale-95 ${isActive ? "bg-primary text-white dark:bg-light-bg-color-primary dark:text-light-text-color-primary" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}>
-            <span>{title}</span>
-            <span className={`p-1 rounded-full leading-none min-w-7 h-7 grid place-items-center duration-300 ${isActive ? "bg-dark-bg-color-tertiary dark:bg-light-bg-color-tertiary dark:text-light-text-color-primary" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary dark:text-dark-text-color-secondary"}`}>{quantity}</span>
-        </button>
-    )
-}
+// Click selects. Holding (menu) and hold-and-drag (reorder) are handled by the row, useCategoryRow in Home,
+// which finds the chip through data-chip; "Todas" has none and so does neither.
+const CategoryBar = ({ title, quantity, isActive, onClick, chip }) => (
+    <button
+        data-chip={chip}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={onClick}
+        style={{ WebkitTouchCallout: "none" }}
+        className={`rounded-full px-4 py-2 gap-2 flex cursor-pointer items-center justify-between font-medium shadow-sm whitespace-nowrap [transition:transform_150ms_ease-out,background-color_300ms,color_300ms] active:scale-95 ${isActive ? "bg-primary text-white dark:bg-light-bg-color-primary dark:text-light-text-color-primary" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}>
+        <span>{title}</span>
+        <span className={`p-1 rounded-full leading-none min-w-7 h-7 grid place-items-center duration-300 ${isActive ? "bg-dark-bg-color-tertiary dark:bg-light-bg-color-tertiary dark:text-light-text-color-primary" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary dark:text-dark-text-color-secondary"}`}>{quantity}</span>
+    </button>
+);
 
 export default CategoryBar;

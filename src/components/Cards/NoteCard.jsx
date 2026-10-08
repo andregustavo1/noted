@@ -8,14 +8,14 @@ import { HiOutlineDuplicate } from "react-icons/hi";
 import { IoMdCheckmark } from "react-icons/io";
 import { MdLabelOutline } from "react-icons/md";
 import { sanitize, trimEnd } from "../../lib/richtext";
-import { headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
+import { headingSize, lineGap, lineStyle, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
 // When a press closed an open card menu. The click that follows that press only closes the menu, on this card or
 // any other, instead of also opening a note.
 let menuClosedAt = 0;
 
-const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, onPinNote, onCategory, onDuplicate, onDelete }) => {
+const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, corner, onPinNote, onCategory, onDuplicate, onDelete }) => {
     const [isNoteOptionsVisible, setNoteOptionsVisible] = useState(false);
     const noteOptionsBtnRef = useRef(null);
     const noteOptionsRef = useRef(null);
@@ -84,7 +84,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
         const icon = check || (line.list && !line.number && !line.heading);
         const fill = isPinned ? "bg-[var(--primary-color-fg)] text-[var(--primary-color)]" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)]";
         return (
-            <div key={index} style={indentStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line) : ""}`}>
+            <div key={index} style={lineStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line) : ""}`}>
                 {check && (
                     <span className="h-[1.625em] shrink-0 flex items-center">
                         <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-50"}`}>
@@ -105,9 +105,10 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
         <div
             ref={cardRef}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card rounded-3xl w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "active:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
+            className={`note-card ${corner == null ? "rounded-[2rem]" : `rounded-[3rem] ${corner}`} w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
             // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
-            // would shrink the card and the menu with it.
+            // would shrink the card and the menu with it. A press on one of the card's own buttons (the dots, the
+            // pin) makes the card :active too, so the shrink is skipped while a button inside is pressed.
             onClick={() => {
                 const closing = Date.now() - menuClosedAt < 1500;
                 menuClosedAt = 0;

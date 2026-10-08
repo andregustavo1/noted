@@ -2,6 +2,10 @@ import React, { useRef, useState } from "react";
 import { BsSearch } from "react-icons/bs";
 import { IoMdClose } from "react-icons/io";
 
+// What the last press landed on; it fires before the input's blur.
+let lastPress = null;
+document.addEventListener("pointerdown", (e) => { lastPress = e.target; }, true);
+
 const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
 
     const searchBarInput = useRef(null)
@@ -16,7 +20,10 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
         setToggleSearch(!toggleSearch)
     }
 
+    // Leaving the field clears and closes the search, except for a press on a note card: the blur comes before the
+    // click, and clearing then would swap the results out from under it so the note never opens.
     const closeSearch = () => {
+        if (lastPress?.closest(".note-card")) return;
         onClearSearch();
         if (toggleSearch) {
             toggleSearchBar();

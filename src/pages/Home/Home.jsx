@@ -40,16 +40,33 @@ const animateNotes = (update) => {
     document.startViewTransition(() => flushSync(update)).finished.then(done, done);
 };
 
-// Lets a mouse drag the category row sideways (touch already scrolls natively).
-// A drag that moved more than a few pixels swallows the click so it doesn't select a category.
-const useDragScroll = () => {
+// The pointer gestures of the category row, in one place so they can't fight each other:
+// - a mouse drag scrolls the row sideways (touch scrolls natively);
+// - holding a chip still lifts it after LIFT ms and, still held at MENU ms, calls onHold (Home opens the menu);
+// - dragging a lifted chip past TOL reorders: onDrag (the menu closes) and the chip follows the pointer. The order
+//   is committed live, each time the chip's center crosses a neighbour's layout center (onReorder), and the row
+//   plays the move back as a FLIP, so the others glide into their new slots while the chip stays under the pointer.
+//   Releasing only lets the chip glide into the slot it already owns, so nothing can jump after the drop. Crossing
+//   back needs the chip to pass the neighbour's new center, so there's no flicker at the boundary.
+//   Drifting less than TOL while holding is still a hold.
+// A gesture that scrolled, held or dragged swallows the click that follows, so it doesn't select the chip.
+// Web Animations rather than CSS transitions: a move that restarts mid-flight picks up from where the chip is,
+// with no transition/reflow/rAF juggling, and the chips' own transform transition can't interfere.
+// Same curve as the card reorder (index.css); the card transition itself can't be reused, it freezes the page.
+// ponytail: no edge auto-scroll while dragging; add if rows get longer than the screen often.
+const LIFT = 100, MENU = 500, TOL = 8, EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+const LIFT_STYLE = { transform: "scale(1.05)", position: "relative", zIndex: 1, boxShadow: "0 6px 16px rgb(0 0 0 / 0.18)" };
+const DROP_STYLE = { transform: "", transition: "", position: "", zIndex: "", boxShadow: "" };
+const useCategoryRow = (callbacks) => {
     const ref = useRef(null);
-    const drag = useRef(null);
+    const g = useRef(null); // the gesture in progress
+    const cb = useRef(callbacks);
+    cb.current = callbacks;
 
-    // Turn a vertical mouse wheel into horizontal scroll. At either end the wheel
-    // passes through, so the page still scrolls. Needs a non-passive listener to preventDefault.
     useEffect(() => {
         const el = ref.current;
+        // Turn a vertical mouse wheel into horizontal scroll. At either end the wheel
+        // passes through, so the page still scrolls. Needs a non-passive listener to preventDefault.
         const onWheel = (e) => {
             if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // trackpad already scrolls sideways
             const max = el.scrollWidth - el.clientWidth;
@@ -57,31 +74,103 @@ const useDragScroll = () => {
             e.preventDefault();
             el.scrollLeft += e.deltaY;
         };
+        // A lifted chip must not scroll the row under the finger (touch-action can't change mid-gesture).
+        const onTouchMove = (e) => { if (g.current?.phase === "lifted" || g.current?.phase === "drag") e.preventDefault(); };
         el.addEventListener("wheel", onWheel, { passive: false });
-        return () => el.removeEventListener("wheel", onWheel);
+        el.addEventListener("touchmove", onTouchMove, { passive: false });
+        return () => {
+            el.removeEventListener("wheel", onWheel);
+            el.removeEventListener("touchmove", onTouchMove);
+        };
     }, []);
 
+    // Where a chip is drawn (transforms and running animations included) and where the layout puts it.
+    const mid = (el) => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+    const lay = (el) => el.offsetLeft + el.offsetWidth / 2;
+    const slide = (el, from) => el.animate([{ transform: from }, { transform: "none" }], { duration: 300, easing: EASE });
+
     const onPointerDown = (e) => {
-        if (e.pointerType !== "mouse" || e.button !== 0) return;
-        drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false };
-    };
-    const onPointerMove = (e) => {
-        if (!drag.current) return;
-        const dx = e.clientX - drag.current.x;
-        if (!drag.current.moved && Math.abs(dx) > 5) {
-            drag.current.moved = true;
+        if (e.button !== 0) return;
+        const chip = e.target.closest("[data-chip]");
+        const s = (g.current = { x: e.clientX, y: e.clientY, left: ref.current.scrollLeft, chip, phase: "idle", mouse: e.pointerType === "mouse" });
+        if (!chip) return;
+        s.timer = setTimeout(() => {
+            s.phase = "lifted";
             ref.current.setPointerCapture(e.pointerId);
-            ref.current.classList.add("dragging");
-        }
-        if (drag.current.moved) ref.current.scrollLeft = drag.current.left - dx;
+            const rect = chip.getBoundingClientRect();
+            Object.assign(chip.style, LIFT_STYLE);
+            s.timer = setTimeout(() => cb.current.onHold(chip.dataset.chip, rect), MENU - LIFT);
+        }, LIFT);
     };
+
+    // The chip's DOM slot changes under it: the others glide from where they were drawn to where they are now,
+    // and the chip's offset absorbs its own layout move so it doesn't budge from under the pointer.
+    const reorder = (s, from, to, dx) => {
+        const kids = [...ref.current.children];
+        const before = kids.map(mid);
+        kids.forEach((k) => k.getAnimations().forEach((a) => a.cancel()));
+        const chipLayout = lay(s.chip);
+        flushSync(() => cb.current.onReorder(from, to));
+        s.offset += chipLayout - lay(s.chip);
+        s.chip.style.transform = `translateX(${dx + s.offset}px) scale(1.05)`;
+        kids.forEach((k, i) => {
+            if (k === s.chip) return;
+            const d = before[i] - mid(k);
+            if (Math.abs(d) > 0.5) slide(k, `translateX(${d}px)`);
+        });
+    };
+
+    const onPointerMove = (e) => {
+        const s = g.current;
+        if (!s) return;
+        const dx = e.clientX - s.x;
+        const far = Math.hypot(dx, e.clientY - s.y) > TOL;
+        if (s.phase === "idle" && far) {
+            clearTimeout(s.timer);
+            s.phase = "scroll";
+            if (s.mouse) { ref.current.setPointerCapture(e.pointerId); ref.current.classList.add("dragging"); }
+        }
+        if (s.phase === "scroll" && s.mouse) ref.current.scrollLeft = s.left - dx;
+        if (s.phase === "lifted" && far) {
+            clearTimeout(s.timer); // the menu, if it hasn't opened yet
+            s.phase = "drag";
+            s.offset = 0;
+            s.chip.style.transition = "none"; // follows the pointer at once
+            ref.current.classList.add("dragging");
+            cb.current.onDrag();
+        }
+        if (s.phase === "drag") {
+            s.chip.style.transform = `translateX(${dx + s.offset}px) scale(1.05)`;
+            const chips = [...ref.current.querySelectorAll("[data-chip]")];
+            const from = chips.indexOf(s.chip);
+            const center = lay(s.chip) + dx + s.offset;
+            const to = chips.filter((c) => c !== s.chip && lay(c) < center).length;
+            if (to !== from) reorder(s, from, to, dx);
+        }
+    };
+
     const onPointerUp = () => {
+        const s = g.current;
+        if (!s) return;
+        clearTimeout(s.timer);
         ref.current.classList.remove("dragging");
+        if (s.phase === "lifted") Object.assign(s.chip.style, DROP_STYLE); // settles through the chip's own transition
+        if (s.phase === "drag") {
+            // The slot is already the chip's: glide into it (and set the shadow down), then hand the styles back.
+            const chip = s.chip;
+            const from = chip.style.transform;
+            chip.style.transform = "";
+            chip.animate(
+                [{ transform: from, boxShadow: LIFT_STYLE.boxShadow }, { transform: "none", boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)" }],
+                { duration: 300, easing: EASE },
+            ).finished.then(() => Object.assign(chip.style, DROP_STYLE), () => {});
+        }
+        s.swallow = s.phase !== "idle";
         // Keep the flag until the click that follows this pointerup has been swallowed.
-        setTimeout(() => { drag.current = null; });
+        setTimeout(() => { g.current = null; });
     };
     const onClickCapture = (e) => {
-        if (drag.current?.moved) e.stopPropagation();
+        if (g.current?.swallow) e.stopPropagation();
     };
 
     return { ref, onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onClickCapture };
@@ -122,7 +211,16 @@ const useLinger = (value, ms = 100) => {
 };
 
 const Home = () => {
-    const categoryScroll = useDragScroll();
+    // Hold opens the chip's menu; hold-and-drag reorders, live (the order lives in settings.categoryOrder).
+    const categoryRow = useCategoryRow({
+        onHold: (name, rect) => setCategoryMenu({ category: categories.find((c) => c.name === name), rect }),
+        onDrag: () => setCategoryMenu(null),
+        onReorder: (from, to) => {
+            const names = categories.map((c) => c.name);
+            names.splice(to, 0, ...names.splice(from, 1));
+            changeSettings({ categoryOrder: names });
+        },
+    });
 
     const [onConfig, setOnConfig] = useState(false)
     const [editNameSignal, setEditNameSignal] = useState(0); // bumped by the pencil on the avatar
@@ -345,6 +443,7 @@ const Home = () => {
     }, []);
 
     // Stored categories plus any name still only on notes (before the schema migration ran), with note counts.
+    // In the order the user dragged them into; ones not ordered yet (new, or from before) come last, by name.
     const categories = useMemo(() => {
         const byName = Object.fromEntries(categoryList.map((c) => [c.name, { ...c, count: 0 }]));
         notes.forEach((note) => {
@@ -352,10 +451,15 @@ const Home = () => {
             byName[note.category] ??= { id: null, name: note.category, count: 0 };
             byName[note.category].count++;
         });
-        return Object.values(byName).sort((a, b) => a.name.localeCompare(b.name));
-    }, [notes, categoryList]);
+        const order = settings.categoryOrder;
+        return Object.values(byName).sort((a, b) => {
+            const ia = order.indexOf(a.name), ib = order.indexOf(b.name);
+            return (ia === -1) - (ib === -1) || ia - ib || a.name.localeCompare(b.name);
+        });
+    }, [notes, categoryList, settings.categoryOrder]);
 
-    const currentCategory = categories.some((c) => c.name === settings.activeCategory) ? settings.activeCategory : "";
+    // Searching looks through every note, so "Todas" shows as selected while there's a query.
+    const currentCategory = searchQuery.trim() ? "" : categories.some((c) => c.name === settings.activeCategory) ? settings.activeCategory : "";
 
     const visibleNotes = useMemo(() => {
         return sortNotes(notes.filter((note) =>
@@ -389,11 +493,18 @@ const Home = () => {
     // Which parity starts tall is rolled once per page load, so the pattern changes on refresh only.
     const [flip] = useState(() => Math.round(Math.random()));
 
-    const renderCard = (note, tall) => (
+    // One corner always squared, on the card's outer side (left column: left corners, right column: right corners),
+    // rolled per slot (every two rows, so it does not track tall/short) and reshuffled with the order. Pinned cards span the row and square their top-left.
+    // Off (settings.cutCorners) the card keeps its plain radius: corner stays undefined.
+    const CORNERS = [["rounded-tl-none", "rounded-bl-none"], ["rounded-tr-none", "rounded-br-none"]];
+    const cut = (corner) => (settings.cutCorners ? corner : undefined);
+
+    const renderCard = (note, tall, corner = cut("rounded-tl-none")) => (
         <NoteCard
             key={note.id}
             id={note.id}
             tall={tall}
+            corner={corner}
             title={note.title}
             date={formatDate(note.updated_at)}
             content={note.content}
@@ -465,11 +576,16 @@ const Home = () => {
             setCategoryList((prev) => prev.map((c) => (c.name === category.name ? { ...c, name } : c)));
             setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: name } : n)));
             queueOp({ type: "renameCategory", id: category.id, from: category.name, to: name });
-            if (settings.activeCategory === category.name) setActiveCategory(name);
+            // One settings change: two would each start from the same stale `settings` and the last would win.
+            changeSettings({
+                activeCategory: settings.activeCategory === category.name ? name : settings.activeCategory,
+                categoryOrder: settings.categoryOrder.map((n) => (n === category.name ? name : n)),
+            });
         } else if (type === "delete") {
             setCategoryList((prev) => prev.filter((c) => c.name !== category.name));
             setNotes((prev) => prev.map((n) => (n.category === category.name ? { ...n, category: "" } : n)));
             queueOp({ type: "deleteCategory", id: category.id, name: category.name });
+            changeSettings({ categoryOrder: settings.categoryOrder.filter((n) => n !== category.name) });
         }
     };
 
@@ -494,7 +610,7 @@ const Home = () => {
                 </div>
             </div>
 
-            <div {...categoryScroll} className="flex items-center gap-2 px-4 py-2 -my-2 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
+            <div {...categoryRow} className="flex items-center gap-2 px-4 py-2 -my-2 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
                 <CategoryBar
                     title={"Todas"}
                     quantity={notes.length}
@@ -505,11 +621,11 @@ const Home = () => {
                 {categories.map((category) => (
                     <CategoryBar
                         key={category.name}
+                        chip={category.name}
                         title={category.name}
                         quantity={category.count}
                         isActive={currentCategory === category.name}
                         onClick={() => setActiveCategory(category.name)}
-                        onHold={(rect) => setCategoryMenu({ category, rect })}
                     />
                 ))}
 
@@ -569,7 +685,7 @@ const Home = () => {
                         {[0, 1].map((col) => (
                             <div key={col} className="flex-1 min-w-0 flex flex-col gap-2">
                                 {/* Alternate tall/short down the column; the other column is offset by one so side-by-side cards differ too. */}
-                                {visibleNotes.filter((n) => !n.is_pinned).filter((_, i) => i % 2 === col).map((n, i) => renderCard(n, (i + col + flip) % 2 === 0))}
+                                {visibleNotes.filter((n) => !n.is_pinned).filter((_, i) => i % 2 === col).map((n, i) => renderCard(n, (i + col + flip) % 2 === 0, cut(CORNERS[col][((i >> 1) + col + flip) % 2])))}
                             </div>
                         ))}
                     </div>
@@ -617,8 +733,8 @@ const Home = () => {
                             maxLength={40}
                             value={dialogName}
                             onChange={(e) => setDialogName(e.target.value)}
-                            placeholder="Ex.: Trabalho"
-                            className="mt-4 w-full text-sm bg-light-bg-color-secondary rounded-full px-4 py-2 outline-none text-center caret-[var(--primary-color)]"
+                            placeholder="Categoria"
+                            className="mt-4 w-full text-sm bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-full px-4 py-2 outline-none text-center caret-[var(--primary-color)]"
                         />
                         <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} />
                     </form>

@@ -2,8 +2,9 @@ import { supabase } from "./supabase";
 
 // User settings live on the account (Supabase user_metadata.settings), so every device gets the same ones.
 // localStorage keeps a copy so the page can paint with them before the account loads (see index.html).
-// activeCategory is the chip selected on the dashboard, kept so the app reopens on the same one.
-export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", sortBy: "date", sortDir: "desc", activeCategory: "" };
+// activeCategory is the chip selected on the dashboard, kept so the app reopens on the same one; categoryOrder the
+// names in the order the user dragged the chips into (Home.jsx).
+export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", cutCorners: false, sortBy: "date", sortDir: "desc", activeCategory: "", categoryOrder: [] };
 
 export const readLocalSettings = () => {
     try {

@@ -4,17 +4,23 @@
 const LIST = /^(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] )?)/;
 export const MAX_INDENT = 4;
 
-// marker is everything before the text (indent + list), so marker + text gives the line back.
+// Between the indent and the list marker, an alignment: "<c> " center, "<r> " right, "<j> " justify (left has none).
+// Typed and pasted text is escaped, so "<c>" can never come from the keyboard.
+const ALIGN = /^<[crj]> /;
+const ALIGNS = { c: "center", r: "right", j: "justify" };
+
+// marker is everything before the text (indent + align + list), so marker + text gives the line back.
 export const parseLine = (line) => {
     const indent = line.match(/^\t*/)[0];
-    const rest = line.slice(indent.length);
+    const align = line.slice(indent.length).match(ALIGN)?.[0] ?? "";
+    const rest = line.slice(indent.length + align.length);
     const m = rest.match(LIST);
-    if (!m) return { marker: indent, list: "", indent, text: rest };
-    return { marker: indent + m[0], list: m[0], indent, text: rest.slice(m[0].length), number: m[1], heading: m[2], check: m[3], done: m[3] !== undefined && m[3] !== " " };
+    if (!m) return { marker: indent + align, list: "", indent, align, text: rest };
+    return { marker: indent + align + m[0], list: m[0], indent, align, text: rest.slice(m[0].length), number: m[1], heading: m[2], check: m[3], done: m[3] !== undefined && m[3] !== " " };
 };
 
-// Indent width per level, for the editor and the card previews.
-export const indentStyle = (line) => (line.indent ? { paddingLeft: `${line.indent.length * 1.5}rem` } : undefined);
+// Indent width per level and text alignment, for the editor and the card previews.
+export const lineStyle = (line) => ({ paddingLeft: line.indent ? `${line.indent.length * 1.5}rem` : undefined, textAlign: ALIGNS[line.align[1]] });
 
 // size styles the row (editor and card previews); menu is the same look one step smaller so the four fit in one line.
 export const HEADINGS = [

@@ -1,13 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChevronRight, MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
+import { MdChevronRight, MdChecklist, MdContentCopy, MdFormatAlignCenter, MdFormatAlignJustify, MdFormatAlignLeft, MdFormatAlignRight, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
 import { BsTrash3 } from "react-icons/bs";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
-import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
+import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
@@ -48,6 +48,12 @@ const STYLES = [
     { label: "Sublinhado", icon: MdFormatUnderlined, command: "underline" },
     { label: "Tachado", icon: MdFormatStrikethrough, command: "strikeThrough" },
 ];
+const ALIGNS = [
+    { label: "Alinhar à esquerda", icon: MdFormatAlignLeft, token: "" },
+    { label: "Centralizar", icon: MdFormatAlignCenter, token: "<c> " },
+    { label: "Alinhar à direita", icon: MdFormatAlignRight, token: "<r> " },
+    { label: "Justificar", icon: MdFormatAlignJustify, token: "<j> " },
+];
 
 // A line as plain text, its marker turned into the symbol the note shows (copying, "Copiar tudo").
 const plainLine = (line, text = plain(line.text)) => {
@@ -62,7 +68,7 @@ const noteText = (title, content) => {
 };
 
 // The marker the next item gets when Enter is pressed on this line. A heading is followed by body text.
-const nextMarker = ({ marker, indent, number, heading }) => (heading ? indent : number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]"));
+const nextMarker = ({ marker, indent, align, number, heading }) => (heading ? indent + align :number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]"));
 
 // Caret helpers: positions are text offsets inside a row's HTML.
 const pointAt = (el, offset) => {
@@ -357,10 +363,11 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const applyList = (prefix) => {
         const indexes = selectedRows();
         const off = indexes.every((i) => parseLine(lines[i]).list.replace(/\[[xX]\]/, "[ ]") === prefix);
-        setRows(indexes, ({ indent, text }) => indent + (off ? "" : prefix) + text);
+        setRows(indexes, ({ indent, align, text }) => indent + align + (off ? "" : prefix) + text);
     };
-    const changeIndent = (step) => setRows(selectedRows(), ({ indent, list, text }) =>
-        "\t".repeat(Math.max(0, Math.min(MAX_INDENT, indent.length + step))) + list + text);
+    const changeIndent = (step) => setRows(selectedRows(), ({ indent, align, list, text }) =>
+        "\t".repeat(Math.max(0, Math.min(MAX_INDENT, indent.length + step))) + align + list + text);
+    const applyAlign = (token) => setRows(selectedRows(), ({ indent, list, text }) => indent + token + list + text);
 
     // The toolbar keeps the note focused, so the command applies to its selection (or to what is typed next).
     const applyStyle = (command) => {
@@ -386,7 +393,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             e.preventDefault();
             if (span.collapsed && line.list && !plain(line.text).length) {
                 // Enter on an empty item ends the list.
-                next[index] = line.indent;
+                next[index] = line.indent + line.align;
                 return update(next, { index, caret: 0 });
             }
             if (span.collapsed && offset === 0 && line.done) {
@@ -405,7 +412,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 // Backspace at a row start: drop its list marker, then its indent, then join it to the row above.
                 if (line.list) {
                     e.preventDefault();
-                    next[index] = line.indent + line.text;
+                    next[index] = line.indent + line.align + line.text;
                     update(next, { index, caret: 0 });
                 } else if (line.indent) {
                     e.preventDefault();
@@ -585,7 +592,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         box.style.left = `${selecting ? parseFloat(getComputedStyle(body).paddingLeft) : row.offsetLeft}px`;
     };
     useLayoutEffect(placeToolbar);
-    const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
+    const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | "align" | null
     // A menu opens under the toolbar, often off the visible part of the note (behind the keyboard): glide to it.
     // The room reveal() keeps under the row already counts the menu by now (scrollPaddingBottom, above).
     useEffect(() => {
@@ -850,7 +857,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             const isFolded = folded.has(keys[index]);
                             const foldable = line.heading && (isFolded || headingSection(lines, index)[1] > index + 1);
                             return (
-                                <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
+                                <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={lineStyle(line)}
                                     className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
                                     {line.heading && (
                                         // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
@@ -908,7 +915,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
-                            {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
+                            {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle], ["align", "Alinhamento", MdFormatAlignLeft]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] "}`}>
                                     <Icon />
@@ -934,6 +941,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
                                         <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
                                             className={`text-2xl py-3 px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                    ))}
+                                    {menuOpen === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
+                                        <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
+                                            className={`text-2xl py-3 px-5 ${option(activeLine.align === token)}`}><Icon /></button>
                                     ))}
                                     {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
