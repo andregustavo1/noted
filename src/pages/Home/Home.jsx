@@ -715,8 +715,8 @@ const Home = () => {
             )}
 
             {deleteShown && (
-                <Modal closing={deleteClosing} title="Excluir nota?" onClose={() => setPendingDelete(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{deleteShown.title || "Noted"}"<br />será excluída.</p>
+                <Modal danger closing={deleteClosing} title="Excluir nota?" onClose={() => setPendingDelete(null)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3 break-words">"{deleteShown.title || "Noted"}"<br />será excluída.</p>
                     <ModalButtons danger confirm="Excluir" onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(deleteShown)} />
                 </Modal>
             )}
@@ -742,8 +742,8 @@ const Home = () => {
             )}
 
             {dialogShown?.type === "delete" && (
-                <Modal closing={dialogClosing} title="Excluir categoria?" onClose={() => setDialog(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-2 break-words">"{dialogShown.category.name}" <br />será excluída.</p>
+                <Modal danger closing={dialogClosing} title="Excluir categoria?" onClose={() => setDialog(null)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3 break-words">"{dialogShown.category.name}" <br />será excluída.</p>
                     <ModalButtons danger confirm="Excluir" onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
                 </Modal>
             )}
