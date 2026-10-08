@@ -87,14 +87,14 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
             <div key={index} style={indentStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line) : ""}`}>
                 {check && (
                     <span className="h-[1.625em] shrink-0 flex items-center">
-                        <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-60"}`}>
+                        <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-50"}`}>
                             {line.done && <IoMdCheckmark />}
                         </span>
                     </span>
                 )}
-                {line.list && !check && !line.heading && <LineMarker line={line} />}
+                {line.list && !check && !line.heading && <LineMarker line={line} style={{ opacity: 0.8 }} />}
                 {/* Lists and headings stay on one line and end in "..."; plain text still wraps. -top-px matches the editor. */}
-                <span className={`relative min-w-0 flex-1 ${icon ? "-top-px" : ""} ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-60" : ""}`}>
+                <span className={`relative min-w-0 flex-1 ${icon ? "-top-px" : ""} ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-50" : "opacity-80"}`}>
                     <span className={line.done ? "strike-done" : ""} dangerouslySetInnerHTML={html(line.done ? trimEnd(line.text) : line.text)} />
                 </span>
             </div>
@@ -125,7 +125,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
                 </div>
             </div>
 
-            <div className='text-sm leading-relaxed opacity-80 mt-2 break-words whitespace-pre-wrap'>{preview.split("\n").map(renderLine)}</div>
+            <div className='text-sm leading-relaxed mt-2 break-words whitespace-pre-wrap'>{preview.split("\n").map(renderLine)}</div>
 
             <div className='flex items-center justify-between mt-auto pt-2'>
                 <p className='text-[12px] opacity-80'>{date}</p>

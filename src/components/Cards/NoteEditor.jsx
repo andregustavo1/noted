@@ -733,14 +733,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 the content scrolled under it, which could be a pinned card's color. This strip gives it the editor's. */}
             <div aria-hidden="true" className={`fixed top-0 inset-x-0 h-3 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
-        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-[2vh] md:pb-[32px] ${closing ? "animate-fade-out" : "animate-fade-in"}`}
+        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
             // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
             style={{ height: typing ? vvHeight : "var(--app-height, 100dvh)" }}>
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[800px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
 
                 {/* relative z-10: the header's menu opens over the note body. */}
                 <div className="relative z-10 flex items-center justify-between gap-1.5">
