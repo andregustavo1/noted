@@ -40,7 +40,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
                     />
                 </div>
 
-                <div className={`bg-light-bg-color-primary rounded-3xl shadow-sm flex items-center py-2 px-4 overflow-x-hidden duration-300 ease-in-out w-full ${toggleSearch ? "translate-x-0 visible" : "translate-x-full md:translate-x-0"}`}>
+                <div className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-sm flex items-center py-2 px-4 overflow-x-hidden duration-300 ease-in-out w-full ${toggleSearch ? "translate-x-0 visible" : "translate-x-full md:translate-x-0"}`}>
                     <div className="flex items-center">
                         <div className="w-5"></div>
 
@@ -50,7 +50,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
                             autoComplete="off"
                             name="search"
                             placeholder="Buscar notas"
-                            className={`px-4 outline-none`}
+                            className={`px-4 outline-none dark:bg-transparent`}
                             value={value}
                             onChange={onChange}
                             ref={searchBarInput}
