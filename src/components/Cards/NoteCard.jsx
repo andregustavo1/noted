@@ -105,7 +105,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
         <div
             ref={cardRef}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card ${corner == null ? "rounded-[2rem]" : `rounded-[3rem] ${corner}`} w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
+            className={`note-card ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
             // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
             // would shrink the card and the menu with it. A press on one of the card's own buttons (the dots, the
             // pin) makes the card :active too, so the shrink is skipped while a button inside is pressed.
