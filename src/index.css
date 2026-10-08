@@ -169,7 +169,7 @@ input[type="password"]::-webkit-inner-spin-button {
 .strike span,
 .strike-done {
     background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 0 1.5px;
-    transition: background-size 350ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: background-size 600ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .strike span.done,
