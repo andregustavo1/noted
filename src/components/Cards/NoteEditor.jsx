@@ -853,13 +853,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
                                     className={`relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
                                     {line.heading && (
-                                        // Fold chevron left of the text: its 20px glyph ends just before the text, overhanging the pl-2 gutter into the
-                                        // card's padding (the note body spans it, so nothing is clipped). One line tall at the heading's size. Shown
-                                        // while folded; otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
+                                        // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
+                                        // so nothing is clipped). The glyph of MdChevronRight ends 5px before its 20px box, so the box ends 5px into
+                                        // the text: the chevron's tip (antialiased to nothing) meets the text, the stroke stays 1px off. One line tall
+                                        // at the heading's size. Shown while folded;
+                                        // otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
                                         <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
                                             onMouseDown={(e) => e.preventDefault()} onClick={() => toggleFold(index)} tabIndex={-1}
                                             style={{ height: "1lh" }}
-                                            className={`absolute -left-4 top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
+                                            className={`absolute -left-[15px] top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
                                             {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
                                             <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
                                         </button>
