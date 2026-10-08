@@ -48,6 +48,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden }) => {
                             id="search-bar"
                             type="text"
                             autoComplete="off"
+                            name="search"
                             placeholder="Buscar notas"
                             className={`px-4 outline-none`}
                             value={value}

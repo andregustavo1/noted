@@ -473,11 +473,14 @@ const Home = () => {
                     <form onSubmit={(e) => { e.preventDefault(); handleCategoryDialog(); }}>
                         <input
                             autoFocus
+                            // No AutoFill: iOS offered contacts here because the field looked like a person's name.
                             autoComplete="off"
+                            name="category"
+                            aria-label="Nome da categoria"
                             maxLength={40}
                             value={dialogName}
                             onChange={(e) => setDialogName(e.target.value)}
-                            placeholder="Nome"
+                            placeholder="Ex.: Trabalho"
                             className="mt-4 w-full text-sm bg-light-bg-color-secondary rounded-full px-4 py-2 outline-none text-center caret-[var(--primary-color)]"
                         />
                         <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} />

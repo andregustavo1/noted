@@ -172,6 +172,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const [activeIndex, setActiveIndex] = useState(0);
     const focusAfterRender = useRef(null);
     const update = (nextLines, focus) => {
+        tap.current = null;
         setContent(nextLines.join("\n"));
         focusAfterRender.current = focus;
         if (focus) { activeRow.current = focus.index; setActiveIndex(focus.index); }
@@ -290,6 +291,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const span = getSpan();
         if (!span) return;
         const type = e.inputType;
+        // Typing closes the toolbar's open menu (the toolbar itself stays).
+        if (!type.startsWith("format")) setMenuOpen(null);
         const [index, offset] = span.start;
         const line = parseLine(lines[index]);
         const next = [...lines];
@@ -372,6 +375,43 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         replaceSpan(span, parts.map((part, i) => (i ? part.replace(/^(\t*)([•☐☑]) /, (_, tabs, sym) => tabs + SYMBOLS[sym]) : part)));
     };
 
+    // Taps: the row under the finger, by height. Set on press, before focus, so the keyboard coming up keeps that row in
+    // view (it used to scroll back to the previous row). A tap on an empty row or beside the text can leave the caret
+    // outside every row (empty rows have nothing to put it in), and the click then puts it in the tapped row.
+    const tap = useRef(null);
+    const rowAtY = (y) => {
+        let best = 0, bestDistance = Infinity;
+        rowBoxes.current.slice(0, lines.length).forEach((box, i) => {
+            if (!box) return;
+            const r = box.getBoundingClientRect();
+            const distance = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+            if (distance < bestDistance) { best = i; bestDistance = distance; }
+        });
+        return best;
+    };
+    const onPointerDown = (e) => {
+        if (e.target.closest("[contenteditable=false]")) return; // checkboxes and markers
+        const row = rowAtY(e.clientY);
+        tap.current = { x: e.clientX, y: e.clientY, row, time: Date.now() };
+        activeRow.current = row;
+        setActiveIndex(row);
+    };
+    const placeTapCaret = () => {
+        const t = tap.current;
+        if (!t || Date.now() - t.time > 1000) return;
+        const sel = window.getSelection();
+        const el = rows.current[t.row];
+        if (!el || !sel.isCollapsed || el.contains(sel.anchorNode)) return;
+        const point = document.caretRangeFromPoint?.(t.x, t.y);
+        if (point && el.contains(point.startContainer)) {
+            sel.removeAllRanges();
+            sel.addRange(point);
+        } else {
+            const r = el.getBoundingClientRect();
+            setSelection(el, t.x < r.left ? 0 : rowLength(t.row));
+        }
+    };
+
     const onKeyDown = (e) => {
         if (e.key === "Tab") {
             e.preventDefault();
@@ -391,6 +431,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (!sel.rangeCount || !hostRef.current?.contains(sel.anchorNode)) return;
         const pos = locate(sel.anchorNode, sel.anchorOffset, false);
         if (!pos) return;
+        // Right after a tap the caret belongs in the tapped row, wherever the browser put it.
+        const tapped = tap.current && Date.now() - tap.current.time < 1000 ? tap.current.row : null;
+        if (sel.isCollapsed && tapped !== null && pos[0] !== tapped) return placeTapCaret();
         if (sel.isCollapsed && !rows.current[pos[0]]?.contains(sel.anchorNode)) setSelection(rows.current[pos[0]], pos[1]);
         if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
         setSelecting(!sel.isCollapsed);
@@ -549,6 +592,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     <input
                         autoFocus={!note}
                         autoComplete="off"
+                        name="note-title"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Título"
@@ -625,6 +669,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         onPaste={onPaste}
                         onCopy={(e) => onCopy(e, false)}
                         onCut={(e) => onCopy(e, true)}
+                        onPointerDown={onPointerDown}
+                        onClick={placeTapCaret}
                         onFocus={() => { setFocused(true); shrinkForKeyboard(); }}
                         onBlur={onBlur}>
                         {lines.map((raw, index) => {

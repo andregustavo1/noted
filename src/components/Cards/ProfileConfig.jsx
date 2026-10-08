@@ -92,12 +92,13 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
                     <p className="text-light-text-color-tertiary text-sm truncate">{email}</p>
                 </div>
 
-                <div className="grid mt-20">
+                <p className="font-semibold text-xl mt-8">Configurações</p>
+
+                <div className="grid mt-6">
                     <div className="grid">
                         <p className="font-medium text-lg">Aparência</p>
 
-                        <p className="font-medium text-sm mt-3 text-light-text-color-secondary"> Tema</p>
-                        <button type="button" role="switch" aria-checked={dark} aria-label="Tema escuro" onClick={() => setDark((d) => !d)} className={`relative flex w-full gap-1 mt-2 p-1 rounded-full transition-[background-color,box-shadow] duration-300 ${dark ? "bg-dark-bg-color-primary" : "bg-light-bg-color-secondary"}`}
+                        <button type="button" role="switch" aria-checked={dark} aria-label="Tema escuro" onClick={() => setDark((d) => !d)} className={`relative flex w-full gap-1 mt-3 p-1 rounded-full transition-[background-color,box-shadow] duration-300 ${dark ? "bg-dark-bg-color-primary" : "bg-light-bg-color-secondary"}`}
                             style={{
                                 boxShadow: dark
                                     ? "inset 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.45)"
@@ -121,8 +122,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
                             </span>
                         </button>
 
-                        <p className="font-medium text-sm mt-3 text-light-text-color-secondary">Cor primária</p>
-                        <div className="flex gap-2 mt-2 px-1" role="radiogroup" aria-label="Cor primária">
+                        <div className="flex gap-2 mt-4 px-1" role="radiogroup" aria-label="Cor primária">
                             {COLORS.map((c) => (
                                 <button
                                     key={c.bg}
