@@ -114,7 +114,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
                 ref={noteOptionsBtnRef}
                 aria-label="Opções"
                 onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
-                className='self-center w-16 h-6 -mt-1 mb-1 shrink-0 flex flex-col items-center justify-center gap-[3px]'>
+                className='self-center w-16 h-6 -mt-1 shrink-0 flex flex-col items-center justify-center gap-[3px]'>
                 <span className='w-9 h-[2px] rounded-full bg-current' />
                 <span className='w-6 h-[2px] rounded-full bg-current' />
             </button>
