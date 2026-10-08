@@ -723,9 +723,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     style={{ paddingBottom: 136, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
+                    // A press on the blank area under the text puts the caret at the end. The last row is made the
+                    // active one before focusing: the focus reveals the active row, and with the previous one (row 0
+                    // on a freshly opened note) it scrolled up there, then glided back down to the caret.
                     onClick={(e) => {
                         if (e.target !== e.currentTarget) return;
                         const last = lines.length - 1;
+                        tap.current = null;
+                        activeRow.current = last;
+                        setActiveIndex(last);
                         hostRef.current.focus({ preventScroll: true });
                         setSelection(rows.current[last], rowLength(last));
                     }}>
