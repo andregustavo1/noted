@@ -251,7 +251,7 @@ const Home = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
     // The dark theme only covers the signed-in app (the login stays light), so the class follows this page.
-    // A switch (not the first paint) crossfades the page in 200ms; see .theme-fade in index.css.
+    // A switch (not the first paint) crossfades the page in 300ms; see .theme-fade in index.css.
     const themeApplied = useRef(false);
     useLayoutEffect(() => {
         const root = document.documentElement;

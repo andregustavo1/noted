@@ -113,7 +113,7 @@ input[type="password"]::-webkit-inner-spin-button {
     display: none;
 }
 
-/* Theme switch: the whole page crossfades to the other theme in 200ms (Home.jsx), so every color moves together.
+/* Theme switch: the whole page crossfades to the other theme in 300ms (Home.jsx), so every color moves together.
    Per-element color transitions can't do that: inherited text color lags behind its parent's. The switch is left
    out of the snapshot and animates live, keeping its own 350ms slide. */
 .theme-fade [data-theme-switch] {
@@ -134,7 +134,7 @@ input[type="password"]::-webkit-inner-spin-button {
 .theme-fade::view-transition-group(*),
 .theme-fade::view-transition-old(*),
 .theme-fade::view-transition-new(*) {
-    animation-duration: 200ms;
+    animation-duration: 300ms;
     animation-timing-function: ease;
 }
 
