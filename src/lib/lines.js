@@ -1,13 +1,20 @@
 // Note content is one line per row; a line may start with a marker that renders as UI (bullet, checkbox, heading...).
 
-// A marker at the start of a line: indent, then "- ", "– ", "- [ ] ", "1. " or "# " (1-3 hashes).
-const MARKER = /^(\s*)(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] )?)/;
+// After the indent (one tab per level): "- ", "– ", "- [ ] ", "1. " or "# " (1-3 hashes).
+const LIST = /^(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] )?)/;
+export const MAX_INDENT = 4;
 
+// marker is everything before the text (indent + list), so marker + text gives the line back.
 export const parseLine = (line) => {
-    const m = line.match(MARKER);
-    if (!m) return { marker: "", text: line };
-    return { marker: m[0], text: line.slice(m[0].length), indent: m[1], number: m[2], heading: m[3], check: m[4], done: m[4] !== undefined && m[4] !== " " };
+    const indent = line.match(/^\t*/)[0];
+    const rest = line.slice(indent.length);
+    const m = rest.match(LIST);
+    if (!m) return { marker: indent, list: "", indent, text: rest };
+    return { marker: indent + m[0], list: m[0], indent, text: rest.slice(m[0].length), number: m[1], heading: m[2], check: m[3], done: m[3] !== undefined && m[3] !== " " };
 };
+
+// Indent width per level, for the editor and the card previews.
+export const indentStyle = (line) => (line.indent ? { paddingLeft: `${line.indent.length * 1.5}rem` } : undefined);
 
 // size styles the row (editor and card previews); menu is the same look one step smaller so the four fit in one line.
 export const HEADINGS = [

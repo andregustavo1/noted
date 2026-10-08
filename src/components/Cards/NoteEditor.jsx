@@ -1,12 +1,12 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdTitle, MdUndo } from "react-icons/md";
+import { MdChecklist, MdContentCopy, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdTitle, MdUndo } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
 import { BsTrash3 } from "react-icons/bs";
 import { escapeHtml, plain, sanitize } from "../../lib/richtext";
-import { HEADINGS, headingSize, lineGap, parseLine } from "../../lib/lines";
+import { HEADINGS, MAX_INDENT, headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
@@ -24,7 +24,7 @@ const LISTS = [
     { label: "Lista de tarefas", icon: MdChecklist, prefix: "- [ ] " },
 ];
 const headingClass = (hashes) => (hashes ? `${headingSize(hashes)} text-light-text-color-primary` : "");
-// Inline styles are the browser's own editing commands on the focused row (Ctrl+B/I/U work too).
+// Inline styles are the browser's own editing commands on the selection (Ctrl+B/I/U work too).
 const STYLES = [
     { label: "Negrito", icon: MdFormatBold, command: "bold" },
     { label: "Itálico", icon: MdFormatItalic, command: "italic" },
@@ -32,22 +32,22 @@ const STYLES = [
     { label: "Tachado", icon: MdFormatStrikethrough, command: "strikeThrough" },
 ];
 
-// The whole note as plain text for "Copiar tudo": markers become the symbols the note shows.
+// A line as plain text, its marker turned into the symbol the note shows (copying, "Copiar tudo").
+const plainLine = (line, text = plain(line.text)) => {
+    if (line.check !== undefined) return `${line.indent}${line.done ? "☑" : "☐"} ${text}`;
+    if (line.number) return `${line.indent}${line.number}. ${text}`;
+    if (line.list && !line.heading) return `${line.indent}${line.list.includes("–") ? "–" : "•"} ${text}`;
+    return line.indent + text;
+};
 const noteText = (title, content) => {
-    const body = content.split("\n").map((raw) => {
-        const line = parseLine(raw);
-        const text = plain(line.text);
-        if (line.check !== undefined) return `${line.indent}${line.done ? "☑" : "☐"} ${text}`;
-        if (line.number || line.heading || !line.marker) return line.number ? `${line.indent}${line.number}. ${text}` : text;
-        return `${line.indent}${line.marker.includes("–") ? "–" : "•"} ${text}`;
-    }).join("\n");
+    const body = content.split("\n").map((raw) => plainLine(parseLine(raw))).join("\n");
     return [title.trim(), body.trim()].filter(Boolean).join("\n\n");
 };
 
 // The marker the next item gets when Enter is pressed on this line. A heading is followed by body text.
-const nextMarker = ({ marker, indent, number, heading }) => (heading ? "" : number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]"));
+const nextMarker = ({ marker, indent, number, heading }) => (heading ? indent : number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]"));
 
-// Caret helpers: rows are contentEditable, so positions are text offsets inside the row's HTML.
+// Caret helpers: positions are text offsets inside a row's HTML.
 const pointAt = (el, offset) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let node;
@@ -65,19 +65,9 @@ const setSelection = (el, start, end = start) => {
     sel.removeAllRanges();
     sel.addRange(range);
 };
-const selectionIn = (el) => {
-    const sel = window.getSelection();
-    if (!sel.rangeCount || !el.contains(sel.anchorNode)) return null;
-    const range = sel.getRangeAt(0);
-    const before = range.cloneRange();
-    before.selectNodeContents(el);
-    before.setEnd(range.startContainer, range.startOffset);
-    const start = before.toString().length;
-    return [start, start + range.toString().length];
-};
-// The row's HTML before and after the selection, each keeping its enclosing <b>/<i>/... tags.
-const splitAt = (el) => {
-    const range = window.getSelection().getRangeAt(0);
+// A row's HTML before and after a text offset, each keeping its enclosing <b>/<i>/... tags.
+const splitAt = (el, offset) => {
+    const point = pointAt(el, offset);
     const html = (from, to) => {
         const part = document.createRange();
         part.selectNodeContents(el);
@@ -87,7 +77,7 @@ const splitAt = (el) => {
         box.appendChild(part.cloneContents());
         return sanitize(box.innerHTML);
     };
-    return [html(null, [range.startContainer, range.startOffset]), html([range.endContainer, range.endOffset], null)];
+    return [html(null, point), html(point, null)];
 };
 
 // saved is the note as stored (null until a new note is first saved); the "..." menu acts on it.
@@ -145,14 +135,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         setContent(snap.content);
     };
 
-    // The body is one contentEditable row per line so list markers can render as real UI (circle checkboxes,
-    // bullets, numbers) and inline styles show as they are.
+    // The body is one contentEditable (the host), so a selection can run across lines like in any text editor.
+    // Each line is a row inside it whose marker (circle checkbox, bullet, number) is real, non-editable UI; the
+    // editor handles every edit that crosses rows itself (Enter, Backspace at a row start, deleting or typing
+    // over a selection, cut and paste) and leaves typing inside a row to the browser.
     const lines = content.split("\n");
-    const rows = useRef([]);
+    const rows = useRef([]); // each row's text element
+    const rowBoxes = useRef([]); // each row (marker + text)
+    const hostRef = useRef(null);
     const bodyRef = useRef(null);
-    // Rows are keyed by stable ids so Enter/Backspace/paste can keep the caret in the DOM node that already has focus
-    // (the new line is inserted above it). Moving focus to another node makes iOS re-seat the keyboard and pan the
-    // whole page to it, which is the screen jumping on every line break.
     const ids = useRef([]);
     const seq = useRef(0);
     const keys = lines.map((_, i) => (ids.current[i] ??= ++seq.current));
@@ -169,7 +160,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     };
 
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
-    // (Enter, Backspace merges, list toggles, rows shifting under an inserted line).
+    // (Enter, Backspace merges, undo, rows shifting under an inserted line).
     useLayoutEffect(() => {
         lines.forEach((raw, index) => {
             const el = rows.current[index];
@@ -178,6 +169,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         });
     });
     const activeRow = useRef(0);
+    const [activeIndex, setActiveIndex] = useState(0);
     const focusAfterRender = useRef(null);
     const update = (nextLines, focus) => {
         setContent(nextLines.join("\n"));
@@ -190,15 +182,69 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         focusAfterRender.current = null;
         const el = rows.current[index];
         if (!el) return;
-        if (document.activeElement !== el) el.focus();
+        if (document.activeElement !== hostRef.current) hostRef.current.focus({ preventScroll: true });
         setSelection(el, caret);
         reveal(el);
     });
 
-    const setLineText = (index, html) => {
+    // Where a DOM point falls, as [row, text offset]. A point outside a row's text (on a marker, between rows or on
+    // the host itself) snaps to the start of its row, or for the end of a selection to the end of the row before.
+    const rowLength = (index) => plain(parseLine(lines[index] ?? "").text).length;
+    const locate = (node, offset, isEnd) => {
+        const index = rows.current.findIndex((el) => el?.contains(node));
+        if (index !== -1) {
+            const range = document.createRange();
+            range.selectNodeContents(rows.current[index]);
+            range.setEnd(node, offset);
+            return [index, range.toString().length];
+        }
+        if (node === hostRef.current) {
+            const at = Math.min(offset, lines.length);
+            return isEnd && at > 0 ? [at - 1, rowLength(at - 1)] : [Math.min(at, lines.length - 1), 0];
+        }
+        const box = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.closest("[data-line]");
+        return box ? [Number(box.dataset.line), 0] : null;
+    };
+    // The selection as { start: [row, offset], end: [row, offset] }, or null when it isn't in the note body.
+    const getSpan = () => {
+        const sel = window.getSelection();
+        if (!sel.rangeCount || !hostRef.current?.contains(sel.anchorNode)) return null;
+        const range = sel.getRangeAt(0);
+        const start = locate(range.startContainer, range.startOffset, false);
+        const end = locate(range.endContainer, range.endOffset, true);
+        if (!start || !end) return null;
+        return { start, end, collapsed: start[0] === end[0] && start[1] === end[1], multi: start[0] !== end[0] };
+    };
+
+    // Replace the selection with lines of HTML: the first joins the text before the selection (keeping that row's
+    // marker), the last joins the text after it; markers[i] prefixes each new line after the first.
+    const replaceSpan = ({ start: [sr, so], end: [er, eo] }, parts, markers = []) => {
+        const [before] = splitAt(rows.current[sr], so);
+        const [, after] = splitAt(rows.current[er], eo);
+        const added = parts.map((part, i) => (i === 0 ? parseLine(lines[sr]).marker + before : markers[i] ?? "") + part);
+        const last = added.length - 1;
+        added[last] += after;
         const next = [...lines];
-        next[index] = parseLine(lines[index]).marker + html;
-        setContent(next.join("\n"));
+        next.splice(sr, er - sr + 1, ...added);
+        ids.current.splice(sr, er - sr + 1, ids.current[sr], ...Array.from({ length: last }, newId));
+        update(next, { index: sr + last, caret: plain(last ? parts[last] : before + parts[0]).length });
+    };
+
+    // The rows' current HTML into the state, after the browser edited them (typing, bold...).
+    const syncFromDom = () => {
+        let changed = false;
+        const next = lines.map((raw, index) => {
+            const el = rows.current[index];
+            if (!el) return raw;
+            // Browsers leave a <br> in an emptied row; clear it so the placeholder (:empty) shows again.
+            if (!el.textContent && el.innerHTML) el.innerHTML = "";
+            const { marker, text } = parseLine(raw);
+            const html = sanitize(el.innerHTML);
+            if (html === text) return raw;
+            changed = true;
+            return marker + html;
+        });
+        if (changed) setContent(next.join("\n"));
     };
 
     // Only the box the user just checked animates, not ones that open already checked.
@@ -211,91 +257,160 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         setContent(next.join("\n"));
     };
 
-    // Toggle a list marker on the focused line, keeping the caret where it is.
-    const applyList = (prefix) => {
-        const index = activeRow.current;
-        const { marker, text } = parseLine(lines[index]);
-        const next = [...lines];
-        next[index] = (marker === prefix ? "" : prefix) + text;
-        update(next, { index, caret: selectionIn(rows.current[index])?.[0] ?? plain(text).length });
+    // The rows a toolbar action applies to: every row the selection touches, or the caret's row.
+    const selectedRows = () => {
+        const span = getSpan();
+        const [from, to] = span ? [span.start[0], span.end[0]] : [activeRow.current, activeRow.current];
+        return Array.from({ length: to - from + 1 }, (_, i) => from + i);
     };
+    // Rows keep their text elements, so the selection stays where it is through these.
+    const setRows = (indexes, fn) => {
+        const next = [...lines];
+        indexes.forEach((i) => { next[i] = fn(parseLine(lines[i])); });
+        setContent(next.join("\n"));
+    };
+    // Toggle a list marker (or heading) on the selected lines: off when they all have it already.
+    const applyList = (prefix) => {
+        const indexes = selectedRows();
+        const off = indexes.every((i) => parseLine(lines[i]).list.replace(/\[[xX]\]/, "[ ]") === prefix);
+        setRows(indexes, ({ indent, text }) => indent + (off ? "" : prefix) + text);
+    };
+    const changeIndent = (step) => setRows(selectedRows(), ({ indent, list, text }) =>
+        "\t".repeat(Math.max(0, Math.min(MAX_INDENT, indent.length + step))) + list + text);
 
-    // The toolbar keeps the row focused, so the command applies to its selection (or to what is typed next).
+    // The toolbar keeps the note focused, so the command applies to its selection (or to what is typed next).
     const applyStyle = (command) => {
-        const index = activeRow.current;
         document.execCommand("styleWithCSS", false, false);
         document.execCommand(command);
-        setLineText(index, sanitize(rows.current[index].innerHTML));
+        syncFromDom();
     };
 
-    const moveTo = (index, caret) => {
-        const el = rows.current[index];
-        el.focus();
-        setSelection(el, caret);
-    };
-
-    const onKeyDown = (e, index) => {
-        const el = e.currentTarget;
+    // Edits that cross rows, from the browser's beforeinput (Enter and Backspace arrive here on phones too).
+    const onBeforeInput = (e) => {
+        const span = getSpan();
+        if (!span) return;
+        const type = e.inputType;
+        const [index, offset] = span.start;
         const line = parseLine(lines[index]);
         const next = [...lines];
-        const [start, end] = selectionIn(el) ?? [0, 0];
-        const length = plain(line.text).length;
-        if (e.key === "Enter") {
+        if (type === "historyUndo" || type === "historyRedo") {
             e.preventDefault();
-            if (line.marker && !length) {
+            go(type === "historyUndo" ? -1 : 1);
+        } else if (type === "insertParagraph" || type === "insertLineBreak") {
+            e.preventDefault();
+            if (span.collapsed && line.list && !plain(line.text).length) {
                 // Enter on an empty item ends the list.
-                next[index] = "";
+                next[index] = line.indent;
                 return update(next, { index, caret: 0 });
             }
-            const [before, after] = splitAt(el);
-            next[index] = line.marker + before;
-            next.splice(index + 1, 0, (line.marker ? nextMarker(line) : "") + after);
-            ids.current.splice(index, 0, newId()); // the text before the caret goes to a new node above; focus stays put
-            update(next, { index: index + 1, caret: 0 });
-        } else if (e.key === "Backspace" && start === 0 && end === 0) {
-            if (line.marker) {
+            replaceSpan(span, ["", ""], [null, nextMarker(line)]);
+        } else if (type.startsWith("delete")) {
+            if (span.multi) {
                 e.preventDefault();
-                next[index] = line.text;
-                update(next, { index, caret: 0 });
-            } else if (index > 0) {
+                replaceSpan(span, [""]);
+            } else if (span.collapsed && offset === 0 && type.endsWith("Backward")) {
+                // Backspace at a row start: drop its list marker, then its indent, then join it to the row above.
+                if (line.list) {
+                    e.preventDefault();
+                    next[index] = line.indent + line.text;
+                    update(next, { index, caret: 0 });
+                } else if (line.indent) {
+                    e.preventDefault();
+                    next[index] = lines[index].slice(1);
+                    update(next, { index, caret: 0 });
+                } else if (index > 0) {
+                    e.preventDefault();
+                    next[index - 1] = lines[index - 1] + line.text;
+                    next.splice(index, 1);
+                    ids.current.splice(index, 1);
+                    update(next, { index: index - 1, caret: rowLength(index - 1) });
+                } else {
+                    e.preventDefault();
+                }
+            } else if (span.collapsed && offset === rowLength(index) && type.endsWith("Forward")) {
                 e.preventDefault();
-                const prevText = parseLine(lines[index - 1]).text;
-                next[index - 1] = lines[index - 1] + line.text;
-                next.splice(index, 1);
-                ids.current.splice(index - 1, 1); // the row above goes away; the focused node takes the merged line
-                update(next, { index: index - 1, caret: plain(prevText).length });
+                if (index === lines.length - 1) return;
+                next[index] = lines[index] + parseLine(lines[index + 1]).text;
+                next.splice(index + 1, 1);
+                ids.current.splice(index + 1, 1);
+                update(next, { index, caret: offset });
             }
-        } else if (e.key === "ArrowUp" && start === 0 && index > 0) {
+        } else if (span.multi && (type === "insertText" || type === "insertReplacementText")) {
             e.preventDefault();
-            moveTo(index - 1, plain(parseLine(lines[index - 1]).text).length);
-        } else if (e.key === "ArrowDown" && start === length && index < lines.length - 1) {
+            replaceSpan(span, [escapeHtml(e.data ?? e.dataTransfer?.getData("text/plain") ?? "")]);
+        } else if (type === "insertFromDrop") {
             e.preventDefault();
-            moveTo(index + 1, 0);
         }
     };
 
-    // Pasted text comes in plain; each of its lines becomes a row.
-    const onPaste = (e, index) => {
+    // The selected text as plain lines; a line selected from its start keeps its marker as a symbol.
+    const selectedText = ({ start: [sr, so], end: [er, eo] }) => {
+        const out = [];
+        for (let i = sr; i <= er; i++) {
+            const line = parseLine(lines[i]);
+            const from = i === sr ? so : 0;
+            const text = plain(line.text).slice(from, i === er ? eo : undefined);
+            out.push(from === 0 && sr !== er ? plainLine(line, text) : text);
+        }
+        return out.join("\n");
+    };
+    const onCopy = (e, cut) => {
+        const span = getSpan();
+        if (!span || span.collapsed) return;
+        e.preventDefault();
+        e.clipboardData.setData("text/plain", selectedText(span));
+        if (cut) replaceSpan(span, [""]);
+    };
+    // Pasted text comes in plain; each of its lines becomes a row. Lines copied from a note get their symbols turned
+    // back into list markers ("–" and "1." already are markers).
+    const SYMBOLS = { "•": "- ", "☐": "- [ ] ", "☑": "- [x] " };
+    const onPaste = (e) => {
+        const span = getSpan();
+        if (!span) return;
         e.preventDefault();
         const parts = e.clipboardData.getData("text/plain").split(/\r?\n/).map(escapeHtml);
-        const [before, after] = splitAt(e.currentTarget);
-        const line = parseLine(lines[index]);
-        const next = [...lines];
-        const last = parts.length - 1;
-        next.splice(index, 1, line.marker + before + parts[0], ...parts.slice(1, last), ...(last ? [parts[last] + after] : []));
-        if (!last) next[index] += after;
-        ids.current.splice(index, 0, ...Array.from({ length: last }, newId));
-        update(next, { index: index + last, caret: plain(last ? parts[last] : before + parts[0]).length });
+        replaceSpan(span, parts.map((part, i) => (i ? part.replace(/^(\t*)([•☐☑]) /, (_, tabs, sym) => tabs + SYMBOLS[sym]) : part)));
     };
 
-    // Toolbar pops up below the focused row while it has focus.
+    const onKeyDown = (e) => {
+        if (e.key === "Tab") {
+            e.preventDefault();
+            changeIndent(e.shiftKey ? -1 : 1);
+        }
+    };
+
+    // The native beforeinput (React's onBeforeInput is a different, older event), through a ref so it sees this render.
+    const beforeInputRef = useRef(null);
+    beforeInputRef.current = onBeforeInput;
+    // On every caret move: track the caret's row (the toolbar follows it), keep a collapsed caret inside a row's
+    // text (a tap between rows can drop it on the host, where typing would land outside every row), and refresh
+    // the open menu's highlights.
+    const selectionRef = useRef(null);
+    selectionRef.current = () => {
+        const sel = window.getSelection();
+        if (!sel.rangeCount || !hostRef.current?.contains(sel.anchorNode)) return;
+        const pos = locate(sel.anchorNode, sel.anchorOffset, false);
+        if (!pos) return;
+        if (sel.isCollapsed && !rows.current[pos[0]]?.contains(sel.anchorNode)) setSelection(rows.current[pos[0]], pos[1]);
+        if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
+        if (menuOpen) rerender((n) => n + 1);
+    };
+    useEffect(() => {
+        const host = hostRef.current;
+        const onBefore = (e) => beforeInputRef.current(e);
+        const onSelect = () => selectionRef.current();
+        host.addEventListener("beforeinput", onBefore);
+        document.addEventListener("selectionchange", onSelect);
+        return () => {
+            host.removeEventListener("beforeinput", onBefore);
+            document.removeEventListener("selectionchange", onSelect);
+        };
+    }, []);
+
+    // Toolbar pops up below the caret's row while the note body has focus.
     const [focused, setFocused] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(0);
-    const toolbarShown = focused;
-    // One toolbar for the whole note, moved under the focused row. (A toolbar per row unmounted and remounted on
-    // every line change, and iOS left the old one's shadow and menu painted behind as ghosts.)
+    // One toolbar for the whole note, moved under the caret's row.
     const toolbarBoxRef = useRef(null);
-    const rowBoxes = useRef([]);
     useLayoutEffect(() => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex];
         if (!box || !row) return;
@@ -308,14 +423,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     useEffect(() => {
         if (!menuOpen) return;
         const onDown = (e) => { if (!toolbarRef.current?.contains(e.target) && !bodyRef.current?.contains(e.target)) setMenuOpen(null); };
-        // Re-render on caret moves so the menu lights up the new line's heading/list and the selection's styles.
-        const onSelect = () => rerender((n) => n + 1);
         document.addEventListener("pointerdown", onDown);
-        document.addEventListener("selectionchange", onSelect);
-        return () => {
-            document.removeEventListener("pointerdown", onDown);
-            document.removeEventListener("selectionchange", onSelect);
-        };
+        return () => document.removeEventListener("pointerdown", onDown);
     }, [menuOpen]);
     const [, rerender] = useState(0);
     // The overlay is sized to the visual viewport while typing: on phones the keyboard only shrinks that (the layout
@@ -331,7 +440,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             setVvHeight(viewport.height);
             const keyboard = appHeight() - viewport.height;
             if (keyboard > 100 && isField(document.activeElement)) localStorage.setItem("keyboardHeight", Math.round(keyboard));
-            // iOS pans the whole page to reveal the focused row (the dashboard shows through and the screen jumps).
+            // iOS pans the whole page to reveal the caret (the dashboard shows through and the screen jumps).
             // Undo it: the overlay already fits the visible area and the row is scrolled into view inside it instead.
             window.scrollTo(0, 0);
         };
@@ -342,10 +451,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             viewport.removeEventListener("scroll", update);
         };
     }, []);
-    // A row got focus and the keyboard is about to come up: shrink the overlay to the last known keyboard height right
-    // away, so by the time iOS looks, the row is already above the keyboard and there is nothing to pan the page to.
-    // Only before the keyboard is up: moving between rows with it open must not shrink the editor again (a stored
-    // height from a taller keyboard left a gap under the note where the dashboard showed through).
+    // The note body got focus and the keyboard is about to come up: shrink the overlay to the last known keyboard
+    // height right away, so by the time iOS looks, the caret is already above the keyboard and there is nothing to
+    // pan the page to. Only before the keyboard is up, so it never leaves a gap under the note.
     const shrinkForKeyboard = () => {
         const keyboard = Number(localStorage.getItem("keyboardHeight"));
         const viewport = window.visualViewport;
@@ -355,12 +463,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     useEffect(() => {
         if (focused) reveal(rows.current[activeRow.current]);
     }, [vvHeight, focused]);
-    // Wait a tick on blur so moving between rows doesn't flicker the toolbar.
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
     const [typing, setTyping] = useState(false);
     const isField = (el) => el?.matches("input, textarea, [contenteditable]") ?? false;
+    // Wait a tick on blur so a press on the toolbar doesn't flicker it.
     const onBlur = () => setTimeout(() => {
-        if (!rows.current.includes(document.activeElement)) { setFocused(false); setMenuOpen(null); }
+        if (document.activeElement !== hostRef.current) { setFocused(false); setMenuOpen(null); }
     }, 0);
 
     // Lock the dashboard scroll while the editor is open.
@@ -377,6 +485,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // The "..." menu in the header: the card menu's actions plus copying the whole note.
     const [optionsOpen, setOptionsOpen] = useState(false);
+    const [copied, setCopied] = useState(false);
     const optionsRef = useRef(null);
     useEffect(() => {
         if (!optionsOpen) return;
@@ -384,11 +493,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         document.addEventListener("pointerdown", onDown);
         return () => document.removeEventListener("pointerdown", onDown);
     }, [optionsOpen]);
+    // "Copiar tudo" answers in place: the item turns into "Copiado" with a check, then the menu closes.
+    useEffect(() => {
+        if (!copied) return;
+        const timeout = setTimeout(() => { setOptionsOpen(false); setCopied(false); }, 1200);
+        return () => clearTimeout(timeout);
+    }, [copied]);
     const copyAll = async () => {
         try {
             await navigator.clipboard.writeText(noteText(title, content));
-            onMessage("Nota copiada");
+            setCopied(true);
         } catch {
+            setOptionsOpen(false);
             onMessage("Não foi possível copiar");
         }
     };
@@ -397,13 +513,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         { label: saved?.is_pinned ? "Desfixar" : "Fixar", icon: saved?.is_pinned ? RiPushpin2Fill : RiUnpinLine, run: () => onPin(saved), needsSaved: true },
         { label: "Categoria", icon: MdLabelOutline, run: () => onCategory(saved), needsSaved: true },
         { label: "Duplicar", icon: HiOutlineDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
-        { label: "Copiar tudo", icon: MdContentCopy, run: copyAll },
+        copied ? { label: "Copiado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Copiar tudo", icon: MdContentCopy, run: copyAll, stayOpen: true },
         { label: "Excluir", icon: BsTrash3, run: () => onDelete(saved), needsSaved: true, danger: true },
     ];
 
-    // What the open menu should light up: the focused line's heading/list marker; styles come from the selection.
+    // What the open menu should light up: the caret line's heading/list marker; styles come from the selection.
     const activeLine = parseLine(lines[activeRow.current] ?? "");
-    const activeList = activeLine.marker.trimStart().replace(/\[[xX]\]/, "[ ]");
+    const activeList = activeLine.list.replace(/\[[xX]\]/, "[ ]");
     const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]");
 
     // Header buttons share one size; undo/redo/options sit on the secondary background.
@@ -423,7 +539,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
                 className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[736px] flex flex-col px-6 md:px-8 py-6 caret-[var(--primary-color)]`}>
 
-                <div className="flex items-center justify-between gap-1.5">
+                {/* relative z-10: the header's menu opens over the note body. */}
+                <div className="relative z-10 flex items-center justify-between gap-1.5">
                     <input
                         autoFocus={!note}
                         autoComplete="off"
@@ -442,16 +559,16 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     ))}
 
                     <div ref={optionsRef} className="relative shrink-0">
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setOptionsOpen((o) => !o)} aria-label="Opções" aria-expanded={optionsOpen}
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOptionsOpen((o) => !o); setCopied(false); }} aria-label="Opções" aria-expanded={optionsOpen}
                             className={`${headerButton} text-base bg-light-bg-color-secondary text-light-text-color-primary hover:bg-light-bg-color-tertiary`}>
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] z-20 grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary border border-light-bg-color-secondary rounded-xl shadow-md text-light-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
-                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger }) => (
+                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen }) => (
                                     <button key={label} type="button" disabled={needsSaved && !saved}
-                                        onClick={() => { setOptionsOpen(false); if (needsSaved) flush(); run(); }}
+                                        onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
                                         className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white" : "hover:bg-light-bg-color-secondary"}`}>
                                         <span>{label}</span>
                                         <Icon />
@@ -477,79 +594,96 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
                 <div
                     ref={bodyRef}
-                    className="relative text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
+                    // isolate: the rows and toolbar stack among themselves, never over the header's menu.
+                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Room under the last row for the toolbar (and its open menu) below it.
                     style={{ paddingBottom: focused ? (menuOpen ? 136 : 80) : 0, scrollPaddingBottom: focused ? (menuOpen ? 136 : 80) : 0 }}
-                    // preventDefault on the empty area: blurring the row on press would close the toolbar before the click refocuses.
+                    // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
-                    onClick={(e) => { if (e.target === e.currentTarget) rows.current[lines.length - 1]?.focus(); }}>
-                    {lines.map((raw, index) => {
-                        const line = parseLine(raw);
-                        const icon = line.check !== undefined || (line.marker && !line.number && !line.heading);
-                        return (
-                            // Earlier rows stack above later ones: each row's tall top padding (below) reaches up over the rows above it.
-                            <div key={keys[index]} ref={(el) => { rowBoxes.current[index] = el; }} style={{ zIndex: lines.length - index }}
-                                className={`relative flex items-start gap-2 ${index === 0 ? "" : lineGap(line)}`}>
-                                {line.check !== undefined && (
-                                    // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
-                                    <span className="h-[1.625em] shrink-0 flex items-center">
-                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
-                                        className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
-                                        {line.done && (
-                                            // The card preview's IoMdCheckmark traced as a stroke, so it can draw in.
-                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1">
-                                                <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={justChecked === index ? "animate-check-draw" : ""} />
-                                            </svg>
+                    onClick={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        const last = lines.length - 1;
+                        hostRef.current.focus({ preventScroll: true });
+                        setSelection(rows.current[last], rowLength(last));
+                    }}>
+                    <div
+                        ref={hostRef}
+                        role="textbox"
+                        aria-multiline="true"
+                        contentEditable
+                        suppressContentEditableWarning
+                        className="outline-none"
+                        onInput={syncFromDom}
+                        onKeyDown={onKeyDown}
+                        onPaste={onPaste}
+                        onCopy={(e) => onCopy(e, false)}
+                        onCut={(e) => onCopy(e, true)}
+                        onFocus={() => { setFocused(true); shrinkForKeyboard(); }}
+                        onBlur={onBlur}>
+                        {lines.map((raw, index) => {
+                            const line = parseLine(raw);
+                            const icon = line.check !== undefined || (line.list && !line.number && !line.heading);
+                            return (
+                                <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
+                                    className={`relative flex items-start gap-2 ${index === 0 ? "" : lineGap(line)}`}>
+                                    {line.check !== undefined && (
+                                        // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
+                                        <span contentEditable={false} suppressContentEditableWarning className="h-[1.625em] shrink-0 flex items-center select-none">
+                                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
+                                            className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
+                                            {line.done && (
+                                                // The card preview's IoMdCheckmark traced as a stroke, so it can draw in.
+                                                <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1">
+                                                    <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={justChecked === index ? "animate-check-draw" : ""} />
+                                                </svg>
+                                            )}
+                                        </button>
+                                        </span>
+                                    )}
+                                    {line.list && line.check === undefined && !line.heading && <LineMarker line={line} contentEditable={false} suppressContentEditableWarning />}
+                                    {/* -top-px: the font sits its letters a touch low in the line, so lift them level with the icon. */}
+                                    <div className={`relative flex-1 min-w-0 transition-opacity duration-300 ${icon ? "-top-px" : ""} ${line.done ? "opacity-60" : ""}`}>
+                                        <div
+                                            ref={(el) => { rows.current[index] = el; }}
+                                            data-placeholder={index === 0 && lines.length === 1 ? "" : undefined}
+                                            className={`min-h-[1.625em] whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
+                                        />
+                                        {/* An invisible copy of the text over the row, whose background draws the strike line. */}
+                                        {line.check !== undefined && (
+                                            <div aria-hidden contentEditable={false} className="strike absolute inset-0 pointer-events-none select-none whitespace-pre-wrap break-words">
+                                                <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: line.text }} />
+                                            </div>
                                         )}
-                                    </button>
-                                    </span>
-                                )}
-                                {line.marker && line.check === undefined && !line.heading && <LineMarker line={line} />}
-                                {/* -top-px: the font sits its letters a touch low in the line, so lift them level with the icon. */}
-                                <div className={`relative flex-1 min-w-0 transition-opacity duration-300 ${icon ? "-top-px" : ""} ${line.done ? "opacity-60" : ""}`}>
-                                <div
-                                    role="textbox"
-                                    contentEditable
-                                    suppressContentEditableWarning
-                                    ref={(el) => { rows.current[index] = el; }}
-                                    data-placeholder={index === 0 && lines.length === 1 ? "" : undefined}
-                                    // Chrome leaves a <br> in an emptied row; clear it so the placeholder (:empty) shows again.
-                                    onInput={(e) => { if (!e.currentTarget.textContent) e.currentTarget.innerHTML = ""; setLineText(index, sanitize(e.currentTarget.innerHTML)); }}
-                                    onKeyDown={(e) => onKeyDown(e, index)}
-                                    onPaste={(e) => onPaste(e, index)}
-                                    onFocus={() => { activeRow.current = index; setActiveIndex(index); setFocused(true); shrinkForKeyboard(); }}
-                                    onBlur={onBlur}
-                                    // pt/-mt: when a row gets focus with the keyboard up, iOS scrolls the page to center a small element in
-                                    // the area above the keyboard, so tapping a lower row jumps the screen. A tall element whose top edge is
-                                    // already off screen is left where it is (WebKit _zoomToFocusRect), and the padding keeps the text in place.
-                                    className={`block w-full outline-none whitespace-pre-wrap break-words pt-[100vh] -mt-[100vh] ${headingClass(line.heading)}`}
-                                />
-                                {/* An invisible copy of the text over the row, whose background draws the strike line. */}
-                                {line.check !== undefined && (
-                                    <div aria-hidden className="strike absolute inset-0 pointer-events-none whitespace-pre-wrap break-words">
-                                        <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: line.text }} />
                                     </div>
-                                )}
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
 
-                    {/* The toolbar, placed under the focused row by the layout effect above. It stays mounted and fades, so moving
-                        between lines just moves it. onMouseDown preventDefault keeps the row focused (and the keyboard open). */}
-                    <div ref={toolbarBoxRef} style={{ zIndex: lines.length + 1 }}
-                        className={`absolute origin-top-left transition-[opacity,transform] duration-150 ease-out ${toolbarShown ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
-                        aria-hidden={!toolbarShown}
+                    {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
+                        between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
+                    <div ref={toolbarBoxRef}
+                        className={`absolute z-10 origin-top-left transition-[opacity,transform] duration-150 ease-out ${focused ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
+                        aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className="relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full rounded-tl-none shadow-lg gap-1">
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
-                                <button key={id} type="button" tabIndex={toolbarShown ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
                                     <Icon />
                                 </button>
                             ))}
+                            {/* Indent: one pill split in two, less on the left and more on the right (Tab / Shift+Tab too). */}
+                            <div className="flex h-11 rounded-full overflow-hidden bg-light-bg-color-secondary gap-[2px]">
+                                {[[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
+                                    <button key={step} type="button" tabIndex={focused ? 0 : -1} onClick={() => changeIndent(step)} disabled={off} aria-label={label} title={label}
+                                        className={`w-12 grid place-items-center text-xl transition-colors hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:opacity-30 disabled:pointer-events-none ${step < 0 ? "border-r-2 border-light-bg-color-primary" : ""}`}>
+                                        <Icon />
+                                    </button>
+                                ))}
+                            </div>
                             {menuOpen && (
-                                // Options already in effect on the focused line (or selection) show in the primary color.
+                                // Options already in effect on the caret's line (or selection) show in the primary color.
                                 <div className={`flex absolute left-0 top-full mt-2 w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
