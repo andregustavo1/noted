@@ -812,15 +812,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
-                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
+                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] "}`}>
                                     <Icon />
                                 </button>
                             ))}
                             {/* Indent: one pill split in two, less on the left and more on the right (Tab / Shift+Tab too). */}
-                            <div className="flex h-11 rounded-full overflow-hidden bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary gap-[2px]">
+                            <div className="flex h-11 rounded-full overflow-hidden gap-px">
                                 {[[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
                                     <button key={step} type="button" tabIndex={focused ? 0 : -1} onClick={() => changeIndent(step)} disabled={off} aria-label={label} title={label}
-                                        className={`w-12 grid place-items-center text-xl transition-colors hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:opacity-30 disabled:pointer-events-none ${step < 0 ? "border-r-2 border-light-bg-color-primary dark:border-dark-bg-color-secondary" : ""}`}>
+                                        className="w-11 grid place-items-center text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] dark:hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:hover:text-inherit disabled:hover:bg-light-bg-color-secondary dark:disabled:hover:bg-dark-bg-color-tertiary disabled:cursor-default [&:disabled>svg]:opacity-30">
                                         <Icon />
                                     </button>
                                 ))}
