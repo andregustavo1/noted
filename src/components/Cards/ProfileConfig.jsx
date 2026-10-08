@@ -5,13 +5,13 @@ import { BsSortDown, BsSortUp } from "react-icons/bs";
 
 // fg is the + icon color that stays readable on bg.
 export const COLORS = [
-    { name: "Verde", bg: "#00ff00", fg: "#000" },
+    { name: "Verde", bg: "#1db954", fg: "#000" },
     { name: "Vermelho", bg: "#ff0000", fg: "#fff" },
     { name: "Laranja", bg: "#fe6802", fg: "#fff" },
-    { name: "Amarelo", bg: "#edce00", fg: "#000" },
+    { name: "Amarelo", bg: "#edbb07", fg: "#000" },
     { name: "Ciano", bg: "#2575a2", fg: "#fff" },
-    { name: "Azul escuro", bg: "#0044ff", fg: "#fff" },
-    { name: "Roxo", bg: "#aa00ff", fg: "#fff" },
+    { name: "Azul escuro", bg: "#133a86", fg: "#fff" },
+    { name: "Roxo", bg: "#4815c4", fg: "#fff" },
 ];
 
 const SORT_BY = [{ value: "date", label: "Data", name: "Data" }, { value: "name", label: "Nome", name: "Nome" }];
