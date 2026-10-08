@@ -85,6 +85,17 @@ const useDragScroll = () => {
     return { ref, onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onClickCapture };
 };
 
+// cubic-bezier(0.4, 0, 0.2, 1), Tailwind's default transition curve: progress at time t (0-1).
+const ease = (t) => {
+    const bez = (u, a, b) => 3 * a * u * (1 - u) ** 2 + 3 * b * u ** 2 * (1 - u) + u ** 3;
+    let lo = 0, hi = 1, u = t;
+    for (let i = 0; i < 20; i++) {
+        u = (lo + hi) / 2;
+        if (bez(u, 0.4, 0.2) < t) lo = u; else hi = u;
+    }
+    return bez(u, 0, 1);
+};
+
 const Home = () => {
     const categoryScroll = useDragScroll();
 
@@ -176,16 +187,32 @@ const Home = () => {
         return () => { document.documentElement.style.overflow = prev; };
     }, [onConfig]);
 
-    // iOS paints the status bar from theme-color, which the backdrop can't cover; darken it to match
-    // (#f3f3f3 under the 20% black backdrop = #c2c2c2).
+    // iOS paints the status bar from theme-color, which the backdrop can't cover. A meta tag can't take a CSS
+    // transition, so step it each frame along the backdrop's fade (300ms, Tailwind's default ease), from wherever
+    // it is so a quick reopen doesn't jump: #f3f3f3 under 0-20% black.
+    const statusShade = useRef(0);
     useEffect(() => {
-        if (!onConfig) return;
         const meta = document.querySelector('meta[name="theme-color"]');
         if (!meta) return;
-        const prev = meta.content;
-        meta.content = "#c2c2c2";
-        return () => { meta.content = prev; };
+        const from = statusShade.current, to = onConfig ? 1 : 0;
+        if (from === to) return;
+        const start = performance.now();
+        let frame;
+        const step = (now) => {
+            const t = Math.min(1, (now - start) / 300);
+            statusShade.current = from + (to - from) * ease(t);
+            const v = Math.round(243 * (1 - 0.2 * statusShade.current)).toString(16).padStart(2, "0");
+            meta.content = `#${v}${v}${v}`;
+            if (t < 1) frame = requestAnimationFrame(step);
+        };
+        frame = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(frame);
     }, [onConfig]);
+    // Leaving the page with the panel open would keep the dark bar.
+    useEffect(() => () => {
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.content = "#f3f3f3";
+    }, []);
 
     // Stored categories plus any name still only on notes (before the schema migration ran), with note counts.
     const categories = useMemo(() => {
