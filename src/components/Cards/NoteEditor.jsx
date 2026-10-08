@@ -755,10 +755,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     return (
         <>
             {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard. */}
-            <div className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
+            <div className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
             {/* iOS tints the status bar from a bar fixed at the top of the page (theme-color is ignored), or else from
                 the content scrolled under it, which could be a pinned card's color. This strip gives it the editor's. */}
-            <div aria-hidden="true" className={`fixed top-0 inset-x-0 h-3 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
+            <div aria-hidden="true" className={`fixed top-0 inset-x-0 h-3 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
         <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
@@ -767,7 +767,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             <div
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-primary md:rounded-3xl md:shadow-md w-full md:max-w-[800px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
+                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:rounded-3xl md:shadow-md dark:md:border dark:border-dark-bg-color-primary w-full md:max-w-[800px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
 
                 {/* relative z-10: the header's menu opens over the note body. */}
                 <div className="relative z-10 flex items-center justify-between gap-1.5">
@@ -785,18 +785,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). */}
                     {[[-1, "Desfazer", MdUndo, history.i === 0], [1, "Refazer", MdRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
                         <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => go(step)} disabled={off} aria-label={label} title={label}
-                            className={`${headerButton} text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-secondary disabled:opacity-40 disabled:pointer-events-none`}>
+                            className={`${headerButton} text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
                             <Icon />
                         </button>
                     ))}
 
                     <div ref={optionsRef} className="relative shrink-0">
                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOptionsOpen((o) => !o); setCopied(false); }} aria-label="Opções" aria-expanded={optionsOpen}
-                            className={`${headerButton} text-base bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-secondary`}>
+                            className={`${headerButton} text-base bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary`}>
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
                                     <button key={label} type="button" disabled={(needsSaved && !saved) || off}
@@ -818,7 +818,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         </button>
                     ) : (
                         <button type="button" onClick={close} disabled={closing} aria-label="Fechar"
-                            className={`${headerButton} text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-secondary dark:hover:bg-dark-bg-color-secondary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
+                            className={`${headerButton} text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
                             <IoMdClose />
                         </button>
                     )}
@@ -937,10 +937,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         className={`absolute z-10 origin-top-left ${showToolbar ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
+                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle], ["align", "Alinhamento", MdFormatAlignLeft]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
-                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] "}`}>
+                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] "}`}>
                                     <Icon />
                                 </button>
                             ))}
@@ -948,14 +948,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             <div className="flex h-11 rounded-full overflow-hidden gap-px">
                                 {[[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
                                     <button key={step} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => changeIndent(step)} disabled={off} aria-label={label} title={label}
-                                        className="w-11 grid place-items-center text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] dark:hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:hover:text-inherit disabled:hover:bg-light-bg-color-secondary dark:disabled:hover:bg-dark-bg-color-tertiary disabled:cursor-default [&:disabled>svg]:opacity-30">
+                                        className="w-11 grid place-items-center text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] dark:hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:hover:text-inherit disabled:hover:bg-light-bg-color-secondary dark:disabled:hover:bg-dark-bg-color-primary disabled:cursor-default [&:disabled>svg]:opacity-30">
                                         <Icon />
                                     </button>
                                 ))}
                             </div>
                             {/* ponytail: UI only, no action yet. */}
                             <button type="button" tabIndex={showToolbar ? 0 : -1} aria-label="Lembrete" title="Lembrete"
-                                className="w-11 h-11 grid place-items-center rounded-full text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)]">
+                                className="w-11 h-11 grid place-items-center rounded-full text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
                                 <MdAccessTime />
                             </button>
                             <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label="Fechar barra" title="Fechar barra"
@@ -965,22 +965,22 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             {menuOpen && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward.
-                                <div className={`flex absolute left-0 ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
+                                <div className={`flex absolute left-0 ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
-                                            className={`text-2xl py-3 px-5 ${option(activeList === prefix)}`}><Icon /></button>
+                                            className={`text-2xl px-5 ${option(activeList === prefix)}`}><Icon /></button>
                                     ))}
                                     {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
                                         <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
-                                            className={`text-2xl py-3 px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                            className={`text-2xl px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
                                     ))}
                                     {menuOpen === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
                                         <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
-                                            className={`text-2xl py-3 px-5 ${option(activeLine.align === token)}`}><Icon /></button>
+                                            className={`text-2xl px-5 ${option(activeLine.align === token)}`}><Icon /></button>
                                     ))}
                                     {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
-                                            className={`flex-1 py-3 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
+                                            className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
                                     ))}
                                 </div>
                             )}
