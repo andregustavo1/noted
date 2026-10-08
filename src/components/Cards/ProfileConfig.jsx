@@ -14,7 +14,7 @@ export const COLORS = [
     { name: "Roxo", bg: "#aa00ff", fg: "#fff" },
 ];
 
-const SORT_BY = [{ value: "date", label: "Data" }, { value: "name", label: "Nome" }];
+const SORT_BY = [{ value: "date", label: "Data", name: "Data" }, { value: "name", label: "Nome", name: "Nome" }];
 const SORT_DIR = [{ value: "desc", label: <BsSortDown size={18} />, name: "Decrescente" }, { value: "asc", label: <BsSortUp size={18} />, name: "Crescente" }];
 
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
@@ -42,24 +42,29 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
 
     const choose = ({ bg, fg }) => onChange({ primaryColor: bg, primaryColorFg: fg });
 
-    // A segmented toggle on the primary color: a light knob slides under the chosen option.
+    // A two-way toggle in the neutral colors of the theme switch: a knob slides under the chosen option, and a press
+    // anywhere on it picks the other one.
     const choices = (label, options, value, key, className) => {
         const index = Math.max(0, options.findIndex((o) => o.value === value));
+        const other = options[(index + 1) % options.length];
         return (
-            <div className={`relative flex p-1 rounded-full bg-[var(--primary-color)] ${className}`} role="radiogroup" aria-label={label}>
-                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-light-bg-color-primary shadow-sm"
+            <button type="button" role="switch" aria-checked={index === 1} aria-label={`${label}: ${options[index].name}`} title={options[index].name}
+                onClick={() => onChange({ [key]: other.value })}
+                className={`relative flex p-1 rounded-full bg-light-bg-color-secondary ${className}`}
+                style={{ boxShadow: "inset 0 3px 6px rgba(15, 23, 42, 0.09), inset 0 -2px 4px rgba(15, 23, 42, 0.06)" }}>
+                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-light-bg-color-tertiary"
                     style={{
                         width: `calc((100% - 0.5rem) / ${options.length})`,
                         transform: `translateX(${index * 100}%)`,
                         transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1)",
                     }} />
                 {options.map((o) => (
-                    <button key={o.value} type="button" role="radio" aria-checked={value === o.value} aria-label={o.name} title={o.name} onClick={() => onChange({ [key]: o.value })}
-                        className={`relative flex-1 h-9 grid place-items-center rounded-full text-sm font-semibold transition-colors duration-300 ${value === o.value ? "text-[var(--primary-color)]" : "text-[var(--primary-color-fg)]"}`}>
+                    <span key={o.value} aria-hidden="true"
+                        className={`relative flex-1 h-9 grid place-items-center text-sm font-semibold transition-colors duration-300 ${o.value === value ? "text-light-text-color-primary" : "text-light-text-color-tertiary"}`}>
                         {o.label}
-                    </button>
+                    </span>
                 ))}
-            </div>
+            </button>
         );
     };
 
@@ -139,7 +144,6 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange }) => {
                             {choices("Ordenar por", SORT_BY, settings.sortBy, "sortBy", "flex-1")}
                             {choices("Ordem", SORT_DIR, settings.sortDir, "sortDir", "w-[104px] shrink-0")}
                         </div>
-                        <p className="text-xs mt-2 text-light-text-color-tertiary">As notas fixadas ficam no topo, na mesma ordem.</p>
                     </div>
 
                     <div className="absolute bottom-0 left-5 right-5 py-8">
