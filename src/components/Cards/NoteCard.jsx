@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SlOptions } from 'react-icons/sl';
 import { RiPushpin2Fill } from "react-icons/ri";
 import { RiUnpinLine } from "react-icons/ri";
 import { BsTrash3 } from 'react-icons/bs';
@@ -20,7 +19,6 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
     const noteOptionsBtnRef = useRef(null);
     const noteOptionsRef = useRef(null);
     const cardRef = useRef(null);
-    const [openRight, setOpenRight] = useState(false);
     const openRef = useRef(false);
     openRef.current = isNoteOptionsVisible;
 
@@ -40,9 +38,6 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
     }, []);
 
     const toggleNoteOptions = () => {
-        // Open toward the side with room, so the menu never runs off a narrow screen.
-        const card = cardRef.current.getBoundingClientRect();
-        setOpenRight(card.right - noteOptionsRef.current.offsetWidth - 8 < 0);
         setNoteOptionsVisible(prevState => !prevState);
     };
 
@@ -105,7 +100,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
         <div
             ref={cardRef}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col px-4 md:px-8 py-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,border-radius_300ms_ease-in-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
+            className={`note-card ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col px-4 md:px-8 pt-3 pb-9 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,border-radius_300ms_ease-in-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
             // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
             // would shrink the card and the menu with it. A press on one of the card's own buttons (the dots, the
             // pin) makes the card :active too, so the shrink is skipped while a button inside is pressed.
@@ -114,17 +109,16 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
                 menuClosedAt = 0;
                 if (!closing) onOpen();
             }}>
-            <div className="">
-                <div className='flex items-center justify-between gap-2'>
-                    <h1 className={`${headingSize("#")} truncate min-w-0`}>{title || "Noted"}</h1>
-                    <button
-                        ref={noteOptionsBtnRef}
-                        onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
-                        className='w-6 h-6 shrink-0 grid place-items-center'>
-                        <SlOptions className={`${isNoteOptionsVisible ? "" : ""} duration-300`} />
-                    </button>
-                </div>
-            </div>
+            {/* Options handle: two short bars centered on top, so the title gets the whole width. */}
+            <button
+                ref={noteOptionsBtnRef}
+                aria-label="Opções"
+                onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
+                className='self-center w-16 h-6 -mt-1 mb-1 shrink-0 flex flex-col items-center justify-center gap-[3px]'>
+                <span className='w-9 h-[2px] rounded-full bg-current' />
+                <span className='w-6 h-[2px] rounded-full bg-current' />
+            </button>
+            <h1 className={`${headingSize("#")} truncate min-w-0`}>{title || "Noted"}</h1>
 
             <div className='text-sm leading-relaxed mt-2 break-words whitespace-pre-wrap'>{preview.split("\n").map(renderLine)}</div>
 
@@ -139,7 +133,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
                 </button>
             </div>
 
-            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl grid absolute top-10 left-1/2 -translate-x-1/2 w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 <button
                     className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>
