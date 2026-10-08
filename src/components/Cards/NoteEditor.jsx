@@ -320,6 +320,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 next[index] = line.indent;
                 return update(next, { index, caret: 0 });
             }
+            if (span.collapsed && offset === 0 && line.done) {
+                // Enter at the start of a ticked item: the new empty (unticked) item goes above, and the ticked
+                // text stays ticked where it is. A plain split would move the text to an unticked line instead.
+                next.splice(index, 0, nextMarker(line));
+                ids.current.splice(index, 0, newId());
+                return update(next, { index: index + 1, caret: 0 });
+            }
             replaceSpan(span, ["", ""], [null, nextMarker(line)]);
         } else if (type.startsWith("delete")) {
             if (span.multi) {
@@ -687,7 +694,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
                                 onMouseDown={(e) => e.preventDefault()}>
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
                                     <button key={label} type="button" disabled={(needsSaved && !saved) || off}
@@ -809,7 +816,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         className={`absolute z-10 origin-top-left ${focused ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
+                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:bg-[var(--primary-color)] "}`}>
@@ -828,7 +835,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             {menuOpen && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward.
-                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:border dark:border-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
+                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-primary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-tertiary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
                                             className={`text-2xl py-3 px-5 transition-colors ${option(activeList === prefix)}`}><Icon /></button>

@@ -138,7 +138,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
                 </button>
             </div>
 
-            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary border border-light-bg-color-secondary dark:border-dark-bg-color-tertiary rounded-3xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl grid absolute top-12 ${openRight ? "left-0 ml-2" : "right-0 mr-2"} w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 <button
                     className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>
