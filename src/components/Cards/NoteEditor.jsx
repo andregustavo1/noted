@@ -393,6 +393,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (!pos) return;
         if (sel.isCollapsed && !rows.current[pos[0]]?.contains(sel.anchorNode)) setSelection(rows.current[pos[0]], pos[1]);
         if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
+        setSelecting(!sel.isCollapsed);
         if (menuOpen) rerender((n) => n + 1);
     };
     useEffect(() => {
@@ -409,14 +410,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Toolbar pops up below the caret's row while the note body has focus.
     const [focused, setFocused] = useState(false);
-    // One toolbar for the whole note, moved under the caret's row.
+    // One toolbar for the whole note, moved under the caret's row. While text is selected it docks at the bottom of
+    // the visible note instead: under the row it covered the selection and clashed with the phone's own
+    // Cut/Copy/Paste menu, which appears right by the selection.
+    const [selecting, setSelecting] = useState(false);
     const toolbarBoxRef = useRef(null);
-    useLayoutEffect(() => {
-        const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex];
-        if (!box || !row) return;
-        box.style.top = `${row.offsetTop + row.offsetHeight + 8}px`;
-        box.style.left = `${row.offsetLeft}px`;
-    });
+    const placeToolbar = () => {
+        const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
+        if (!box || !row || !body) return;
+        box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
+        box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
+    };
+    useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
@@ -493,10 +498,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         document.addEventListener("pointerdown", onDown);
         return () => document.removeEventListener("pointerdown", onDown);
     }, [optionsOpen]);
-    // "Copiar tudo" answers in place: the item turns into "Copiado" with a check, then the menu closes.
+    // "Copiar tudo" answers in place: the item turns into "Copiado" with a check, then back; the menu stays open.
     useEffect(() => {
         if (!copied) return;
-        const timeout = setTimeout(() => { setOptionsOpen(false); setCopied(false); }, 1200);
+        const timeout = setTimeout(() => setCopied(false), 1200);
         return () => clearTimeout(timeout);
     }, [copied]);
     const copyAll = async () => {
@@ -594,6 +599,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
                 <div
                     ref={bodyRef}
+                    onScroll={() => { if (selecting) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
                     className="relative isolate text-sm leading-relaxed text-light-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Room under the last row for the toolbar (and its open menu) below it.
@@ -666,7 +672,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         className={`absolute z-10 origin-top-left transition-[opacity,transform] duration-150 ease-out ${focused ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className="relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full rounded-tl-none shadow-lg gap-1">
+                        <div ref={toolbarRef} className={`relative w-max border border-light-bg-color-secondary flex items-center py-2 px-2 bg-light-bg-color-primary text-light-text-color-primary rounded-full shadow-lg gap-1 ${selecting ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle]].map(([id, label, Icon]) => (
                                 <button key={id} type="button" tabIndex={focused ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]"}`}>
@@ -684,7 +690,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             </div>
                             {menuOpen && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
-                                <div className={`flex absolute left-0 top-full mt-2 w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in`}>
+                                // Docked at the bottom, the menu opens upward.
+                                <div className={`flex absolute left-0 ${selecting ? "bottom-full mb-2" : "top-full mt-2"} w-max rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary shadow-md text-light-text-color-primary animate-pop-in`}>
                                     {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
                                             className={`text-2xl py-3 px-5 transition-colors ${option(activeList === prefix)}`}><Icon /></button>

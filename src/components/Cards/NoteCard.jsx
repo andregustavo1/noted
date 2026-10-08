@@ -46,12 +46,26 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
         ? { previewLength: 90 + jitter, minHeight: 170 + jitter }
         : { previewLength: 45 + jitter, minHeight: 112 + jitter };
     const previewLength = isPinned ? 80 : size.previewLength;
-    // Cap lines too: list and checkbox notes break every few characters, so a char cap alone runs very tall.
+    // Lines up to maxLines. List and heading lines stay on one line and end in "..." on their own, so a long one never
+    // hides the lines under it; plain text wraps, so it spends the character budget and is cut where that runs out.
     const maxLines = isPinned ? 4 : tall ? 5 : 3;
-    const lines = content.slice(0, previewLength).split("\n");
-    const cut = content.length > previewLength || lines.length > maxLines;
-    // The cut may land inside an inline tag; drop that tail before the lines are rendered as HTML.
-    const preview = lines.slice(0, maxLines).join("\n").replace(/<\/?[a-z]*$/, "") + (cut ? "..." : "");
+    const all = content.split("\n");
+    const shown = [];
+    let budget = previewLength;
+    for (const raw of all) {
+        if (shown.length === maxLines || budget <= 0) break;
+        const { list, text } = parseLine(raw);
+        if (list) {
+            shown.push(raw);
+            budget -= Math.min(text.length, 20);
+        } else {
+            // The cut may land inside an inline tag; drop that tail before the line is rendered as HTML.
+            shown.push(raw.slice(0, budget).replace(/<\/?[a-z]*$/, ""));
+            budget -= raw.length;
+        }
+    }
+    const cut = budget < 0 || shown.length < all.length;
+    const preview = shown.join("\n") + (cut ? "..." : "");
     const html = (text) => ({ __html: sanitize(text) });
 
     // Each line renders like the open note does (same markers, heading sizes and spacing), cut to fit the card.

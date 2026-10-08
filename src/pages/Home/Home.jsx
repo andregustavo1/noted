@@ -16,9 +16,8 @@ import { createNote, deleteNote, fetchNotes, updateNote } from "../../lib/notes"
 import { createCategory, deleteCategory, fetchCategories, renameCategory } from "../../lib/categories";
 import Modal, { ModalButtons } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
+import { applySettings, fetchSettings, readLocalSettings, saveSettings, sortNotes } from "../../lib/settings";
 
-const sortNotes = (notes) =>
-    [...notes].sort((a, b) => (b.is_pinned - a.is_pinned) || b.updated_at.localeCompare(a.updated_at));
 
 const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
@@ -102,6 +101,29 @@ const Home = () => {
 
     const navigate = useNavigate();
     const { user } = useAuth();
+
+    // Settings (color, theme, note order) are kept on the account. The local copy paints first; the account's
+    // version wins once it loads, and an account without any yet gets this device's.
+    const [settings, setSettings] = useState(readLocalSettings);
+    useEffect(() => {
+        let active = true;
+        fetchSettings()
+            .then((remote) => {
+                if (!active) return;
+                if (remote) { setSettings(remote); applySettings(remote); }
+                else saveSettings(readLocalSettings()).catch(console.error);
+            })
+            .catch(console.error);
+        return () => { active = false; };
+    }, []);
+    const changeSettings = (changes) => {
+        const next = { ...settings, ...changes };
+        applySettings(next);
+        // A new order moves the cards, so let them glide like a pin does.
+        if ("sortBy" in changes || "sortDir" in changes) animateNotes(() => setSettings(next));
+        else setSettings(next);
+        saveSettings(next).catch((error) => { console.error(error); setMessage("Não foi possível salvar as configurações"); });
+    };
     const userName = getUserName(user);
 
     const onLogout = async () => {
@@ -164,10 +186,10 @@ const Home = () => {
     const currentCategory = categories.some((c) => c.name === activeCategory) ? activeCategory : "";
 
     const visibleNotes = useMemo(() => {
-        return notes.filter((note) =>
+        return sortNotes(notes.filter((note) =>
             (!currentCategory || note.category === currentCategory) && noteMatches(note, searchQuery)
-        );
-    }, [notes, currentCategory, searchQuery]);
+        ), settings);
+    }, [notes, currentCategory, searchQuery, settings]);
 
     // Editor: null when closed, { note: null } for a new note, { note } to edit one.
     const [editor, setEditor] = useState(null);
@@ -415,7 +437,7 @@ const Home = () => {
 
             <div className={`absolute overflow-hidden w-full h-full top-0 right-0 duration-300 ${onConfig ? "visible" : "invisible"}`}>
                 <div ref={panelRef} className={`absolute top-0 right-0 h-full overflow-hidden duration-300 ease-in-out transform z-40 ${onConfig ? "translate-x-0" : "translate-x-full"}`}>
-                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} />
+                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} />
                 </div>
             </div>
 
