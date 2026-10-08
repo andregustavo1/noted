@@ -527,7 +527,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const fade = `opacity 150ms ${ease}, transform 150ms ${ease}`;
         box.style.transition = glide ? `${fade}, top 150ms ${ease}, left 150ms ${ease}` : fade;
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
-        box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
+        box.style.left = `${selecting ? parseFloat(getComputedStyle(body).paddingLeft) : row.offsetLeft}px`;
         toolbarWasShown.current = focused;
     };
     useLayoutEffect(placeToolbar);
@@ -747,7 +747,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     ref={bodyRef}
                     onScroll={() => { if (selecting) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
-                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
+                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-4 px-4 md:-mx-8 md:px-8 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Blank room under the last row, always (like Apple Notes): the toolbar and its open menu fit there,
                     // and a tap on it puts the caret at the end. The room reveal() keeps under the caret's row is only
                     // what the toolbar needs right now.
@@ -778,7 +778,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         spellCheck
                         contentEditable
                         suppressContentEditableWarning
-                        className="outline-none pl-5"
+                        className="outline-none"
                         onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
@@ -799,13 +799,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
                                     className={`relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
                                     {line.heading && (
-                                        // Fold chevron in the gutter, one line tall at the heading's size. Shown while folded; otherwise only
-                                        // on hover or while the caret is on the heading, and not at all with nothing under it to fold.
+                                        // Fold chevron in the card's side padding, one line tall at the heading's size. Shown while folded;
+                                        // otherwise only on hover or while the caret is on the heading, and not at all with nothing to fold.
                                         <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
                                             onMouseDown={(e) => e.preventDefault()} onClick={() => toggleFold(index)} tabIndex={-1}
                                             style={{ height: "1lh" }}
-                                            className={`absolute -left-5 top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-[opacity,transform] duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : "rotate-90"} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
-                                            <MdChevronRight size="0.9em" />
+                                            className={`absolute -left-4 top-0 w-4 md:-left-8 md:w-8 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
+                                            {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
+                                            <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
                                         </button>
                                     )}
                                     {line.check !== undefined && (
