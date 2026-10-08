@@ -7,7 +7,7 @@ import { MdOutlineCreate } from "react-icons/md";
 import { HiOutlineDuplicate } from "react-icons/hi";
 import { IoMdCheckmark } from "react-icons/io";
 import { MdLabelOutline } from "react-icons/md";
-import { sanitize } from "../../lib/richtext";
+import { sanitize, trimEnd } from "../../lib/richtext";
 import { headingSize, indentStyle, lineGap, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
@@ -95,7 +95,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, on
                 {line.list && !check && !line.heading && <LineMarker line={line} />}
                 {/* Lists and headings stay on one line and end in "..."; plain text still wraps. -top-px matches the editor. */}
                 <span className={`relative min-w-0 flex-1 ${icon ? "-top-px" : ""} ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-60" : ""}`}>
-                    <span className={line.done ? "strike-done" : ""} dangerouslySetInnerHTML={html(line.text)} />
+                    <span className={line.done ? "strike-done" : ""} dangerouslySetInnerHTML={html(line.done ? trimEnd(line.text) : line.text)} />
                 </span>
             </div>
         );

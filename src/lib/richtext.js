@@ -29,3 +29,13 @@ export const plain = (html) => {
 };
 
 export const escapeHtml = escape;
+
+// The HTML without the whitespace at its end, inside closing tags too, so a strike line stops at the last letter.
+export const trimEnd = (html) => {
+    let out = html, prev;
+    do {
+        prev = out;
+        out = out.replace(/(?:&nbsp;|\u00a0|\s)+((?:<\/[a-z]+>)*)$/i, "$1");
+    } while (out !== prev);
+    return out;
+};
