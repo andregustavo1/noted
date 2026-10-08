@@ -21,9 +21,9 @@ const CategoryBar = ({ title, quantity, isActive, onClick, onHold }) => {
             onContextMenu={(e) => e.preventDefault()}
             onClick={(e) => { if (held.current) { e.preventDefault(); return; } onClick(); }}
             style={{ WebkitTouchCallout: "none" }}
-            className={`rounded-full px-4 py-2 gap-2 flex cursor-pointer items-center justify-between font-medium shadow-sm whitespace-nowrap [transition:transform_150ms_ease-out,background-color_300ms,color_300ms] active:scale-95 ${isActive ? "bg-primary text-white" : "bg-light-bg-color-primary"}`}>
+            className={`rounded-full px-4 py-2 gap-2 flex cursor-pointer items-center justify-between font-medium shadow-sm whitespace-nowrap [transition:transform_150ms_ease-out,background-color_300ms,color_300ms] active:scale-95 ${isActive ? "bg-primary text-white" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}>
             <span>{title}</span>
-            <span className={`p-1 rounded-full leading-none min-w-7 h-7 grid place-items-center duration-300 ${isActive ? "bg-dark-bg-color-tertiary" : "bg-light-bg-color-secondary"}`}>{quantity}</span>
+            <span className={`p-1 rounded-full leading-none min-w-7 h-7 grid place-items-center duration-300 ${isActive ? "bg-dark-bg-color-tertiary" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary"}`}>{quantity}</span>
         </button>
     )
 }
