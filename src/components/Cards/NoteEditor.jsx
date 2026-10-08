@@ -12,6 +12,22 @@ import LineMarker from "./LineMarker";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
 
+// Folded headings of a note, on this device: [[heading text, which one of that text], ...].
+const foldKey = (id) => `noted:folds:${id}`;
+const readFolds = (id) => {
+    try {
+        return (id && JSON.parse(localStorage.getItem(foldKey(id)))) || [];
+    } catch {
+        return [];
+    }
+};
+const writeFolds = (id, entries) => {
+    try {
+        if (entries.length) localStorage.setItem(foldKey(id), JSON.stringify(entries));
+        else localStorage.removeItem(foldKey(id));
+    } catch { /* private mode */ }
+};
+
 // Same grid as the Md list icons, with short dashes in place of the dots.
 const MdFormatListDashed = () => (
     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
@@ -153,8 +169,38 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Headings fold the lines under them (lib/lines.js headingSection); folded holds the keys of the folded ones,
     // hidden the rows they hide. A row the caret must land on (Enter on a folded heading, a merge into it) unfolds
     // what hides it first, in the same render.
-    const [folded, setFolded] = useState(() => new Set());
+    // The folds are kept on the device per note, as the headings' text (and which one of that text), so they
+    // survive reopening the note and most edits.
+    const noteId = saved?.id ?? note?.id ?? null;
+    const [folded, setFolded] = useState(() => {
+        const stored = readFolds(noteId);
+        if (!stored.length) return new Set();
+        const seen = {};
+        const set = new Set();
+        lines.forEach((raw, i) => {
+            const line = parseLine(raw);
+            if (!line.heading) return;
+            const text = plain(line.text).trim();
+            const n = (seen[text] = (seen[text] ?? 0) + 1);
+            if (stored.some(([t, k]) => t === text && k === n)) set.add(ids.current[i]);
+        });
+        return set;
+    });
     const hidden = foldedRows(lines, keys, folded);
+    useEffect(() => {
+        if (!noteId) return;
+        const seen = {};
+        const entries = [];
+        lines.forEach((raw, i) => {
+            const line = parseLine(raw);
+            if (!line.heading) return;
+            const text = plain(line.text).trim();
+            const n = (seen[text] = (seen[text] ?? 0) + 1);
+            if (folded.has(keys[i])) entries.push([text, n]);
+        });
+        writeFolds(noteId, entries);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [noteId, folded, content]);
     const unfoldFor = (nextLines, index) => {
         const by = foldedRows(nextLines, ids.current, folded).get(index);
         if (by) setFolded((prev) => new Set([...prev].filter((k) => !by.includes(k))));
@@ -536,7 +582,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         // Hidden: stay put while shrinking away (a fold moves the caret to the heading); placed again when it reopens.
         if (!showToolbar) return;
         box.style.top = `${selecting ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
-        box.style.left = `${selecting ? 0 : row.offsetLeft}px`;
+        box.style.left = `${selecting ? parseFloat(getComputedStyle(body).paddingLeft) : row.offsetLeft}px`;
     };
     useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | null
@@ -755,7 +801,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     ref={bodyRef}
                     onScroll={() => { if (selecting) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
-                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-1 px-1 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
+                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-4 px-4 md:-mx-8 md:px-8 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Blank room under the last row, always (like Apple Notes): the toolbar and its open menu fit there,
                     // and a tap on it puts the caret at the end. The room reveal() keeps under the caret's row is only
                     // what the toolbar needs right now.
@@ -786,7 +832,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         spellCheck
                         contentEditable
                         suppressContentEditableWarning
-                        className="outline-none pl-4"
+                        className="outline-none pl-2"
                         onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
@@ -807,12 +853,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={indentStyle(line)}
                                     className={`relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
                                     {line.heading && (
-                                        // Fold chevron in the 1rem gutter left of the text (pl-4 on the host), one line tall at the heading's size.
-                                        // Shown while folded; otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
+                                        // Fold chevron left of the text: its 20px glyph ends just before the text, overhanging the pl-2 gutter into the
+                                        // card's padding (the note body spans it, so nothing is clipped). One line tall at the heading's size. Shown
+                                        // while folded; otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
                                         <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
                                             onMouseDown={(e) => e.preventDefault()} onClick={() => toggleFold(index)} tabIndex={-1}
                                             style={{ height: "1lh" }}
-                                            className={`absolute -left-4 top-0 w-4 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
+                                            className={`absolute -left-4 top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
                                             {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
                                             <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
                                         </button>
