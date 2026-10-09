@@ -6,7 +6,6 @@ import NoteEditor from "../../components/Cards/NoteEditor";
 import { TfiPlus } from "react-icons/tfi";
 import { MdOutlineCreate, MdLabelOutline, MdDoNotDisturbAlt } from "react-icons/md";
 import { BsTrash3 } from "react-icons/bs";
-import { IoMdClose } from "react-icons/io";
 import CategoryBar from "../../components/Cards/CategoryBar";
 import ProfileInfo from "../../components/Cards/ProfileInfo";
 import ProfileConfig from "../../components/Cards/ProfileConfig.jsx";
@@ -20,7 +19,6 @@ import { noteMatches } from "../../lib/search";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
 import { flush, flushedSince } from "../../lib/sync";
-import { applyUpdate, checkUpdate, subscribeUpdate } from "../../lib/update";
 
 
 const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
@@ -414,16 +412,6 @@ const Home = () => {
     };
 
     const [searchQuery, setSearchQuery] = useState("");
-
-    // A new build is live (lib/update.js): a popup offers it, and so does the side panel above "Desconectar".
-    const [updateReady, setUpdateReady] = useState(false);
-    useEffect(() => subscribeUpdate(setUpdateReady), []);
-    const [updateDismissed, setUpdateDismissed] = useState(false);
-    const onCheckUpdate = async () => {
-        const result = await checkUpdate();
-        if (result === false) setMessage("Você já está na versão mais recente");
-        else if (result === null) setMessage("Não foi possível verificar");
-    };
     const setActiveCategory = (name) => changeSettings({ activeCategory: name });
 
     useEffect(() => {
@@ -720,7 +708,7 @@ const Home = () => {
             {/* The keyboard-free screen height (index.html), so the keyboard never shortens the panel. */}
             <div className={`absolute overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 duration-300 ${onConfig ? "visible" : "invisible"}`}>
                 <div ref={panelRef} className={`absolute top-0 right-0 h-full overflow-hidden duration-300 ease-in-out transform z-40 ${onConfig ? "translate-x-0" : "translate-x-full"}`}>
-                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} updateReady={updateReady} onUpdate={applyUpdate} onCheckUpdate={onCheckUpdate} />
+                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
                 </div>
             </div>
 
@@ -789,15 +777,6 @@ const Home = () => {
                         })}
                     </div>
                 </Modal>
-            )}
-
-            {updateReady && !updateDismissed && !editor && (
-                // Same spot as the messages; it stays until the update is applied or the X is pressed.
-                <div className="fixed bottom-28 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-primary text-white text-sm rounded-full pl-4 pr-1 py-1 shadow-md z-[70] animate-pop-in whitespace-nowrap">
-                    <span>Nova versão disponível</span>
-                    <button type="button" onClick={applyUpdate} className="ml-2 rounded-full px-3 h-8 font-semibold bg-[var(--primary-color)] text-[var(--primary-color-fg)] active:scale-95 duration-150">Atualizar</button>
-                    <button type="button" onClick={() => setUpdateDismissed(true)} aria-label="Agora não" className="w-8 h-8 grid place-items-center rounded-full hover:bg-white/15 text-lg"><IoMdClose /></button>
-                </div>
             )}
 
             {message && (
