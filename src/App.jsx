@@ -2,18 +2,20 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
 import Home from "./pages/Home/Home";
 import Login from "./pages/Login/Login"
+import MfaCode from "./pages/Login/MfaCode";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { isSupabaseConfigured } from "./lib/supabase";
 
 const RequireAuth = ({ children }) => {
-    const { session, loading } = useAuth();
+    const { session, needsMfa, loading } = useAuth();
     if (loading) return null;
-    return session ? children : <Navigate to="/login" replace />;
+    return session && !needsMfa ? children : <Navigate to="/login" replace />;
 }
 
 const RedirectIfAuthed = ({ children }) => {
-    const { session, loading } = useAuth();
+    const { session, needsMfa, loading } = useAuth();
     if (loading) return null;
+    if (needsMfa) return <MfaCode />;
     return session ? <Navigate to="/dashboard" replace /> : children;
 }
 

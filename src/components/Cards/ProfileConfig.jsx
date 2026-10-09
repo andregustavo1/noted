@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { FiLogOut, FiSun, FiMoon } from "react-icons/fi";
 import { BsSortDown, BsSortUp } from "react-icons/bs";
 import { TbBorderCornerSquare, TbSquareRounded } from "react-icons/tb";
+import MfaSetup from "./MfaSetup";
 
 // fg is the + icon color that stays readable on bg.
 export const COLORS = [
@@ -177,6 +178,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                         </div>
                     </div>
 
+                    <MfaSetup />
                 </div>
                 </div>
 

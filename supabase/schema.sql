@@ -79,3 +79,31 @@ create policy "Users manage their own categories" on public.categories
 insert into public.categories (user_id, name)
 select distinct user_id, category from public.notes where category <> ''
 on conflict do nothing;
+
+-- Two-step verification: once the account has a verified TOTP factor, a session signed in with only the password
+-- (aal1) gets nothing. The error is a 401 (PostgREST maps SQLSTATE PT401) rather than an empty result, so a device
+-- still on an old aal1 token keeps its queued changes and cache (sync.js treats 401 as the connection's) until it
+-- shows the code screen.
+create or replace function public.require_mfa()
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+    if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2'
+        and exists (select 1 from auth.mfa_factors where user_id = auth.uid() and status = 'verified') then
+        raise sqlstate 'PT401' using message = 'MFA required';
+    end if;
+    return true;
+end;
+$$;
+
+drop policy if exists "Require MFA when enrolled" on public.notes;
+create policy "Require MFA when enrolled" on public.notes
+    as restrictive for all to authenticated using ((select public.require_mfa()));
+
+drop policy if exists "Require MFA when enrolled" on public.categories;
+create policy "Require MFA when enrolled" on public.categories
+    as restrictive for all to authenticated using ((select public.require_mfa()));

@@ -1,7 +1,20 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const AuthContext = createContext({ session: null, user: null, loading: true });
+const AuthContext = createContext({ session: null, user: null, needsMfa: false, loading: true });
+
+// The assurance level the access token was signed with: "aal2" once the TOTP code was given in this session.
+const aal = (token) => {
+    try {
+        return JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).aal;
+    } catch {
+        return null;
+    }
+};
+
+// Signed in with the password but not yet with the code. Read from the session itself, so it holds offline too.
+const mfaPending = (session) =>
+    Boolean(session?.user?.factors?.some((f) => f.status === "verified")) && aal(session.access_token) !== "aal2";
 
 // The session as supabase-js keeps it on this device. It paints the app at once, and keeps it open offline: with the
 // access token expired, getSession() can't refresh it and reports no session, although the account is still signed
@@ -38,7 +51,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ session, user: session?.user ?? null, loading }}>
+        <AuthContext.Provider value={{ session, user: session?.user ?? null, needsMfa: mfaPending(session), loading }}>
             {children}
         </AuthContext.Provider>
     );
