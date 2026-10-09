@@ -121,6 +121,14 @@
     
 }
 
+/* The side panel's progress, 0 closed to 1 open (Home.jsx). Registered so it transitions as a number: the panel and
+   the avatar each read it, with the same transition, so both move from one value and stay locked together. */
+@property --cfg {
+    syntax: "<number>";
+    inherits: false;
+    initial-value: 0;
+}
+
 /* Menus materialize out of the control that opened them (set transform-origin there): fade and scale together.
    Here rather than in tailwind.config.js: a running dev server doesn't pick up new config keyframes (it kept serving
    the menus without these until restarted), while this file always hot-reloads. */

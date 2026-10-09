@@ -21,6 +21,10 @@ import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, u
 import { flush, flushedSince } from "../../lib/sync";
 
 
+// Inline: Tailwind reads an arbitrary [transition:--cfg...] as a var() and drops it. The curve is Tailwind's ease-in-out,
+// which the panel used before (the CSS ease-in-out keyword starts slower).
+const CFG_TRANSITION = "--cfg 300ms cubic-bezier(0.4, 0, 0.2, 1)";
+
 const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
 // Cards glide to their new slots instead of jumping (View Transitions API, styled in index.css).
@@ -224,15 +228,17 @@ const Home = () => {
 
     const [onConfig, setOnConfig] = useState(false)
     const [editNameSignal, setEditNameSignal] = useState(0); // bumped by the pencil on the avatar
-    const [avatarShift, setAvatarShift] = useState(0)
+    // The avatar's ride into the panel: shift is how far it ends up moving, width the panel's.
+    const [avatarRide, setAvatarRide] = useState({ shift: 0, width: 0 })
     const avatarRef = useRef(null)
     const panelRef = useRef(null)
 
     const toggleConfig = () => {
         if (!onConfig) {
-            // Slide the avatar to the panel's left padding (px-5 = 20px), wherever the header sits.
-            const panelLeft = document.documentElement.clientWidth - panelRef.current.offsetWidth;
-            setAvatarShift(panelLeft + 20 - avatarRef.current.getBoundingClientRect().left);
+            // The avatar ends on the panel's left padding (px-5 = 20px), wherever the header sits.
+            const width = panelRef.current.offsetWidth;
+            const panelLeft = document.documentElement.clientWidth - width;
+            setAvatarRide({ shift: panelLeft + 20 - avatarRef.current.getBoundingClientRect().left, width });
         }
         setOnConfig(!onConfig)
     }
@@ -454,7 +460,11 @@ const Home = () => {
     const [deleteShown, deleteClosing] = useLinger(pendingDelete);
     const openDialog = (next) => { setCategoryMenu(null); setDialogName(next.category?.name ?? ""); setDialog(next); };
 
+    // Opening a note ends the search: the query clears and the bar closes (SearchBar closes itself once the query is
+    // empty and the field has lost focus; the blur here covers a tap that left the field focused).
     const openEditor = (note = null) => {
+        document.getElementById("search-bar")?.blur();
+        setSearchQuery("");
         setEditorError("");
         editorNoteId.current = note?.id ?? null;
         setEditor({ note });
@@ -571,8 +581,12 @@ const Home = () => {
             <div className="max-w-[768px] relative mx-auto">
                 <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-                <div className="absolute top-0 right-0 py-4 pr-4 pl-2 z-50 transition-transform duration-300 ease-in-out"
-                    style={{ transform: `translateX(${onConfig ? avatarShift : 0}px)` }}>
+                {/* Phones: the panel picks the avatar up: it stays put until the panel's edge reaches it, then rides along
+                    at the panel's speed. Wide screens, where the panel ends right of the avatar (shift > 0): the avatar
+                    moves over to meet it. Both are driven by the same --cfg (0 closed, 1 open, index.css), so they can't drift. */}
+                <div className="absolute top-0 right-0 py-4 pr-4 pl-2 z-50"
+                    style={{ transition: CFG_TRANSITION, "--cfg": onConfig ? 1 : 0, "--shift": `${avatarRide.shift}px`, "--panel-w": `${avatarRide.width}px`,
+                        transform: avatarRide.shift > 0 ? "translateX(calc(var(--shift) * var(--cfg)))" : "translateX(min(0px, calc(var(--shift) + (1 - var(--cfg)) * var(--panel-w))))" }}>
                     <div ref={avatarRef} className="relative">
                         <ProfileInfo name={userName} onConfigClick={toggleConfig}></ProfileInfo>
                         {/* With the panel open the avatar sits at the start of the name: a pencil there shows the name is editable. */}
@@ -670,7 +684,8 @@ const Home = () => {
 
             {/* The keyboard-free screen height (index.html), so the keyboard never shortens the panel. */}
             <div className={`absolute overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 duration-300 ${onConfig ? "visible" : "invisible"}`}>
-                <div ref={panelRef} className={`absolute top-0 right-0 h-full overflow-hidden duration-300 ease-in-out transform z-40 ${onConfig ? "translate-x-0" : "translate-x-full"}`}>
+                <div ref={panelRef} className="absolute top-0 right-0 h-full overflow-hidden z-40"
+                    style={{ transition: CFG_TRANSITION, "--cfg": onConfig ? 1 : 0, transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
                     <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
                 </div>
             </div>
