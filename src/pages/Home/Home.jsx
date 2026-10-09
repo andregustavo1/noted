@@ -67,7 +67,7 @@ const animateNotes = (update) => {
 // with no transition/reflow/rAF juggling, and the chips' own transform transition can't interfere.
 // Same curve as the card reorder (index.css); the card transition itself can't be reused, it freezes the page.
 // ponytail: no edge auto-scroll while dragging; add if rows get longer than the screen often.
-const LIFT = 100, MENU = 500, TOL = 8, EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+const LIFT = 100, MENU = 300, TOL = 8, EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 const LIFT_STYLE = { transform: "scale(1.05)", position: "relative", zIndex: 1, boxShadow: "0 6px 16px rgb(0 0 0 / 0.18)" };
 const DROP_STYLE = { transform: "", transition: "", position: "", zIndex: "", boxShadow: "" };
 const useCategoryRow = (callbacks) => {
@@ -107,6 +107,9 @@ const useCategoryRow = (callbacks) => {
         const chip = e.target.closest("[data-chip]");
         const s = (g.current = { x: e.clientX, y: e.clientY, left: ref.current.scrollLeft, chip, phase: "idle", mouse: e.pointerType === "mouse" });
         if (!chip) return;
+        // Once the menu opens over the finger, iOS may not deliver the release to the row; any release ends the hold.
+        s.ac = new AbortController();
+        ["pointerup", "pointercancel", "touchend", "touchcancel"].forEach((t) => window.addEventListener(t, onPointerUp, { signal: s.ac.signal }));
         s.timer = setTimeout(() => {
             s.phase = "lifted";
             ref.current.setPointerCapture(e.pointerId);
@@ -164,7 +167,9 @@ const useCategoryRow = (callbacks) => {
 
     const onPointerUp = () => {
         const s = g.current;
-        if (!s) return;
+        if (!s || s.ended) return;
+        s.ended = true;
+        s.ac?.abort();
         clearTimeout(s.timer);
         ref.current.classList.remove("dragging");
         if (s.phase === "lifted") Object.assign(s.chip.style, DROP_STYLE); // settles through the chip's own transition
@@ -189,16 +194,6 @@ const useCategoryRow = (callbacks) => {
     return { ref, onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onClickCapture };
 };
 
-// cubic-bezier(0.4, 0, 0.2, 1), Tailwind's default transition curve: progress at time t (0-1).
-const ease = (t) => {
-    const bez = (u, a, b) => 3 * a * u * (1 - u) ** 2 + 3 * b * u ** 2 * (1 - u) + u ** 3;
-    let lo = 0, hi = 1, u = t;
-    for (let i = 0; i < 20; i++) {
-        u = (lo + hi) / 2;
-        if (bez(u, 0.4, 0.2) < t) lo = u; else hi = u;
-    }
-    return bez(u, 0, 1);
-};
 
 // Changes land on the device at once and reach Supabase from the queue (lib/queue.js, lib/sync.js): this long after
 // the last change, so a burst (the theme switched twenty times, a note being typed) goes out as one request per
@@ -211,6 +206,9 @@ const FAILURE_MESSAGE = {
     settings: "Não foi possível salvar as configurações",
 };
 const now = () => new Date().toISOString();
+// Focus without the native reveal, for a dialog field: iOS would pan the page to a prefilled name (not to an empty
+// field), and the dialog already glides up above the keyboard by itself (Modal). Module-level so the ref is stable.
+const focusQuiet = (el) => el?.focus({ preventScroll: true });
 
 const Home = () => {
     // Hold opens the chip's menu; hold-and-drag reorders, live (the order lives in settings.categoryOrder).
@@ -417,32 +415,6 @@ const Home = () => {
         return () => { document.documentElement.style.overflow = prev; };
     }, [onConfig]);
 
-    // iOS paints the status bar from theme-color, which the backdrop can't cover. A meta tag can't take a CSS
-    // transition, so step it each frame along the backdrop's fade (300ms, Tailwind's default ease), from wherever
-    // it is so a quick reopen doesn't jump: #f3f3f3 under 0-20% black.
-    const statusShade = useRef(0);
-    useEffect(() => {
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (!meta) return;
-        const from = statusShade.current, to = onConfig ? 1 : 0;
-        if (from === to) return;
-        const start = performance.now();
-        let frame;
-        const step = (now) => {
-            const t = Math.min(1, (now - start) / 300);
-            statusShade.current = from + (to - from) * ease(t);
-            const v = Math.round(243 * (1 - 0.2 * statusShade.current)).toString(16).padStart(2, "0");
-            meta.content = `#${v}${v}${v}`;
-            if (t < 1) frame = requestAnimationFrame(step);
-        };
-        frame = requestAnimationFrame(step);
-        return () => cancelAnimationFrame(frame);
-    }, [onConfig]);
-    // Leaving the page with the panel open would keep the dark bar.
-    useEffect(() => () => {
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.content = "#f3f3f3";
-    }, []);
 
     // Stored categories plus any name still only on notes (before the schema migration ran), with note counts.
     // In the order the user dragged them into; ones not ordered yet (new, or from before) come last, by name.
@@ -505,6 +477,7 @@ const Home = () => {
         <NoteCard
             key={note.id}
             id={note.id}
+            hidden={Boolean(editor) && editorNoteId.current === note.id}
             tall={tall}
             corner={corner}
             title={note.title}
@@ -612,7 +585,7 @@ const Home = () => {
                 </div>
             </div>
 
-            <div {...categoryRow} className="flex items-center gap-2 px-4 py-2 -my-2 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
+            <div {...categoryRow} className="flex items-center gap-2 px-4 pt-3 pb-6 -mt-3 -mb-6 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
                 <CategoryBar
                     title={"Todas"}
                     quantity={notes.length}
@@ -640,12 +613,13 @@ const Home = () => {
             </div>
 
             {menuShown && (
-                // Same menu as the card's, narrower; fixed so the scrolling chip row can't clip it. The backdrop closes it.
-                <div className={`fixed inset-0 z-[60] ${menuClosing ? "pointer-events-none" : ""}`} onMouseDown={() => setCategoryMenu(null)} onTouchStart={() => setCategoryMenu(null)}>
+                // Same menu as the card's, narrower; fixed so the scrolling chip row can't clip it. The backdrop closes it
+                // on click, not on press: closing on press let the tap's click fall through to the note underneath.
+                <div className={`fixed inset-x-0 top-px bottom-0 z-[60] touch-none ${menuClosing ? "pointer-events-none" : ""}`} onClick={() => setCategoryMenu(null)}>
                     <div
-                        style={{ left: Math.min(menuShown.rect.left, document.documentElement.clientWidth - 158), top: menuShown.rect.bottom + 4 }}
-                        onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
-                        className={`fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-pop-out" : "animate-pop-in"} origin-top-left`}>
+                        style={{ left: Math.max(8, Math.min(menuShown.rect.left + menuShown.rect.width / 2 - 75, document.documentElement.clientWidth - 158)), top: menuShown.rect.bottom + 4 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out" : "animate-menu-in"} origin-top`}>
                         <button className={`${menuItem} rounded-t-3xl dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary`} onClick={() => openDialog({ type: "rename", category: menuShown.category })}>
                             <p>Editar</p>
                             <MdOutlineCreate />
@@ -726,21 +700,23 @@ const Home = () => {
 
             {(dialogShown?.type === "add" || dialogShown?.type === "rename") && (
                 <Modal icon={MdLabelOutline} closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
-                    <form onSubmit={(e) => { e.preventDefault(); handleCategoryDialog(); }}>
+                    {/* No <form> and no "nome" in the label, like the note title: iOS offered AutoFill (contacts) here
+                        because the field sat in a form and looked like a person's name, autoComplete="off" or not. */}
+                    <div>
                         <input
-                            autoFocus
-                            // No AutoFill: iOS offered contacts here because the field looked like a person's name.
+                            ref={focusQuiet}
                             autoComplete="off"
                             name="category"
-                            aria-label="Nome da categoria"
+                            aria-label="Categoria"
                             maxLength={40}
                             value={dialogName}
                             onChange={(e) => setDialogName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && dialogName.trim()) handleCategoryDialog(); }}
                             placeholder="Categoria"
                             className="mt-4 w-full h-11 text-sm bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-full px-4 outline-none text-center caret-[var(--primary-color)]"
                         />
-                        <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} />
-                    </form>
+                        <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
+                    </div>
                 </Modal>
             )}
 

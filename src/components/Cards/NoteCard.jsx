@@ -14,7 +14,7 @@ import LineMarker from "./LineMarker";
 // any other, instead of also opening a note.
 let menuClosedAt = 0;
 
-const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, corner, onPinNote, onCategory, onDuplicate, onDelete }) => {
+const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, tall, corner, onPinNote, onCategory, onDuplicate, onDelete }) => {
     const [isNoteOptionsVisible, setNoteOptionsVisible] = useState(false);
     const noteOptionsBtnRef = useRef(null);
     const noteOptionsRef = useRef(null);
@@ -37,6 +37,19 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
         };
     }, []);
 
+    // Holding the card opens its menu, like holding a category chip (Home's MENU). A finger that moves is a scroll.
+    // The click after the hold is swallowed as a menu close (menuClosedAt), so it doesn't open the note.
+    const hold = useRef(null);
+    const endHold = () => { clearTimeout(hold.current?.timer); hold.current = null; };
+    const onPointerDown = (e) => {
+        if (e.target.closest("button")) return;
+        const { clientX: x, clientY: y } = e;
+        hold.current = { x, y, timer: setTimeout(() => { menuClosedAt = Date.now(); setNoteOptionsVisible(true); }, 300) };
+    };
+    const onPointerMove = (e) => {
+        if (hold.current && Math.hypot(e.clientX - hold.current.x, e.clientY - hold.current.y) > 8) endHold();
+    };
+
     const toggleNoteOptions = () => {
         setNoteOptionsVisible(prevState => !prevState);
     };
@@ -55,6 +68,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
     const all = content.split("\n");
     const shown = [];
     let budget = previewLength;
+    let cut = false; // a plain line cut short; lines left out entirely get no "..."
     for (const raw of all) {
         if (shown.length === maxLines || budget <= 0) break;
         const { list, text } = parseLine(raw);
@@ -64,10 +78,10 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
         } else {
             // The cut may land inside an inline tag; drop that tail before the line is rendered as HTML.
             shown.push(raw.slice(0, budget).replace(/<\/?[a-z]*$/, ""));
+            cut = raw.length > budget;
             budget -= raw.length;
         }
     }
-    const cut = budget < 0 || shown.length < all.length;
     const preview = shown.join("\n") + (cut ? "..." : "");
     const html = (text) => ({ __html: sanitize(text) });
 
@@ -99,11 +113,18 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
     return (
         <div
             ref={cardRef}
+            data-note={id}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
-            className={`note-card ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col px-4 md:px-8 pt-2 pb-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,border-radius_300ms_ease-in-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
+            // hidden: its note is open in the editor, which grew out of this card (Home's morphNote).
+            className={`note-card ${hidden ? "invisible" : ""} ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col select-none [-webkit-touch-callout:none] px-4 md:px-8 pt-2 pb-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,border-radius_300ms_ease-in-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
             // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
             // would shrink the card and the menu with it. A press on one of the card's own buttons (the dots, the
             // pin) makes the card :active too, so the shrink is skipped while a button inside is pressed.
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endHold}
+            onPointerCancel={endHold}
+            onContextMenu={(e) => e.preventDefault()}
             onClick={() => {
                 const closing = Date.now() - menuClosedAt < 1500;
                 menuClosedAt = 0;
@@ -133,7 +154,7 @@ const NoteCard = ({ id, title, content, date, onOpen, onEdit, isPinned, tall, co
                 </button>
             </div>
 
-            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl grid absolute top-10 left-1/2 -translate-x-1/2 w-[210px] duration-300 ease-in-out z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+            <div ref={noteOptionsRef} className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl grid absolute top-8 left-1/2 -translate-x-1/2 w-[210px] origin-top transition-[opacity,transform,visibility] z-50 shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${isNoteOptionsVisible ? 'opacity-100 visible scale-100 duration-200 ease-out' : 'opacity-0 invisible scale-90 duration-100 ease-in'}`}>
                 <button
                     className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>

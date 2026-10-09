@@ -1,10 +1,60 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BsExclamationCircle } from "react-icons/bs";
 
 // Centered dialog card, the width of an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 60px.
-// closing plays the exit (fade + pop-out) while the parent keeps it mounted for 100ms.
-const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? BsExclamationCircle : null }) => (
-    <div className={`fixed inset-0 z-[80] grid place-items-center bg-black/20 ${closing ? "animate-fade-out pointer-events-none" : "animate-fade-in"}`} onMouseDown={onClose}>
+// closing plays the exit (menu-out: fade, shrink) while the parent keeps it mounted for 100ms.
+// The backdrop is as tall as the visible area, so with the keyboard up the card glides to the center of what's left
+// (same approach as the NoteEditor's overlay). It is shrunk right at focus time, to the last keyboard height the
+// editor measured, so iOS finds the field already clear of the keyboard and has nothing to pan the page to; the real
+// height follows on the viewport's resize, where any pan iOS did anyway is undone (once, not on every scroll tick).
+const appHeight = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-height")) || window.innerHeight;
+const useVisibleHeight = () => {
+    const box = useRef(null);
+    const fit = (h) => { if (box.current) box.current.style.height = `${h}px`; };
+    const shrinkForKeyboard = () => {
+        const keyboard = Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 340 : 0);
+        const viewport = window.visualViewport;
+        if (!keyboard || (viewport && viewport.height <= appHeight() - 100)) return;
+        // From the full height, so the card glides up along with the keyboard rather than appearing already up.
+        fit(appHeight());
+        void box.current?.offsetHeight;
+        fit(appHeight() - keyboard);
+    };
+    const onFocus = (e) => { if (e.target.matches("input, textarea")) shrinkForKeyboard(); };
+    // A tap on an unfocused field would focus it natively, and iOS then pans the page to reveal its text (so the
+    // card ends up half off screen, more on every retry). Focus it from here instead, with preventScroll, still
+    // inside the tap so the keyboard opens. A tap on the focused field keeps its default (caret placement).
+    const onMouseDown = (e) => {
+        if (!e.target.matches("input, textarea") || document.activeElement === e.target) return;
+        e.preventDefault();
+        e.target.focus({ preventScroll: true });
+    };
+    // The field is already focused by the time this runs (children commit first).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useLayoutEffect(() => { if (box.current?.contains(document.activeElement)) onFocus({ target: document.activeElement }); }, []);
+    useEffect(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+        const y = window.scrollY;
+        const update = () => {
+            if (viewport.height < 100) return; // nothing visible (backgrounded); not a keyboard
+            fit(viewport.height);
+            if (viewport.height < appHeight() - 100 && window.scrollY !== y) window.scrollTo(0, y);
+        };
+        viewport.addEventListener("resize", update);
+        return () => viewport.removeEventListener("resize", update);
+    }, []);
+    return { ref: box, onFocusCapture: onFocus, onMouseDownCapture: onMouseDown };
+};
+
+const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? BsExclamationCircle : null }) => {
+    const backdrop = useVisibleHeight();
+    return (
+    // The dim covers the whole screen (fixed to the layout viewport, which keeps its full height under the keyboard);
+    // only the box that centers the card follows the visible height. It starts 1px down, leaving the top edge to the
+    // status bar strip (index.html): iOS would take the bar's color from this dim instead.
+    <div className={`fixed inset-x-0 top-px bottom-0 min-h-[calc(var(--app-height,100dvh)-1px)] z-[80] bg-black/20 ${closing ? "animate-fade-out pointer-events-none" : "animate-fade-in"}`} onMouseDown={onClose}>
+    <div {...backdrop} className="h-[var(--app-height,100dvh)] transition-[height] duration-300 ease-out grid place-items-center">
         <div
             role="dialog"
             aria-modal="true"
@@ -12,7 +62,7 @@ const Modal = ({ title, onClose, children, label = "modal-title", closing = fals
             onMouseDown={(e) => e.stopPropagation()}
             // Stop Escape here so the editor's document listener doesn't close the note too.
             onKeyDown={(e) => { if (e.key === "Escape") { e.nativeEvent.stopPropagation(); onClose(); } }}
-            className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+110px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-8 text-center ${closing ? "animate-pop-out" : "animate-pop-in"}`}>
+            className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+110px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-8 text-center ${closing ? "animate-menu-out" : "animate-menu-in"}`}>
             {Icon && (
                 <div className={`mx-auto mb-5 grid place-items-center size-12 rounded-full ${danger ? "bg-red-100 dark:bg-red-500/20 text-red-500" : "bg-[color-mix(in_srgb,var(--primary-color)_15%,transparent)] text-[var(--primary-color)]"}`}>
                     <Icon size={22} />
@@ -22,7 +72,9 @@ const Modal = ({ title, onClose, children, label = "modal-title", closing = fals
             {children}
         </div>
     </div>
-);
+    </div>
+    );
+};
 
 // The two-button row every dialog ends with; the confirm is red when `danger`.
 export const ModalButtons = ({ onCancel, onConfirm, confirm, danger, disabled }) => (

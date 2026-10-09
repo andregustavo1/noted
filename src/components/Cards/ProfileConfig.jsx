@@ -13,7 +13,7 @@ export const COLORS = [
     { name: "Laranja", bg: "#fe6802", fg: "#fff" },
     { name: "Amarelo", bg: "#edbb07", fg: "#000" },
     { name: "Ciano", bg: "#2575a2", fg: "#fff" },
-    { name: "Azul escuro", bg: "#142b59", fg: "#fff" },
+    { name: "Azul escuro", bg: "#00273d", fg: "#fff" },
     { name: "Roxo", bg: "#691392", fg: "#fff" },
 ];
 

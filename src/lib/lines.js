@@ -19,6 +19,20 @@ export const parseLine = (line) => {
     return { marker: indent + align + m[0], list: m[0], indent, align, text: rest.slice(m[0].length), number: m[1], heading: m[2], check: m[3], done: m[3] !== undefined && m[3] !== " " };
 };
 
+// A numbered line under another of the same indent continues its count (deeper lines in between don't break it,
+// any other line does); every run starts at 1.
+export const renumber = (lines) => {
+    const last = []; // last number per indent level
+    return lines.map((raw) => {
+        const line = parseLine(raw);
+        const d = line.indent.length;
+        last.length = Math.min(last.length, line.number ? d + 1 : d);
+        if (!line.number) return raw;
+        last[d] = (last[d] ?? 0) + 1;
+        return `${line.indent}${line.align}${last[d]}. ${line.text}`;
+    });
+};
+
 // Indent width per level and text alignment, for the editor and the card previews.
 export const lineStyle = (line) => ({ paddingLeft: line.indent ? `${line.indent.length * 1.5}rem` : undefined, textAlign: ALIGNS[line.align[1]] });
 

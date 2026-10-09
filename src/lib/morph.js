@@ -1,0 +1,98 @@
+// The editor opening out of its note's card and closing back into it: the editor panel starts on the card's spot
+// with the card's size, corners and color, and grows to its own place on a spring (and the reverse on close). The
+// panel's content keeps its real size and is revealed as the box grows, under a copy of the card that fades out
+// (and back in on close), so it reads as the card itself opening. Only transform, clip-path, color and opacity move.
+
+// A spring as a CSS linear() easing, in Apple's terms (WWDC 2018 "Designing Fluid Interfaces"): damping 1 settles
+// without overshoot, lower overshoots; response is about how fast it gets there, in seconds. The duration is
+// where the motion has settled. Browsers without linear() get the app's ease-out curve.
+const spring = (damping, response) => {
+    if (!CSS.supports("animation-timing-function", "linear(0, 1)")) return { easing: "cubic-bezier(0.23, 1, 0.32, 1)", duration: 400 };
+    const w = (2 * Math.PI) / response;
+    const wd = w * Math.sqrt(Math.max(0, 1 - damping * damping));
+    const x = (t) => (damping >= 1
+        ? 1 - (1 + w * t) * Math.exp(-w * t)
+        : 1 - Math.exp(-damping * w * t) * (Math.cos(wd * t) + ((damping * w) / wd) * Math.sin(wd * t)));
+    const end = (damping >= 1 ? 9.2 : 6.9 / damping) / w; // within 0.1% of the target
+    const points = Array.from({ length: 50 }, (_, i) => x((end * i) / 49).toFixed(4));
+    points[49] = "1";
+    return { easing: `linear(${points.join(", ")})`, duration: end * 1000 };
+};
+
+const OPEN = spring(0.9, 0.45);
+const CLOSE = spring(1, 0.35);
+
+const cardOf = (id) => id && document.querySelector(`.note-card[data-note="${id}"]`);
+
+// Whether the editor for this note can open out of its card: the card is on the page. Runs under
+// prefers-reduced-motion too, like the card reorder (index.css): Windows with animations off reports it, and the
+// creator wants this motion there.
+export const canMorph = (id) => Boolean(cardOf(id));
+
+const corners = (c) => `${c.borderTopLeftRadius} ${c.borderTopRightRadius} ${c.borderBottomRightRadius} ${c.borderBottomLeftRadius}`;
+
+// The panel's look sitting on the card (from) and in its own place (to). The panel must be untransformed here.
+const frames = (panel, card) => {
+    const p = panel.getBoundingClientRect();
+    const c = card.getBoundingClientRect();
+    const cs = getComputedStyle(card);
+    const ps = getComputedStyle(panel);
+    return {
+        on: {
+            transform: `translate(${c.left - p.left}px, ${c.top - p.top}px)`,
+            clipPath: `inset(0px ${p.width - c.width}px ${p.height - c.height}px 0px round ${corners(cs)})`,
+            backgroundColor: cs.backgroundColor,
+        },
+        off: { transform: "translate(0px, 0px)", clipPath: `inset(0px 0px 0px 0px round ${corners(ps)})`, backgroundColor: ps.backgroundColor },
+        width: c.width,
+        height: c.height,
+    };
+};
+
+// A copy of the card over the panel's top-left corner, so the opening starts (and the closing ends) as the card.
+const cover = (panel, card, { width, height }) => {
+    const copy = card.cloneNode(true);
+    copy.removeAttribute("data-note");
+    copy.classList.remove("note-card", "invisible");
+    Object.assign(copy.style, { position: "absolute", top: "0", left: "0", width: `${width}px`, height: `${height}px`, margin: "0", transition: "none", transform: "none", boxShadow: "none", zIndex: "20", pointerEvents: "none" });
+    panel.append(copy);
+    return copy;
+};
+
+// Starts the opening (call before the first paint). Returns the running animations, for close to take over.
+export const openFrom = (panel, backdrop, id) => {
+    const card = cardOf(id);
+    const f = frames(panel, card);
+    // The two contents hand over in turn rather than crossfading, so the card's text and the note's never overlap.
+    const content = [...panel.children];
+    const copy = cover(panel, card, f);
+    const grow = panel.animate([f.on, f.off], OPEN);
+    const fade = copy.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: "ease-out", fill: "forwards" });
+    const shows = content.map((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, delay: 70, easing: "ease-out", fill: "backwards" }));
+    // The phones' opaque backdrop waits for the panel to cover the screen, so the notes stay visible around it.
+    backdrop?.animate([{ opacity: 0 }, { opacity: 0 }], OPEN);
+    const done = () => copy.remove();
+    grow.finished.then(done, done);
+    return [grow, fade, ...shows];
+};
+
+// Shrinks the panel back into the note's card, from wherever it is now (even mid-opening), then calls done.
+// Returns false when the card is gone (deleted, filtered out), and the editor closes its own way.
+export const closeInto = (panel, backdrop, id, running, done) => {
+    const card = cardOf(id);
+    if (!card) return false;
+    const now = getComputedStyle(panel);
+    const from = { transform: now.transform, clipPath: now.clipPath, backgroundColor: now.backgroundColor };
+    running?.forEach((a) => a.cancel()); // also drops the opening's copy
+    const f = frames(panel, card);
+    if (from.clipPath === "none") from.clipPath = f.off.clipPath;
+    const content = [...panel.children];
+    const copy = cover(panel, card, f);
+    content.forEach((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: "ease-in", fill: "forwards" }));
+    // The notes are live again at once: the shrinking card doesn't hold taps.
+    panel.parentElement.style.pointerEvents = "none";
+    if (backdrop) backdrop.style.opacity = "0";
+    panel.animate([from, f.on], { ...CLOSE, fill: "forwards" }).finished.then(done, done);
+    copy.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, delay: 70, easing: "ease-out", fill: "both" });
+    return true;
+};

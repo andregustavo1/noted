@@ -8,8 +8,8 @@ const LineMarker = ({ line, ...props }) => {
     // Drawn rather than typed: a "•" or "–" glyph sits wherever the font puts it, a shape centers exactly.
     const dash = line.marker.includes("–");
     return (
-        <span {...props} className="w-[18px] h-[1.625em] shrink-0 flex items-center justify-center">
-            <span className={`bg-current ${dash ? "w-2.5 h-[1.5px]" : "w-[5px] h-[5px] rounded-full"}`} />
+        <span {...props} className="w-[18px] h-[1.625em] shrink-0 flex items-center justify-center select-none">
+            <span className={`bg-current ${dash ? "w-2.5 h-[2px] rounded-full" : "w-[5px] h-[5px] rounded-full"}`} />
         </span>
     );
 };

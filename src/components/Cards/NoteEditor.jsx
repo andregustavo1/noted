@@ -7,8 +7,9 @@ import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
 import { BsTrash3 } from "react-icons/bs";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
-import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine } from "../../lib/lines";
+import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine, renumber } from "../../lib/lines";
 import LineMarker from "./LineMarker";
+import { canMorph, closeInto, openFrom } from "../../lib/morph";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
 
@@ -110,7 +111,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Play the exit animation, then let Home unmount the editor (100ms = animate-pop-out).
     const [closing, setClosing] = useState(false);
-    const close = () => { setClosing(true); setTimeout(onClose, 100); };
+    // An existing note opens out of its card and closes back into it (lib/morph.js); otherwise the editor pops.
+    const [morph] = useState(() => canMorph(note?.id));
+    const panelRef = useRef(null);
+    const backdropRef = useRef(null);
+    const morphing = useRef(null);
+    const close = () => {
+        if (morphing.current === "closing") return;
+        // saved: a new note closes into the card it became.
+        if (closeInto(panelRef.current, backdropRef.current, saved?.id ?? note?.id, morphing.current, onClose)) { morphing.current = "closing"; return; }
+        morphing.current?.forEach((a) => a.cancel());
+        setClosing(true);
+        setTimeout(onClose, 100);
+    };
 
     const lastSaved = useRef(note ? JSON.stringify({ title: note.title ?? "", content: note.content ?? "" }) : EMPTY);
     const pending = useRef(null);
@@ -263,7 +276,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const focusAfterRender = useRef(null);
     const update = (nextLines, focus) => {
         tap.current = null;
-        setContent(nextLines.join("\n"));
+        setContent(renumber(nextLines).join("\n"));
         focusAfterRender.current = focus;
         if (focus) { activeRow.current = focus.index; setActiveIndex(focus.index); unfoldFor(nextLines, focus.index); }
     };
@@ -280,6 +293,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Where a DOM point falls, as [row, text offset]. A point outside a row's text (on a marker, between rows or on
     // the host itself) snaps to the start of its row, or for the end of a selection to the end of the row before.
+    // A point in a row's box but after its text (its strike overlay) is between that row and the next: the browsers
+    // put a selection dragged onto a ticked checkbox there, at the previous row's overlay, since a position inside the
+    // non-editable button resolves to the nearest non-editable candidate.
     const rowLength = (index) => plain(parseLine(lines[index] ?? "").text).length;
     const locate = (node, offset, isEnd) => {
         const index = rows.current.findIndex((el) => el?.contains(node));
@@ -294,7 +310,11 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             return isEnd && at > 0 ? [at - 1, rowLength(at - 1)] : [Math.min(at, lines.length - 1), 0];
         }
         const box = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.closest("[data-line]");
-        return box ? [Number(box.dataset.line), 0] : null;
+        if (!box) return null;
+        const row = Number(box.dataset.line);
+        const text = rows.current[row];
+        if (!text || !(node.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_PRECEDING)) return [row, 0];
+        return isEnd || row === lines.length - 1 ? [row, rowLength(row)] : [row + 1, 0];
     };
     // The selection as { start: [row, offset], end: [row, offset] }, or null when it isn't in the note body.
     const getSpan = () => {
@@ -308,11 +328,11 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     };
 
     // Replace the selection with lines of HTML: the first joins the text before the selection (keeping that row's
-    // marker), the last joins the text after it; markers[i] prefixes each new line after the first.
+    // marker, unless markers[0] replaces it), the last joins the text after it; markers[i] prefixes each new line after the first.
     const replaceSpan = ({ start: [sr, so], end: [er, eo] }, parts, markers = []) => {
         const [before] = splitAt(rows.current[sr], so);
         const [, after] = splitAt(rows.current[er], eo);
-        const added = parts.map((part, i) => (i === 0 ? parseLine(lines[sr]).marker + before : markers[i] ?? "") + part);
+        const added = parts.map((part, i) => (i === 0 ? (markers[0] ?? parseLine(lines[sr]).marker) + before : markers[i] ?? "") + part);
         const last = added.length - 1;
         added[last] += after;
         const next = [...lines];
@@ -358,7 +378,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const setRows = (indexes, fn) => {
         const next = [...lines];
         indexes.forEach((i) => { next[i] = fn(parseLine(lines[i])); });
-        setContent(next.join("\n"));
+        setContent(renumber(next).join("\n"));
     };
     // Toggle a list marker (or heading) on the selected lines: off when they all have it already.
     const applyList = (prefix) => {
@@ -427,6 +447,11 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     update(next, { index: index - 1, caret: rowLength(index - 1) });
                 } else {
                     e.preventDefault();
+                    // An empty first row goes away, and the caret moves to the start of the new first row.
+                    if (plain(line.text).length || lines.length === 1) return;
+                    next.splice(0, 1);
+                    ids.current.splice(0, 1);
+                    update(next, { index: 0, caret: 0 });
                 }
             } else if (span.collapsed && offset === rowLength(index) && type.endsWith("Forward")) {
                 e.preventDefault();
@@ -463,14 +488,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (cut) replaceSpan(span, [""]);
     };
     // Pasted text comes in plain; each of its lines becomes a row. Lines copied from a note get their symbols turned
-    // back into list markers ("–" and "1." already are markers).
+    // back into list markers ("–" and "1." already are markers). The first line too when pasted at a row start: its
+    // marker takes the row's place (keeping the row's alignment).
     const SYMBOLS = { "•": "- ", "☐": "- [ ] ", "☑": "- [x] " };
+    const SYMBOL = /^(\t*)([•☐☑]) /;
     const onPaste = (e) => {
         const span = getSpan();
         if (!span) return;
         e.preventDefault();
         const parts = e.clipboardData.getData("text/plain").split(/\r?\n/).map(escapeHtml);
-        replaceSpan(span, parts.map((part, i) => (i ? part.replace(/^(\t*)([•☐☑]) /, (_, tabs, sym) => tabs + SYMBOLS[sym]) : part)));
+        const first = span.start[1] === 0 && parts[0].match(SYMBOL);
+        const markers = first ? [first[1] + parseLine(lines[span.start[0]]).align + SYMBOLS[first[2]]] : [];
+        if (first) parts[0] = parts[0].slice(first[0].length);
+        replaceSpan(span, parts.map((part, i) => (i ? part.replace(SYMBOL, (_, tabs, sym) => tabs + SYMBOLS[sym]) : part)), markers);
     };
 
     // Taps: the row under the finger, by height. Set on press, before focus, so the keyboard coming up keeps that row in
@@ -588,19 +618,24 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // the visible note instead: under the row it covered the selection and clashed with the phone's own
     // Cut/Copy/Paste menu, which appears right by the selection.
     const [selecting, setSelecting] = useState(false);
+    // While text is selected the rows' non-editable islands (checkbox, list marker, fold chevron) ignore touches, so a
+    // selection handle dragged over one hits the row and resolves to the start of its text. Hitting the island gives
+    // WebKit a non-editable position (its nearest candidate: the previous row's strike overlay, or nothing), and iOS
+    // then sets the selection with that as its base, which WebKit shrinks out of the editable text: the selection
+    // vanishes (start handle) or lands a row up (end handle).
+    const island = selecting ? { pointerEvents: "none" } : undefined;
     // The "Barra de ferramentas fixa" setting keeps it docked there the whole time, just above the keyboard.
     const docked = selecting || Boolean(fixedToolbar);
     const toolbarBoxRef = useRef(null);
-    // While shown, the toolbar glides (150ms) to its new place instead of jumping: to the next row, down to the dock
-    // when a selection starts, and back up to the row when it ends. It appears in place (no glide from wherever it
-    // was hidden), and while docked it follows a scroll without lag (placed again on every scroll, no glide).
+    // While shown, the toolbar glides (150ms) from row to row instead of jumping. It appears in place (no glide from
+    // wherever it was hidden) and just moves between a row and the dock (different coordinate spaces, see below).
+    // Docked, its wrapper is sticky at the top of the visible note and the toolbar sits at the bottom of that: CSS
+    // holds it there through a scroll. Following scrollTop from JS lagged on iOS (scroll events trail the compositor).
     const toolbarWasShown = useRef(false);
-    const toolbarWasDocked = useRef(false);
     const placeToolbar = () => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
-        const glide = showToolbar && toolbarWasShown.current && (!docked || !toolbarWasDocked.current);
-        toolbarWasDocked.current = docked;
+        const glide = showToolbar && toolbarWasShown.current && !docked;
         // Opening and closing always animate (the toolbar emerges from its corner by the row, and shrinks back).
         const ease = "cubic-bezier(0.23, 1, 0.32, 1)";
         const fade = `opacity 150ms ${ease}, transform 150ms ${ease}`;
@@ -608,8 +643,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         toolbarWasShown.current = showToolbar;
         // Hidden: stay put while shrinking away (a fold moves the caret to the heading); placed again when it reopens.
         if (!showToolbar) return;
-        box.style.top = `${docked ? body.scrollTop + body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
-        box.style.left = `${docked ? (body.clientWidth - box.offsetWidth) / 2 : row.offsetLeft}px`;
+        box.style.top = `${docked ? body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
+        box.style.left = `${docked ? (box.offsetParent.clientWidth - box.offsetWidth) / 2 : row.offsetLeft}px`;
     };
     useLayoutEffect(placeToolbar);
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | "align" | null
@@ -621,6 +656,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     }, [menuOpen]);
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
+    const indentRef = useRef(null);
     useEffect(() => {
         if (!menuOpen) return;
         const onDown = (e) => { if (!toolbarRef.current?.contains(e.target) && !bodyRef.current?.contains(e.target)) setMenuOpen(null); };
@@ -686,7 +722,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Lock the dashboard scroll while the editor is open.
     // iOS ignores overflow:hidden on body (the page still pans with the keyboard up), so pin it in place instead.
-    useEffect(() => {
+    // A layout effect, before the opening below measures: pinning can drop the page's scrollbar and move the cards.
+    useLayoutEffect(() => {
         const y = window.scrollY;
         const { style } = document.body;
         Object.assign(style, { position: "fixed", top: `-${y}px`, left: "0", right: "0", overflow: "hidden" });
@@ -695,6 +732,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             window.scrollTo(0, y);
         };
     }, []);
+
+    // Opens out of the card (lib/morph.js) before the first paint.
+    useLayoutEffect(() => {
+        if (!morph) return;
+        const running = openFrom(panelRef.current, backdropRef.current, note.id);
+        morphing.current = running;
+        // StrictMode mounts twice in dev: the second opening must measure an untransformed panel, not this one's.
+        return () => running.forEach((a) => a.cancel());
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // The "..." menu in the header: the card menu's actions plus copying the whole note.
     const [optionsOpen, setOptionsOpen] = useState(false);
@@ -754,20 +800,21 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     return (
         <>
-            {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard. */}
-            <div className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
-            {/* iOS tints the status bar from a bar fixed at the top of the page (theme-color is ignored), or else from
-                the content scrolled under it, which could be a pinned card's color. This strip gives it the editor's. */}
-            <div aria-hidden="true" className={`fixed top-0 inset-x-0 h-3 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : "animate-fade-in"}`} />
+            {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard.
+                It and the editor start 1px down: the top edge is left to the status bar strip (index.html), since iOS
+                takes the bar's color from any fixed element touching that edge, whatever is in front. */}
+            <div ref={backdropRef} className={`fixed inset-x-0 top-px bottom-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
-        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : "animate-fade-in"}`}
+        {/* Grown out of its card (morph): that is the entrance, so no fade or pop of its own. */}
+        <div className={`fixed inset-x-0 top-px z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
             // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
-            style={{ height: typing ? vvHeight : "var(--app-height, 100dvh)" }}>
+            style={{ height: typing ? vvHeight - 1 : "calc(var(--app-height, 100dvh) - 1px)" }}>
             <div
+                ref={panelRef}
                 onFocus={(e) => setTyping(isField(e.target))}
                 onBlur={() => setTimeout(() => setTyping(isField(document.activeElement)), 0)}
-                className={`${closing ? "animate-pop-out" : "animate-pop-in"} bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:rounded-3xl md:shadow-md dark:md:border dark:border-dark-bg-color-primary w-full md:max-w-[800px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
+                className={`${closing ? "animate-pop-out" : morph ? "" : "animate-pop-in"} relative bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:rounded-3xl md:shadow-md dark:md:border dark:border-dark-bg-color-primary w-full md:max-w-[800px] flex flex-col px-4 py-4 md:px-8  caret-[var(--primary-color)]`}>
 
                 {/* relative z-10: the header's menu opens over the note body. */}
                 <div className="relative z-10 flex items-center justify-between gap-1.5">
@@ -777,9 +824,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         name="note-title"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
+                        // Enter moves on to the start of the note's first line.
+                        onKeyDown={(e) => {
+                            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                            e.preventDefault();
+                            tap.current = null;
+                            activeRow.current = 0;
+                            setActiveIndex(0);
+                            hostRef.current.focus({ preventScroll: true });
+                            setSelection(rows.current[0], 0);
+                        }}
                         placeholder="Título"
                         // Styled like the big heading inside the note.
-                        className={`${headingSize("#")} text-light-text-color-primary dark:text-dark-text-color-primary dark:bg-transparent outline-none w-full min-w-0`}
+                        className={`${headingSize("#")} text-light-text-color-primary dark:text-dark-text-color-primary bg-transparent outline-none w-full min-w-0`}
                     />
 
                     {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). */}
@@ -796,7 +853,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             <SlOptions />
                         </button>
                         {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-pop-in"
+                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-menu-in"
                                 onMouseDown={(e) => e.preventDefault()}>
                                 {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
                                     <button key={label} type="button" disabled={(needsSaved && !saved) || off}
@@ -818,7 +875,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         </button>
                     ) : (
                         <button type="button" onClick={close} disabled={closing} aria-label="Fechar"
-                            className={`${headerButton} text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-secondary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
+                            className={`${headerButton} text-2xl text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
                             <IoMdClose />
                         </button>
                     )}
@@ -826,9 +883,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
                 <div
                     ref={bodyRef}
-                    onScroll={() => { if (docked) placeToolbar(); }}
                     // isolate: the rows and toolbar stack among themselves, never over the header's menu.
-                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 pt-1 -mx-4 px-4 md:-mx-8 md:px-8 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
+                    className="relative isolate text-sm leading-relaxed text-light-text-color-secondary dark:text-dark-text-color-secondary mt-3 -mx-4 px-4 md:-mx-8 md:px-8 flex-1 min-h-0 overflow-y-auto overscroll-contain cursor-text"
                     // Blank room under the last row, always (like Apple Notes): the toolbar and its open menu fit there,
                     // and a tap on it puts the caret at the end. The room reveal() keeps under the caret's row is only
                     // what the toolbar needs right now.
@@ -849,6 +905,63 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         hostRef.current.focus({ preventScroll: true });
                         setSelection(rows.current[last], rowLength(last));
                     }}>
+                    {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
+                        between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
+                    {/* Zero height, so it never moves the rows. Static (invisible to layout) with the toolbar under a row;
+                        sticky at the top of the visible note while docked, so the toolbar is placed from there, not from scrollTop. */}
+                    <div className={`h-0 z-10 ${docked ? "sticky top-0" : ""}`}>
+                    <div ref={toolbarBoxRef}
+                        className={`absolute z-10 origin-top-left ${showToolbar ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
+                        aria-hidden={!focused}
+                        onMouseDown={(e) => e.preventDefault()}>
+                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
+                            {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle], ["align", "Alinhamento", MdFormatAlignLeft], ["indent", "Recuo", MdFormatIndentIncrease]].map(([id, label, Icon]) => (
+                                <button key={id} ref={id === "indent" ? indentRef : undefined} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] "}`}>
+                                    <Icon />
+                                </button>
+                            ))}
+                            {/* ponytail: UI only, no action yet. */}
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} aria-label="Lembrete" title="Lembrete"
+                                className="w-11 h-11 grid place-items-center rounded-full text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
+                                <MdAccessTime />
+                            </button>
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label="Fechar barra" title="Fechar barra"
+                                className="w-11 h-11 grid place-items-center rounded-full text-2xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
+                                <MdKeyboardArrowDown />
+                            </button>
+                            {menuOpen && (
+                                // Options already in effect on the caret's line (or selection) show in the primary color.
+                                // Docked at the bottom, the menu opens upward. The indent menu is centered on its button.
+                                <div style={menuOpen === "indent" && indentRef.current ? { left: indentRef.current.offsetLeft + indentRef.current.offsetWidth / 2 } : undefined}
+                                    className={`flex absolute ${menuOpen === "indent" ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-menu-in ${docked ? (menuOpen === "indent" ? "origin-bottom" : "origin-bottom-left") : menuOpen === "indent" ? "origin-top" : "origin-top-left"}`}>
+                                    {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
+                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
+                                            className={`text-2xl px-5 ${option(activeList === prefix)}`}><Icon /></button>
+                                    ))}
+                                    {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
+                                        <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
+                                            className={`text-2xl px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                    ))}
+                                    {menuOpen === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
+                                        <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
+                                            className={`text-2xl px-5 ${option(activeLine.align === token)}`}><Icon /></button>
+                                    ))}
+                                    {/* Less on the left, more on the right (Tab / Shift+Tab too). Stays open for repeated steps. */}
+                                    {menuOpen === "indent" && [[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
+                                        <button key={step} type="button" onClick={() => changeIndent(step)} disabled={off} title={label} aria-label={label}
+                                            className={`text-2xl px-5 ${option(false)} disabled:pointer-events-none [&:disabled>svg]:opacity-30`}><Icon /></button>
+                                    ))}
+                                    {menuOpen === "heading" &&HEADINGS.map(({ label, prefix, menu }) => (
+                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
+                                            className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    </div>
+
                     <div
                         ref={hostRef}
                         role="textbox"
@@ -861,7 +974,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         spellCheck
                         contentEditable
                         suppressContentEditableWarning
-                        className="outline-none pl-2"
+                        className="outline-none pl-2 pt-1"
                         onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
@@ -889,7 +1002,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                         // otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
                                         <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
                                             onMouseDown={(e) => e.preventDefault()} onClick={() => toggleFold(index)} tabIndex={-1}
-                                            style={{ height: "1lh" }}
+                                            style={{ height: "1lh", ...island }}
                                             className={`absolute -left-[15px] top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
                                             {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
                                             <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
@@ -898,19 +1011,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     {line.check !== undefined && (
                                         // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
                                         // The hit area grows up, down and to the left, not to the right: a tap near the text's start is for the text.
-                                        <span contentEditable={false} suppressContentEditableWarning className="h-[1.625em] shrink-0 flex items-center select-none">
+                                        <span contentEditable={false} suppressContentEditableWarning style={island} className="h-[1.625em] shrink-0 flex items-center select-none">
                                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
                                             className={`relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
-                                            {line.done && (
-                                                // The card preview's IoMdCheckmark traced as a stroke, so it can draw in.
-                                                <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1">
-                                                    <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={justChecked === index ? "animate-check-draw" : ""} />
-                                                </svg>
-                                            )}
+                                            {/* The card preview's IoMdCheckmark traced as a stroke, so it can draw in. Always in the DOM, just hidden
+                                                while unticked: a selection dragged onto the box lands on a position inside the button, and the browsers
+                                                resolve that differently for an empty button and one with a child (see locate), so both states keep the child. */}
+                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1" className={line.done ? "" : "opacity-0"}>
+                                                <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={line.done && justChecked === index ? "animate-check-draw" : ""} />
+                                            </svg>
                                         </button>
                                         </span>
                                     )}
-                                    {line.list && line.check === undefined && !line.heading && <LineMarker line={line} contentEditable={false} suppressContentEditableWarning />}
+                                    {line.list && line.check === undefined && !line.heading && <LineMarker line={line} contentEditable={false} suppressContentEditableWarning style={island} />}
                                     {/* -top-px: the font sits its letters a touch low in the line, so lift them level with the icon. */}
                                     <div className={`relative flex-1 min-w-0 transition-opacity duration-500 ${icon ? "-top-px" : ""} ${line.done ? "opacity-60" : ""}`}>
                                         <div
@@ -929,62 +1042,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 </div>
                             );
                         })}
-                    </div>
-
-                    {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
-                        between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
-                    <div ref={toolbarBoxRef}
-                        className={`absolute z-10 origin-top-left ${showToolbar ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
-                        aria-hidden={!focused}
-                        onMouseDown={(e) => e.preventDefault()}>
-                        <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
-                            {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle], ["align", "Alinhamento", MdFormatAlignLeft]].map(([id, label, Icon]) => (
-                                <button key={id} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
-                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] "}`}>
-                                    <Icon />
-                                </button>
-                            ))}
-                            {/* Indent: one pill split in two, less on the left and more on the right (Tab / Shift+Tab too). */}
-                            <div className="flex h-11 rounded-full overflow-hidden gap-px">
-                                {[[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
-                                    <button key={step} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => changeIndent(step)} disabled={off} aria-label={label} title={label}
-                                        className="w-11 grid place-items-center text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] dark:hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] disabled:hover:text-inherit disabled:hover:bg-light-bg-color-secondary dark:disabled:hover:bg-dark-bg-color-primary disabled:cursor-default [&:disabled>svg]:opacity-30">
-                                        <Icon />
-                                    </button>
-                                ))}
-                            </div>
-                            {/* ponytail: UI only, no action yet. */}
-                            <button type="button" tabIndex={showToolbar ? 0 : -1} aria-label="Lembrete" title="Lembrete"
-                                className="w-11 h-11 grid place-items-center rounded-full text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
-                                <MdAccessTime />
-                            </button>
-                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label="Fechar barra" title="Fechar barra"
-                                className="w-11 h-11 grid place-items-center rounded-full text-2xl transition-opacity bg-[var(--primary-color)] text-[var(--primary-color-fg)] hover:opacity-80">
-                                <MdKeyboardArrowDown />
-                            </button>
-                            {menuOpen && (
-                                // Options already in effect on the caret's line (or selection) show in the primary color.
-                                // Docked at the bottom, the menu opens upward.
-                                <div className={`flex absolute left-0 ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary dark:ring-1 dark:ring-inset dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-pop-in`}>
-                                    {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
-                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
-                                            className={`text-2xl px-5 ${option(activeList === prefix)}`}><Icon /></button>
-                                    ))}
-                                    {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
-                                        <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
-                                            className={`text-2xl px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
-                                    ))}
-                                    {menuOpen === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
-                                        <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
-                                            className={`text-2xl px-5 ${option(activeLine.align === token)}`}><Icon /></button>
-                                    ))}
-                                    {menuOpen === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
-                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
-                                            className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
 

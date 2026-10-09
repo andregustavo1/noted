@@ -37,10 +37,12 @@
         -webkit-touch-callout: none;
     }
 
+    /* Not "[contenteditable] *": the descendants inherit this, and an explicit "text" on the children of the editor's
+       select-none islands (the checkbox, the list markers, the strike overlay's text copy) made them caret
+       candidates, where WebKit then put a selection dragged onto a checkbox (and iOS lost it). */
     input,
     textarea,
-    [contenteditable="true"],
-    [contenteditable="true"] * {
+    [contenteditable="true"] {
         -webkit-user-select: text;
         user-select: text;
         -webkit-touch-callout: default;
@@ -56,6 +58,23 @@
     .dark body {
         background-color: var(--dark-bg-color-secondary);
         color: var(--dark-text-color-primary);
+    }
+
+    /* See index.html. 1px, opaque, above everything (dialogs, the editor, the side panel's backdrop), no animation:
+       a translucent, fading or covered strip makes Safari fall back to the color of what's under it. */
+    .status-tint {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        z-index: 2147483647;
+        pointer-events: none;
+        background-color: var(--light-bg-color-secondary);
+    }
+
+    .dark .status-tint {
+        background-color: var(--dark-bg-color-secondary);
     }
 
     /* Overlay-style scrollbar: thin translucent pill, no track, grows on hover */
@@ -100,6 +119,25 @@
     }
 
     
+}
+
+/* Menus materialize out of the control that opened them (set transform-origin there): fade and scale together.
+   Here rather than in tailwind.config.js: a running dev server doesn't pick up new config keyframes (it kept serving
+   the menus without these until restarted), while this file always hot-reloads. */
+.animate-menu-in {
+    animation: menu-in 200ms ease-out;
+}
+
+.animate-menu-out {
+    animation: menu-out 100ms ease-in forwards;
+}
+
+@keyframes menu-in {
+    from { opacity: 0; transform: scale(0.9); }
+}
+
+@keyframes menu-out {
+    to { opacity: 0; transform: scale(0.9); }
 }
 
 .custom-shadow {

@@ -45,6 +45,9 @@
     </script>
   </head>
   <body ontouchstart=""><!-- iOS only fires :active when a touchstart listener exists -->
+    <!-- iOS 26 Safari colors its top bar from the fixed element in front at the top edge (theme-color is ignored),
+         or else from whatever content is up there. This strip is always that element: the bar keeps the page color. -->
+    <div class="status-tint" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
