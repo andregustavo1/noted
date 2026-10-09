@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { FiLogOut, FiSun, FiMoon } from "react-icons/fi";
+import { FiDownload, FiLogOut, FiSun, FiMoon, FiRefreshCw } from "react-icons/fi";
 import { BsSortDown, BsSortUp } from "react-icons/bs";
 import { TbBorderCornerSquare, TbSquareRounded } from "react-icons/tb";
 import MfaSetup from "./MfaSetup";
@@ -60,7 +60,7 @@ const Switch = ({ on, onToggle, label, icons: [Off, On], dark, ...rest }) => {
 };
 
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
-const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSignal }) => {
+const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSignal, updateReady, onUpdate, onCheckUpdate }) => {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(name);
     const primary = settings.primaryColor;
@@ -184,6 +184,12 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
 
                 {/* Last in the column, so it sits at the panel's bottom whatever the keyboard does. */}
                 <div className="-mx-5 px-5 py-2 border-t border-light-bg-color-tertiary dark:border-dark-bg-color-tertiary">
+                    {/* The app's update: apply it when a new build is live, otherwise look for one. */}
+                    {updateReady ? (
+                        <button onClick={onUpdate} className="w-full font-semibold rounded-full h-11 mb-1 bg-[var(--primary-color)] text-[var(--primary-color-fg)] active:scale-95 duration-200 flex items-center justify-center gap-2"><FiDownload size={20} />Atualizar app</button>
+                    ) : (
+                        <button onClick={onCheckUpdate} className="w-full font-medium rounded-full h-11 mb-1 text-light-text-color-tertiary dark:text-dark-text-color-tertiary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary active:scale-95 duration-200 flex items-center justify-center gap-2"><FiRefreshCw size={18} />Verificar atualização</button>
+                    )}
                     <button onClick={onLogout} className="w-full font-semibold rounded-full h-11 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><FiLogOut size={20} />Desconectar</button>
                 </div>
             </div>
