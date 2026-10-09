@@ -15,7 +15,7 @@ import { supabase } from "../../lib/supabase";
 import { getUserName, useAuth } from "../../context/AuthContext";
 import { fetchNotes } from "../../lib/notes";
 import { fetchCategories } from "../../lib/categories";
-import Modal, { ModalButtons } from "../../components/Cards/Modal";
+import Modal, { ModalButtons, useLinger } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
@@ -213,17 +213,6 @@ const FAILURE_MESSAGE = {
     settings: "Não foi possível salvar as configurações",
 };
 const now = () => new Date().toISOString();
-
-// Keeps the last non-null value for `ms` after it clears, so a popup can play its exit; true while it does.
-const useLinger = (value, ms = 100) => {
-    const [shown, setShown] = useState(value);
-    useEffect(() => {
-        if (value) { setShown(value); return; }
-        const t = setTimeout(() => setShown(null), ms);
-        return () => clearTimeout(t);
-    }, [value, ms]);
-    return [value ?? shown, !value && !!shown];
-};
 
 const Home = () => {
     // Hold opens the chip's menu; hold-and-drag reorders, live (the order lives in settings.categoryOrder).

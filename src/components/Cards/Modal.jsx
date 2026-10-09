@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BsExclamationCircle } from "react-icons/bs";
 
 // Centered dialog card, the width of an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 60px.
@@ -36,5 +36,17 @@ export const ModalButtons = ({ onCancel, onConfirm, confirm, danger, disabled })
         </button>
     </div>
 );
+
+// Keeps the last non-null value for `ms` after it clears, so a popup can play its exit; true while it does.
+// eslint-disable-next-line react-refresh/only-export-components
+export const useLinger = (value, ms = 100) => {
+    const [shown, setShown] = useState(value);
+    useEffect(() => {
+        if (value) { setShown(value); return; }
+        const t = setTimeout(() => setShown(null), ms);
+        return () => clearTimeout(t);
+    }, [value, ms]);
+    return [value ?? shown, !value && !!shown];
+};
 
 export default Modal;
