@@ -15,25 +15,12 @@ self.addEventListener("activate", (event) => {
     );
 });
 
-// A fresh index.html that differs from the saved one means a new build is live: every open page is told, so it
-// can offer the update (src/lib/update.js) instead of waiting for the following open.
-const announce = async (cached, fresh) => {
-    if (!cached) return;
-    const [before, after] = await Promise.all([cached.clone().text(), fresh.clone().text()]);
-    if (before === after) return;
-    const clients = await self.clients.matchAll({ type: "window" });
-    clients.forEach((client) => client.postMessage({ type: "updated" }));
-};
-
 // Saved copy now, fresh copy fetched in the background for next time (a new deploy shows on the following open).
 const staleWhileRevalidate = async (request, key = request) => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(key);
-    const fresh = fetch(request).then(async (response) => {
-        if (response.ok) {
-            if (key === "/") await announce(cached, response);
-            cache.put(key, response.clone());
-        }
+    const fresh = fetch(request).then((response) => {
+        if (response.ok) cache.put(key, response.clone());
         return response;
     });
     if (cached) {
@@ -61,27 +48,4 @@ self.addEventListener("fetch", (event) => {
     if (request.mode === "navigate") return event.respondWith(staleWhileRevalidate(request, "/"));
     if (url.pathname.startsWith("/assets/")) return event.respondWith(cacheFirst(request));
     event.respondWith(staleWhileRevalidate(request));
-});
-
-// A page asking whether a new build is live: fetch index.html past every cache, compare, save, and answer.
-self.addEventListener("message", (event) => {
-    if (event.data?.type !== "check") return;
-    const reply = (updated) => event.ports[0]?.postMessage({ updated });
-    event.waitUntil((async () => {
-        try {
-            const cache = await caches.open(CACHE);
-            const cached = await cache.match("/");
-            const fresh = await fetch("/", { cache: "no-store" });
-            if (!fresh.ok) return reply(false);
-            const updated = cached ? (await cached.clone().text()) !== (await fresh.clone().text()) : false;
-            await cache.put("/", fresh.clone());
-            if (updated) {
-                const clients = await self.clients.matchAll({ type: "window" });
-                clients.forEach((client) => client.postMessage({ type: "updated" }));
-            }
-            reply(updated);
-        } catch {
-            reply(false);
-        }
-    })());
 });
