@@ -339,7 +339,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // dry: only work out where the scroll would go, without scrolling.
     const reveal = (el, { pad = parseFloat(bodyRef.current?.style.scrollPaddingBottom) || 0, instant = false, center = false, dry = false } = {}) => {
         const box = bodyRef.current;
-        if (!el || !box) return;
+        // A row text element no longer in the page (the browser removed it, see syncFromDom) has no row to aim at.
+        if (!el || !box || (!(el instanceof Range) && !el.isConnected)) return;
         const b = box.getBoundingClientRect();
         let r;
         if (el instanceof Range) r = el.getBoundingClientRect();
@@ -459,9 +460,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (!box) return null;
         const row = Number(box.dataset.line);
         const text = rows.current[row];
-        if (!text || !(node.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_PRECEDING)) return [row, 0];
+        // Where the point falls against the row's text, also when it sits in an ancestor of it (the row box, the
+        // text's wrapper): a whole line selected often ends there, after the text element, and reading that end as
+        // the row's start made the selection look like a caret.
+        let side = -1;
+        if (text?.isConnected) {
+            const span = document.createRange();
+            span.selectNodeContents(text);
+            try { side = span.comparePoint(node, offset); } catch { side = -1; }
+        }
+        if (side <= 0) return [row, 0];
         return isEnd || row === lines.length - 1 ? [row, rowLength(row)] : [row + 1, 0];
     };
+    const inRowText = (node) => rows.current.some((el) => el?.isConnected && el.contains(node));
     // The selection as { start: [row, offset], end: [row, offset] }, or null when it isn't in the note body.
     const getSpan = () => {
         const sel = window.getSelection();
@@ -493,9 +504,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // The rows' current HTML into the state, after the browser edited them (typing, bold...).
     const syncFromDom = () => {
         let changed = false;
+        let healed = null;
         const next = lines.map((raw, index) => {
             const el = rows.current[index];
             if (!el) return raw;
+            // The browser deleted the row's text element itself (with its text): a row with nowhere to type into.
+            // It is remounted (new key) with the text gone, and the caret goes there.
+            if (!el.isConnected) {
+                ids.current[index] = newId();
+                healed ??= index;
+                changed = true;
+                return parseLine(raw).marker;
+            }
             // Browsers leave a <br> in an emptied row; clear it so the placeholder (:empty) shows again.
             if (!el.textContent && el.innerHTML) el.innerHTML = "";
             const { marker, text } = parseLine(raw);
@@ -504,7 +524,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             changed = true;
             return marker + html;
         });
-        if (changed) setContent(next.join("\n"));
+        if (healed !== null) update(next, { index: healed, caret: 0 });
+        else if (changed) setContent(next.join("\n"));
     };
 
     // Only the box the user just checked animates, not ones that open already checked.
@@ -562,6 +583,11 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (span.collapsed && !rows.current[index]?.contains(window.getSelection().anchorNode)) setSelection(rows.current[index], offset);
         const line = parseLine(lines[index]);
         const next = [...lines];
+        // A selection with an end outside the rows' text (a whole line selected often ends on the text's wrapper or
+        // the row box) is edited here, as a multi-row one is: the browser would delete the row's text element along
+        // with its text, leaving a row with nowhere to type into.
+        const domSel = window.getSelection();
+        const straddles = span.multi || (!span.collapsed && !(inRowText(domSel.anchorNode) && inRowText(domSel.focusNode)));
         if (type === "historyUndo" || type === "historyRedo") {
             e.preventDefault();
             go(type === "historyUndo" ? -1 : 1);
@@ -581,7 +607,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             }
             replaceSpan(span, ["", ""], [null, nextMarker(line)]);
         } else if (type.startsWith("delete")) {
-            if (span.multi) {
+            if (straddles) {
                 e.preventDefault();
                 replaceSpan(span, [""]);
             } else if (span.collapsed && offset === 0 && type.endsWith("Backward")) {
@@ -616,7 +642,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 ids.current.splice(index + 1, 1);
                 update(next, { index, caret: offset });
             }
-        } else if (span.multi && (type === "insertText" || type === "insertReplacementText")) {
+        } else if (straddles && (type === "insertText" || type === "insertReplacementText")) {
             e.preventDefault();
             replaceSpan(span, [escapeHtml(e.data ?? e.dataTransfer?.getData("text/plain") ?? "")]);
         }
@@ -826,8 +852,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         // A selection dragged past a row's text (onto its checkbox or marker, or between rows) has an end on
         // non-editable content, and the browser then ignores typing into it: snap that end to the row's text.
         // The anchor keeps its side, so the drag (and Shift+arrows) goes on from where it started.
-        const inRow = (node) => rows.current.some((el) => el?.contains(node));
-        if (!sel.isCollapsed && !(inRow(sel.anchorNode) && inRow(sel.focusNode))) {
+        if (!sel.isCollapsed && !(inRowText(sel.anchorNode) && inRowText(sel.focusNode))) {
             const range = sel.getRangeAt(0);
             const backwards = sel.focusNode !== range.endContainer || sel.focusOffset !== range.endOffset;
             const anchor = locate(sel.anchorNode, sel.anchorOffset, backwards), focus = locate(sel.focusNode, sel.focusOffset, !backwards);
