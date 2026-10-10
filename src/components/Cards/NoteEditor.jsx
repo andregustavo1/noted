@@ -1,14 +1,11 @@
 import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRestart, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
 import { flushSync } from "react-dom";
-import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChevronRight, MdKeyboardArrowDown, MdKeyboardArrowUp, MdSearch, MdChecklist, MdContentCopy, MdFormatAlignCenter, MdFormatAlignJustify, MdFormatAlignLeft, MdFormatAlignRight, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo, MdAccessTime } from "react-icons/md";
-import { SlOptions } from "react-icons/sl";
-import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
-import { HiOutlineDuplicate } from "react-icons/hi";
-import { BsTrash3 } from "react-icons/bs";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
 import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine, renumber } from "../../lib/lines";
 import LineMarker from "./LineMarker";
+import ReminderCalendar from "./ReminderCalendar";
+import Modal, { ModalButtons, useLinger } from "./Modal";
 import { findAll } from "../../lib/search";
 import { canMorph, closeInto, openFrom } from "../../lib/morph";
 
@@ -33,31 +30,25 @@ const writeFolds = (id, entries) => {
     } catch { /* private mode */ }
 };
 
-// Same grid as the Md list icons, with short dashes in place of the dots.
-const MdFormatListDashed = () => (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
-        <path d="M2 5h3v2H2zm0 6h3v2H2zm0 6h3v2H2zM7 5h14v2H7zm0 6h14v2H7zm0 6h14v2H7z" />
-    </svg>
-);
 const LISTS = [
-    { label: "Lista com marcadores", icon: MdFormatListBulleted, prefix: "- " },
-    { label: "Lista com traços", icon: MdFormatListDashed, prefix: "– " },
-    { label: "Lista numerada", icon: MdFormatListNumbered, prefix: "1. " },
-    { label: "Lista de tarefas", icon: MdChecklist, prefix: "- [ ] " },
+    { label: "Lista com marcadores", icon: NiListBullet, prefix: "- " },
+    { label: "Lista com traços", icon: NiListDash, prefix: "– " },
+    { label: "Lista numerada", icon: NiListNumber, prefix: "1. " },
+    { label: "Lista de tarefas", icon: NiListCheck, prefix: "- [ ] " },
 ];
 const headingClass = (hashes) => (hashes ? `${headingSize(hashes)} text-light-text-color-primary dark:text-dark-text-color-primary` : "");
 // Inline styles are the browser's own editing commands on the selection (Ctrl+B/I/U work too).
 const STYLES = [
-    { label: "Negrito", icon: MdFormatBold, command: "bold" },
-    { label: "Itálico", icon: MdFormatItalic, command: "italic" },
-    { label: "Sublinhado", icon: MdFormatUnderlined, command: "underline" },
-    { label: "Tachado", icon: MdFormatStrikethrough, command: "strikeThrough" },
+    { label: "Negrito", icon: NiBold, command: "bold" },
+    { label: "Itálico", icon: NiItalic, command: "italic" },
+    { label: "Sublinhado", icon: NiUnderline, command: "underline" },
+    { label: "Tachado", icon: NiStrike, command: "strikeThrough" },
 ];
 const ALIGNS = [
-    { label: "Alinhar à esquerda", icon: MdFormatAlignLeft, token: "" },
-    { label: "Centralizar", icon: MdFormatAlignCenter, token: "<c> " },
-    { label: "Alinhar à direita", icon: MdFormatAlignRight, token: "<r> " },
-    { label: "Justificar", icon: MdFormatAlignJustify, token: "<j> " },
+    { label: "Alinhar à esquerda", icon: NiAlignLeft, token: "" },
+    { label: "Centralizar", icon: NiAlignCenter, token: "<c> " },
+    { label: "Alinhar à direita", icon: NiAlignRight, token: "<r> " },
+    { label: "Justificar", icon: NiAlignJustify, token: "<j> " },
 ];
 
 // A line as plain text, its marker turned into the symbol the note shows (copying, "Copiar tudo").
@@ -119,7 +110,7 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
             className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden ? "hidden" : ""}`}>
             {line.heading && (
                 // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
-                // so nothing is clipped). The glyph of MdChevronRight ends 5px before its 20px box, so the box ends 5px into
+                // so nothing is clipped). The glyph of NiChevronRight ends 5px before its 20px box, so the box ends 5px into
                 // the text: the chevron's tip (antialiased to nothing) meets the text, the stroke stays 1px off. One line tall
                 // at the heading's size. Shown while folded;
                 // otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
@@ -128,7 +119,7 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                     style={{ height: "1lh", ...island }}
                     className={`absolute -left-[15px] top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (active ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
                     {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
-                    <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
+                    <NiChevronRight size={18} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
                 </button>
             )}
             {/* The marker slots (checkbox, bullet, number) are visibility:hidden with their content made visible again.
@@ -141,11 +132,11 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                 <span contentEditable={false} suppressContentEditableWarning style={island} className="invisible relative top-[0.5px] h-[1.625em] shrink-0 flex items-center select-none">
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.toggleCheck(index)} aria-pressed={line.done}
                     className={`visible relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked ? "animate-check-pop" : ""}`}>
-                    {/* The card preview's IoMdCheckmark traced as a stroke, so it can draw in. Always in the DOM, just hidden
+                    {/* The card preview's check (NiCheck) traced as a stroke, so it can draw in. Always in the DOM, just hidden
                         while unticked: a selection dragged onto the box lands on a position inside the button, and the browsers
                         resolve that differently for an empty button and one with a child (see locate), so both states keep the child. */}
-                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1" className={line.done ? "" : "opacity-0"}>
-                        <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={line.done && justChecked ? "animate-check-draw" : ""} />
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={line.done ? "" : "opacity-0"}>
+                        <path d="M5 12.5l4.5 4.5L19 7.5" strokeDasharray="24" className={line.done && justChecked ? "animate-check-draw" : ""} />
                     </svg>
                 </button>
                 </span>
@@ -658,7 +649,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const span = getSpan();
         if (!span) return;
         e.preventDefault();
-        const parts = e.clipboardData.getData("text/plain").split(/\r?\n/).map(escapeHtml);
+        pasteText(span, e.clipboardData.getData("text/plain"));
+    };
+    const pasteText = (span, text) => {
+        const parts = text.split(/\r?\n/).map(escapeHtml);
         const first = span.start[1] === 0 && parts[0].match(SYMBOL);
         const markers = first ? [first[1] + parseLine(lines[span.start[0]]).align + SYMBOLS[first[2]]] : [];
         if (first) parts[0] = parts[0].slice(first[0].length);
@@ -668,6 +662,17 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Taps: the row under the finger, by height. Set on press, before focus, so the keyboard coming up keeps that row in
     // view (it used to scroll back to the previous row). A tap on an empty row or beside the text can leave the caret
     // outside every row (empty rows have nothing to put it in), and the click then puts it in the tapped row.
+    // The toolbar's clipboard menu. The async Clipboard API (iOS asks before a paste with its own "Colar" bubble).
+    const clipboardAction = async (action) => {
+        setMenuOpen(null);
+        const span = getSpan();
+        if (!span) return;
+        if (action === "paste") return pasteText(span, await navigator.clipboard.readText().catch(() => ""));
+        if (span.collapsed) return;
+        await navigator.clipboard.writeText(selectedText(span));
+        if (action === "cut") replaceSpan(span, [""]);
+    };
+
     const tap = useRef(null);
     const rowAtY = (y) => {
         let best = 0, bestDistance = Infinity;
@@ -942,12 +947,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
     }, [toolbarIn, docked]); // eslint-disable-line react-hooks/exhaustive-deps
-    const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | "align" | null
+    const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | "clip" | "indent" | "align" (no button now) | null
     // The menu on screen: the open one, or the one just closed while it shrinks away (animate-menu-out).
     const [shownMenu, setShownMenu] = useState(null);
     if (menuOpen && menuOpen !== shownMenu) setShownMenu(menuOpen);
     const menu = menuOpen ?? shownMenu;
     const menuClosing = !menuOpen && Boolean(shownMenu);
+    const centered = menu === "indent" || menu === "clip";
     // A menu opens under the toolbar, often off the visible part of the note (behind the keyboard): glide to it.
     // The room reveal() keeps under the row already counts the menu by now (scrollPaddingBottom, above).
     useEffect(() => {
@@ -956,7 +962,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     }, [menuOpen]);
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
-    const indentRef = useRef(null);
+    const centerRefs = useRef({}); // buttons whose menu opens centered on them
+    // The reminder dialog. ponytail: UI only, Salvar just closes until it's wired to setReminder (lines.js).
+    const [remindOpen, setRemindOpen] = useState(false);
+    const [remindShown, remindClosing] = useLinger(remindOpen || null);
     useEffect(() => {
         if (!menuOpen) return;
         const onDown = (e) => { if (!toolbarRef.current?.contains(e.target) && !bodyRef.current?.contains(e.target)) setMenuOpen(null); };
@@ -1173,13 +1182,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Actions on the stored note save pending edits first, so they see (and keep) what was just typed.
     const OPTIONS = [
-        { label: "Buscar na nota", icon: MdSearch, run: openSearch, big: true },
-        { label: saved?.is_pinned ? "Desfixar" : "Fixar", icon: saved?.is_pinned ? RiPushpin2Fill : RiUnpinLine, run: () => onPin(saved), needsSaved: true },
-        { label: "Categoria", icon: MdLabelOutline, run: () => onCategory(saved), needsSaved: true },
-        { label: "Duplicar", icon: HiOutlineDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
-        copied ? { label: "Copiado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Copiar tudo", icon: MdContentCopy, run: copyAll, stayOpen: true },
-        reset ? { label: "Resetado", icon: IoMdCheckmark, run: () => {}, stayOpen: true } : { label: "Resetar checklist", icon: MdRestartAlt, run: resetChecks, stayOpen: true, off: !hasDone },
-        { label: "Excluir", icon: BsTrash3, run: () => onDelete(saved), needsSaved: true, danger: true },
+        { label: "Buscar na nota", icon: NiSearch, run: openSearch },
+        { label: saved?.is_pinned ? "Desfixar" : "Fixar", icon: saved?.is_pinned ? NiPinFilled : NiPin, run: () => onPin(saved), needsSaved: true },
+        { label: "Categoria", icon: NiTag, run: () => onCategory(saved), needsSaved: true },
+        { label: "Duplicar", icon: NiDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
+        copied ? { label: "Copiado", icon: NiCheck, run: () => {}, stayOpen: true } : { label: "Copiar tudo", icon: NiCopy, run: copyAll, stayOpen: true },
+        reset ? { label: "Resetado", icon: NiCheck, run: () => {}, stayOpen: true } : { label: "Resetar checklist", icon: NiRestart, run: resetChecks, stayOpen: true, off: !hasDone },
+        { label: "Excluir", icon: NiTrash, run: () => onDelete(saved), needsSaved: true, danger: true },
     ];
 
     // What the open menu should light up: the caret line's heading/list marker; styles come from the selection.
@@ -1233,27 +1242,27 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). Greyed out with
                         aria-disabled, not disabled: a disabled button lets the press through to the header, which took
                         the focus (and the keyboard) away. */}
-                    {[[-1, "Desfazer", MdUndo, history.i === 0], [1, "Refazer", MdRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
+                    {[[-1, "Desfazer", NiUndo, history.i === 0], [1, "Refazer", NiRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
                         <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => !off && go(step)} aria-disabled={off} aria-label={label} title={label}
-                            className={`${headerButton} text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary aria-disabled:opacity-40 aria-disabled:active:scale-100 aria-disabled:hover:bg-light-bg-color-secondary dark:aria-disabled:hover:bg-dark-bg-color-primary aria-disabled:cursor-default`}>
+                            className={`${headerButton} text-[22px] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary aria-disabled:opacity-40 aria-disabled:active:scale-100 aria-disabled:hover:bg-light-bg-color-secondary dark:aria-disabled:hover:bg-dark-bg-color-primary aria-disabled:cursor-default`}>
                             <Icon />
                         </button>
                     ))}
 
                     <div ref={optionsRef} className="relative shrink-0">
                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOptionsOpen((o) => !o); setCopied(false); }} aria-label="Opções" aria-expanded={optionsOpen}
-                            className={`${headerButton} text-base bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary`}>
-                            <SlOptions />
+                            className={`${headerButton} text-[22px] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary`}>
+                            <NiMore />
                         </button>
                         {/* Always rendered so closing animates too (same transition as the card menu). */}
                         <div className={`absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right transition-[opacity,transform,visibility] ${optionsOpen ? "opacity-100 visible scale-100 duration-200 ease-out" : "opacity-0 invisible scale-90 duration-100 ease-in"}`}
                             onMouseDown={(e) => e.preventDefault()}>
-                            {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off, big }) => (
+                            {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
                                 <button key={label} type="button" disabled={(needsSaved && !saved) || off}
                                     onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
                                     className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
                                     <span>{label}</span>
-                                    <Icon className={big ? "text-[1.2em]" : undefined} />
+                                    <Icon size={18} />
                                 </button>
                             ))}
                         </div>
@@ -1264,7 +1273,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         // the field focused (and the phone keyboard up) while stepping through matches.
                         <div className="absolute inset-0 z-20 flex items-center gap-1.5 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary animate-fade-in">
                             <div className="flex-1 min-w-0 h-11 flex items-center gap-2 pl-4 pr-3 rounded-full bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary">
-                                <MdSearch className="shrink-0 text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary" />
+                                <NiSearch className="shrink-0 text-[22px] text-light-text-color-tertiary dark:text-dark-text-color-tertiary" />
                                 <input
                                     ref={searchInput}
                                     autoComplete="off"
@@ -1292,15 +1301,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     </span>
                                 )}
                             </div>
-                            {[[-1, "Anterior", MdKeyboardArrowUp], [1, "Próximo", MdKeyboardArrowDown]].map(([by, label, Icon]) => (
+                            {[[-1, "Anterior", NiChevronUp], [1, "Próximo", NiChevronDown]].map(([by, label, Icon]) => (
                                 <button key={by} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => step(by)} disabled={matches.length < 2} aria-label={label} title={label}
-                                    className={`${headerButton} text-2xl bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
+                                    className={`${headerButton} text-[22px] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
                                     <Icon />
                                 </button>
                             ))}
                             <button type="button" onClick={closeSearch} aria-label="Fechar busca"
-                                className={`${headerButton} text-2xl text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
-                                <IoMdClose />
+                                className={`${headerButton} text-[22px] text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
+                                <NiClose />
                             </button>
                         </div>
                     )}
@@ -1310,13 +1319,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     {typing && !searching ? (
                         // onMouseDown preventDefault: blurring on press would swap this back to the X before the click lands.
                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={done} aria-label="Concluir"
-                            className={`${headerButton} text-lg bg-[var(--primary-color)] text-[var(--primary-color-fg)]`}>
-                            <IoMdCheckmark />
+                            className={`${headerButton} text-[22px] bg-[var(--primary-color)] text-[var(--primary-color-fg)]`}>
+                            <NiCheck />
                         </button>
                     ) : (
                         <button type="button" onClick={close} disabled={closing} aria-label="Fechar"
-                            className={`${headerButton} text-2xl text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
-                            <IoMdClose />
+                            className={`${headerButton} text-[22px] text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
+                            <NiClose />
                         </button>
                     )}
                 </div>
@@ -1359,42 +1368,46 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
-                            {[["list", "Lista", MdFormatListBulleted], ["style", "Estilo", MdFormatBold], ["heading", "Título", MdTitle], ["align", "Alinhamento", MdFormatAlignLeft], ["indent", "Recuo", MdFormatIndentIncrease]].map(([id, label, Icon]) => (
-                                <button key={id} ref={id === "indent" ? indentRef : undefined} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
-                                    className={`w-11 h-11 grid place-items-center rounded-full text-xl transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] "}`}>
+                            {[["list", "Lista", NiListBullet], ["style", "Estilo", NiBold], ["heading", "Título", NiHeading], ["clip", "Copiar, recortar, colar", NiCut], ["indent", "Recuo", NiIndentMore]].map(([id, label, Icon]) => (
+                                <button key={id} ref={(el) => { centerRefs.current[id] = el; }} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                    className={`w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] "}`}>
                                     <Icon />
                                 </button>
                             ))}
-                            {/* ponytail: UI only, no action yet. */}
-                            <button type="button" tabIndex={showToolbar ? 0 : -1} aria-label="Lembrete" title="Lembrete"
-                                className="w-11 h-11 grid place-items-center rounded-full text-xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
-                                <MdAccessTime />
+                            {/* Opens a centered dialog; the keyboard goes down first so the dialog has the whole screen. */}
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setMenuOpen(null); document.activeElement?.blur(); setRemindOpen(true); }} aria-label="Lembrete" title="Lembrete"
+                                className="w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
+                                <NiClock />
                             </button>
                             <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label="Fechar barra" title="Fechar barra"
-                                className="w-11 h-11 grid place-items-center rounded-full text-2xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
-                                <MdKeyboardArrowDown />
+                                className="w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
+                                <NiChevronDown />
                             </button>
                             {menu && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward. The indent menu is centered on its button.
-                                <div onAnimationEnd={() => { if (menuClosing) setShownMenu(null); }} style={menu === "indent" && indentRef.current ? { left: indentRef.current.offsetLeft + indentRef.current.offsetWidth / 2 } : undefined}
-                                    className={`flex absolute ${menu === "indent" ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out pointer-events-none" : "animate-menu-in"} ${docked ? (menu === "indent" ? "origin-bottom" : "origin-bottom-left") : menu === "indent" ? "origin-top" : "origin-top-left"}`}>
+                                <div onAnimationEnd={() => { if (menuClosing) setShownMenu(null); }} style={centered && centerRefs.current[menu] ? { left: centerRefs.current[menu].offsetLeft + centerRefs.current[menu].offsetWidth / 2 } : undefined}
+                                    className={`flex absolute ${centered ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out pointer-events-none" : "animate-menu-in"} ${docked ? (centered ? "origin-bottom" : "origin-bottom-left") : centered ? "origin-top" : "origin-top-left"}`}>
                                     {menu === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
-                                            className={`text-2xl px-5 ${option(activeList === prefix)}`}><Icon /></button>
+                                            className={`text-[22px] px-5 ${option(activeList === prefix)}`}><Icon /></button>
                                     ))}
                                     {menu === "style" && STYLES.map(({ label, icon: Icon, command }) => (
                                         <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
-                                            className={`text-2xl px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                            className={`text-[22px] px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
+                                    ))}
+                                    {menu === "clip" && [["copy", "Copiar", NiCopy], ["cut", "Recortar", NiCut], ["paste", "Colar", NiPaste]].map(([action, label, Icon]) => (
+                                        <button key={action} type="button" onClick={() => clipboardAction(action)} title={label} aria-label={label}
+                                            className={`text-[22px] px-5 ${option(false)}`}><Icon /></button>
                                     ))}
                                     {menu === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
                                         <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
-                                            className={`text-2xl px-5 ${option(activeLine.align === token)}`}><Icon /></button>
+                                            className={`text-[22px] px-5 ${option(activeLine.align === token)}`}><Icon /></button>
                                     ))}
                                     {/* Less on the left, more on the right (Tab / Shift+Tab too). Stays open for repeated steps. */}
-                                    {menu === "indent" && [[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
+                                    {menu === "indent" && [[-1, "Diminuir recuo", NiIndentLess, !activeLine.indent], [1, "Aumentar recuo", NiIndentMore, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
                                         <button key={step} type="button" onClick={() => changeIndent(step)} disabled={off} title={label} aria-label={label}
-                                            className={`text-2xl px-5 ${option(false)} disabled:pointer-events-none [&:disabled>svg]:opacity-30`}><Icon /></button>
+                                            className={`text-[22px] px-5 ${option(false)} disabled:pointer-events-none [&:disabled>svg]:opacity-30`}><Icon /></button>
                                     ))}
                                     {menu === "heading" &&HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
@@ -1457,6 +1470,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
             </div>
         </div>
+            {remindShown && (
+                <Modal icon={NiClock} closing={remindClosing} title="Lembrete" onClose={() => setRemindOpen(false)}>
+                    <ReminderCalendar />
+                    <ModalButtons confirm="Salvar" onCancel={() => setRemindOpen(false)} onConfirm={() => setRemindOpen(false)} />
+                </Modal>
+            )}
         </>
     )
 }

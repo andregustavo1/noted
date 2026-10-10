@@ -49,3 +49,20 @@ self.addEventListener("fetch", (event) => {
     if (url.pathname.startsWith("/assets/")) return event.respondWith(cacheFirst(request));
     event.respondWith(staleWhileRevalidate(request));
 });
+
+// Task reminders, sent by supabase/functions/send-reminders: { title: the task, body: the note's title, note: its id }.
+self.addEventListener("push", (event) => {
+    const { title, body, note } = event.data.json();
+    event.waitUntil(self.registration.showNotification(title, { body, data: { note }, icon: "/icon-192.png" }));
+});
+
+// Tapping one brings the app up on that note: an open window gets a message, otherwise the app opens with ?note=.
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const { note } = event.notification.data;
+    event.waitUntil(self.clients.matchAll({ type: "window" }).then((windows) => {
+        if (!windows.length) return self.clients.openWindow(`/dashboard?note=${note}`);
+        windows[0].postMessage({ type: "open-note", note });
+        return windows[0].focus();
+    }));
+});

@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BsExclamationCircle } from "react-icons/bs";
+import { NiAlert } from "../Icons/NotedIcons";
 
 // Centered dialog card, the width of an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 60px.
 // closing plays the exit (menu-out: fade, shrink) while the parent keeps it mounted for 100ms.
@@ -50,7 +50,7 @@ const useVisibleHeight = (closing) => {
     return { ref: box, onFocusCapture: onFocus, onMouseDownCapture: onMouseDown };
 };
 
-const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? BsExclamationCircle : null }) => {
+const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? NiAlert : null }) => {
     const backdrop = useVisibleHeight(closing);
     return (
     // The dim covers the whole screen (fixed to the layout viewport, which keeps its full height under the keyboard);
@@ -64,7 +64,7 @@ const Modal = ({ title, onClose, children, label = "modal-title", closing = fals
             onMouseDown={(e) => e.stopPropagation()}
             // Stop Escape here so the editor's document listener doesn't close the note too.
             onKeyDown={(e) => { if (e.key === "Escape") { e.nativeEvent.stopPropagation(); onClose(); } }}
-            className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-3xl shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+110px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-4 md:px-8 py-8 text-center ${closing ? "animate-menu-out" : "animate-menu-in"}`}>
+            className={`bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-[1.75rem] shadow-md w-[calc((min(100%,768px)-2rem)/2-0.25rem+132px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-8 md:px-8 py-8 text-center ${closing ? "animate-menu-out" : "animate-menu-in"}`}>
             {Icon && (
                 <div className={`mx-auto mb-5 grid place-items-center size-12 rounded-full ${danger ? "bg-red-100 dark:bg-red-500/20 text-red-500" : "bg-[color-mix(in_srgb,var(--primary-color)_15%,transparent)] text-[var(--primary-color)]"}`}>
                     <Icon size={22} />

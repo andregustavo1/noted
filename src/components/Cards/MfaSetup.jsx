@@ -1,6 +1,6 @@
 import React, { useState } from "react";
+import { NiLock, NiUnlock } from "../Icons/NotedIcons";
 import { createPortal } from "react-dom";
-import { FiLock, FiUnlock } from "react-icons/fi";
 import CodeInput from "../Input/CodeInput";
 import Switch from "../Input/Switch";
 import Modal, { ModalButtons, useLinger } from "./Modal";
@@ -74,7 +74,7 @@ const MfaSetup = ({ dark }) => {
         <div className="grid mt-6">
             <p className="font-medium text-lg">Verificação 2FA</p>
 
-            <Switch dark={dark} on={Boolean(factor || enrolling)} onToggle={toggle} label="Verificação em duas etapas" icons={[FiUnlock, FiLock]} />
+            <Switch dark={dark} on={Boolean(factor || enrolling)} onToggle={toggle} label="Verificação em duas etapas" icons={[NiUnlock, NiLock]} />
 
             {error && !enrolling && <p className="text-red-500 text-sm mt-1 text-center">{error}</p>}
 
@@ -88,7 +88,7 @@ const MfaSetup = ({ dark }) => {
             )}
 
             {setupShown && createPortal(
-                <Modal icon={FiLock} closing={setupClosing} title="Ativar 2FA" onClose={() => setEnrolling(null)}>
+                <Modal icon={NiLock} closing={setupClosing} title="Ativar 2FA" onClose={() => setEnrolling(null)}>
                     <img src={setupShown.qr_code} alt="QR code" className="w-44 h-44 mx-auto mt-4 bg-white rounded-lg p-2" />
                     <a href={setupShown.uri} className="grid place-items-center w-full h-11 mt-4 rounded-full font-semibold bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary">Adicionar ao app Senhas</a>
                     <p className="text-sm mt-4 text-light-text-color-tertiary dark:text-dark-text-color-tertiary">Ou digite a chave (guarde uma cópia):</p>

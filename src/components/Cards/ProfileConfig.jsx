@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { NiBarFixed, NiBarFloating, NiCornersCut, NiCornersRound, NiLogout, NiMoon, NiSortDown, NiSortUp, NiSun } from "../Icons/NotedIcons";
 import { supabase } from "../../lib/supabase";
-import { FiLogOut, FiSun, FiMoon } from "react-icons/fi";
-import { BsSortDown, BsSortUp } from "react-icons/bs";
-import { TbBorderCornerSquare, TbSquareRounded } from "react-icons/tb";
 import MfaSetup from "./MfaSetup";
 import Switch from "../Input/Switch";
 
@@ -18,18 +16,8 @@ export const COLORS = [
 ];
 
 const SORT_BY = [{ value: "date", label: "Data", name: "Data" }, { value: "name", label: "Nome", name: "Nome" }];
-const SORT_DIR = [{ value: "desc", label: <BsSortDown size={18} />, name: "Decrescente" }, { value: "asc", label: <BsSortUp size={18} />, name: "Crescente" }];
+const SORT_DIR = [{ value: "desc", label: <NiSortDown size={18} />, name: "Decrescente" }, { value: "asc", label: <NiSortUp size={18} />, name: "Crescente" }];
 
-// Toolbar toggle icons: a bar hovering over a dotted ground (floating) and one resting on a solid ground (static).
-// Drawn centred in the 24-grid and shown at 22px (the Tabler icons next to them are 18px but carry less ink).
-const barIcon = (y, ground) => () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
-        <rect x="5" y={y} width="14" height="6" rx="3" />
-        {ground}
-    </svg>
-);
-const FloatingBar = barIcon(6, <path d="M5 18h2M11 18h2M17 18h2" />);
-const StaticBar = barIcon(8, <path d="M3 16h18" />);
 
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
 const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSignal }) => {
@@ -117,7 +105,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                     <div className="grid">
                         <p className="font-medium text-lg">Aparência</p>
 
-                        <Switch dark={dark} on={dark} onToggle={() => setDark((d) => !d)} label="Tema escuro" icons={[FiSun, FiMoon]} data-theme-switch />
+                        <Switch dark={dark} on={dark} onToggle={() => setDark((d) => !d)} label="Tema escuro" icons={[NiSun, NiMoon]} data-theme-switch />
 
                         {/* Same sunken track as the theme switch, with the colors inside it. */}
                         <div className="flex items-center justify-between gap-1.5 h-11 mt-3 px-3 rounded-full bg-light-bg-color-secondary dark:bg-dark-bg-color-primary" role="radiogroup" aria-label="Cor primária"
@@ -136,10 +124,10 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                         </div>
 
                         {/* Cut corners: cards get a bigger radius with one corner squared (Home.jsx). */}
-                        <Switch dark={dark} on={Boolean(settings.cutCorners)} onToggle={() => onChange({ cutCorners: !settings.cutCorners })} label="Cantos recortados" icons={[TbSquareRounded, TbBorderCornerSquare]} />
+                        <Switch dark={dark} on={Boolean(settings.cutCorners)} onToggle={() => onChange({ cutCorners: !settings.cutCorners })} label="Cantos recortados" icons={[NiCornersRound, NiCornersCut]} />
 
                         {/* Editor toolbar: follows the caret's row, or stays docked above the keyboard (NoteEditor.jsx). */}
-                        <Switch dark={dark} on={Boolean(settings.fixedToolbar)} onToggle={() => onChange({ fixedToolbar: !settings.fixedToolbar })} label="Barra de ferramentas fixa" icons={[FloatingBar, StaticBar]} />
+                        <Switch dark={dark} on={Boolean(settings.fixedToolbar)} onToggle={() => onChange({ fixedToolbar: !settings.fixedToolbar })} label="Barra de ferramentas fixa" icons={[NiBarFloating, NiBarFixed]} />
                     </div>
 
                     <div className="grid mt-6">
@@ -156,7 +144,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
 
                 {/* Last in the column, so it sits at the panel's bottom whatever the keyboard does. */}
                 <div className="-mx-5 px-5 py-2 border-t border-light-bg-color-tertiary dark:border-dark-bg-color-tertiary">
-                    <button onClick={onLogout} className="w-full font-semibold rounded-full h-11 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><FiLogOut size={20} />Desconectar</button>
+                    <button onClick={onLogout} className="w-full font-semibold rounded-full h-11 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><NiLogout size={22} />Desconectar</button>
                 </div>
             </div>
         </>

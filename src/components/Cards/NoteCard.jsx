@@ -1,11 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { RiPushpin2Fill } from "react-icons/ri";
-import { RiUnpinLine } from "react-icons/ri";
-import { BsTrash3 } from 'react-icons/bs';
-import { MdOutlineCreate } from "react-icons/md";
-import { HiOutlineDuplicate } from "react-icons/hi";
-import { IoMdCheckmark } from "react-icons/io";
-import { MdLabelOutline } from "react-icons/md";
+import { NiCheck, NiDuplicate, NiEdit, NiPin, NiPinFilled, NiTag, NiTrash } from "../Icons/NotedIcons";
 import { sanitize, trimEnd } from "../../lib/richtext";
 import { headingSize, lineGap, lineStyle, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
@@ -96,7 +90,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                 {check && (
                     <span className="relative top-[0.5px] h-[1.625em] shrink-0 flex items-center">
                         <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-50"}`}>
-                            {line.done && <IoMdCheckmark />}
+                            {line.done && <NiCheck size={14} />}
                         </span>
                     </span>
                 )}
@@ -149,7 +143,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                     aria-label={isPinned ? "Desfixar" : "Fixar"}
                     className={`text-lg cursor-pointer p-3 -m-3`}
                     onClick={(e) => { e.stopPropagation(); onPinNote(); }}>
-                    {isPinned ? <RiPushpin2Fill /> : <RiUnpinLine />}
+                    {isPinned ? <NiPinFilled size={18} /> : <NiPin size={18} />}
                 </button>
             </div>
 
@@ -158,35 +152,35 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                     className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>
                     <p>Editar</p>
-                    <MdOutlineCreate />
+                    <NiEdit size={18} />
                 </button>
 
                 <button
                     className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onPinNote(); }}>
                     <p>{isPinned ? "Desfixar" : "Fixar"}</p>
-                    {isPinned ? <RiPushpin2Fill /> : <RiUnpinLine />}
+                    {isPinned ? <NiPinFilled size={18} /> : <NiPin size={18} />}
                 </button>
 
                 <button
                     className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onCategory(); }}>
                     <p>Categoria</p>
-                    <MdLabelOutline />
+                    <NiTag size={18} />
                 </button>
 
                 <button
                     className='flex items-center justify-between text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDuplicate(); }}>
                     <p>Duplicar</p>
-                    <HiOutlineDuplicate />
+                    <NiDuplicate size={18} />
                 </button>
 
                 <button
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDelete(); }}
                     className='flex items-center justify-between text-sm text-red-600 py-3 px-4 rounded-b-3xl hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500 duration-200'>
                     <p>Excluir</p>
-                    <BsTrash3></BsTrash3>
+                    <NiTrash size={18} />
                 </button>
             </div>
         </div>

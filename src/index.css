@@ -128,8 +128,8 @@
     
 }
 
-/* The side panel's progress, 0 closed to 1 open (Home.jsx). Registered so it transitions as a number: the panel and
-   the avatar each read it, with the same transition, so both move from one value and stay locked together. */
+/* The side panel's progress, 0 closed to 1 open (Home.jsx writes it on every frame to the panel, the avatar and the
+   backdrop, so they move from one value and stay locked together). Registered for its initial 0 before the first write. */
 @property --cfg {
     syntax: "<number>";
     inherits: false;
@@ -305,4 +305,9 @@ input[type="password"]::-webkit-inner-spin-button {
     content: attr(data-placeholder);
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* Noted icons (components/Icons/NotedIcons.jsx) keep a 1.75px line at any size. */
+.noted-icon * {
+    vector-effect: non-scaling-stroke;
 }

@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { NiEdit, NiNone, NiPlus, NiTag, NiTrash } from "../../components/Icons/NotedIcons";
 import { flushSync } from "react-dom";
 import Navbar from "../../components/Navbar/Navbar";
 import NoteCard from "../../components/Cards/NoteCard";
 import NoteEditor from "../../components/Cards/NoteEditor";
-import { TfiPlus } from "react-icons/tfi";
-import { MdOutlineCreate, MdLabelOutline, MdDoNotDisturbAlt } from "react-icons/md";
-import { BsTrash3 } from "react-icons/bs";
 import CategoryBar from "../../components/Cards/CategoryBar";
 import ProfileInfo from "../../components/Cards/ProfileInfo";
 import ProfileConfig from "../../components/Cards/ProfileConfig.jsx";
@@ -19,11 +17,8 @@ import { noteMatches } from "../../lib/search";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
 import { flush, flushedSince } from "../../lib/sync";
+import { animateSpring, project, rubber, tracker } from "../../lib/spring";
 
-
-// Inline: Tailwind reads an arbitrary [transition:--cfg...] as a var() and drops it. The curve is Tailwind's ease-in-out,
-// which the panel used before (the CSS ease-in-out keyword starts slower).
-const CFG_TRANSITION = "--cfg 300ms cubic-bezier(0.4, 0, 0.2, 1)";
 
 const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
@@ -231,17 +226,94 @@ const Home = () => {
     // The avatar's ride into the panel: shift is how far it ends up moving, width the panel's.
     const [avatarRide, setAvatarRide] = useState({ shift: 0, width: 0 })
     const avatarRef = useRef(null)
+    const avatarRideRef = useRef(null)
     const panelRef = useRef(null)
+    const panelLayerRef = useRef(null)
+    const configBackdropRef = useRef(null)
 
-    const toggleConfig = () => {
-        if (!onConfig) {
+    // The panel's progress (--cfg: 0 closed, 1 open, past 1 while pulled open further) is written straight to the
+    // panel, the avatar and the backdrop on every frame, by a spring or by the finger, never through React.
+    const cfg = useRef(0)
+    const stopCfg = useRef(null)
+    const paintCfg = (p) => {
+        cfg.current = p;
+        [panelRef, avatarRideRef, configBackdropRef].forEach((r) => r.current.style.setProperty("--cfg", p));
+        panelLayerRef.current.style.visibility = p > 0 ? "visible" : "";
+    }
+    const setConfig = (open, velocity = 0) => {
+        if (open && !onConfig) {
             // The avatar ends on the panel's left padding (px-5 = 20px), wherever the header sits.
             const width = panelRef.current.offsetWidth;
             const panelLeft = document.documentElement.clientWidth - width;
             setAvatarRide({ shift: panelLeft + 20 - avatarRef.current.getBoundingClientRect().left, width });
         }
-        setOnConfig(!onConfig)
+        setOnConfig(open);
+        stopCfg.current?.();
+        stopCfg.current = animateSpring({ from: cfg.current, to: open ? 1 : 0, velocity, onFrame: paintCfg });
     }
+    const toggleConfig = () => setConfig(!onConfig)
+
+    // Phones: a sideways drag anywhere moves the panel 1:1, to open it (leftward, over the notes) or close it (on the
+    // panel or the backdrop), rubber-banding when pulled further open. On release it springs open or shut by where
+    // the flick would coast to, keeping its speed. Caught mid-flight, it carries on from where it is. A vertical start
+    // is left to the page's scroll; the page only pans vertically (touch-action, set below), so sideways moves reach
+    // here. Not over the category row (it scrolls sideways) or fields, nor with the editor or a popup open.
+    // A drag swallows the click that follows it.
+    const panelDrag = useRef(null)
+    const panelDragged = useRef(false)
+    const panelGesture = useRef(null)
+    panelGesture.current = {
+        down: (e) => {
+            if (e.pointerType !== "touch") return;
+            if (!onConfig && (editor || dialog || categoryMenu || pendingDelete || e.target.closest("[data-category-row], input, textarea, [contenteditable]"))) return;
+            panelDrag.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        },
+        move: (e) => {
+            const d = panelDrag.current;
+            if (!d || e.pointerId !== d.id) return;
+            if (!d.on) {
+                const dx = e.clientX - d.x, dy = Math.abs(e.clientY - d.y);
+                if (Math.abs(dx) < 10 && dy < 10) return;
+                // Closed, only a leftward drag opens it.
+                if (Math.abs(dx) <= dy || (!onConfig && cfg.current === 0 && dx > 0)) { panelDrag.current = null; return; }
+                stopCfg.current?.();
+                if (!onConfig) setConfig(true); // measures the avatar's ride; the spring it starts is stopped below
+                stopCfg.current?.();
+                Object.assign(d, { on: true, x: e.clientX, from: cfg.current, w: panelRef.current.offsetWidth, v: tracker() });
+                panelDragged.current = true;
+            }
+            d.p = d.from - (e.clientX - d.x) / d.w;
+            d.v.add(d.p);
+            paintCfg(d.p > 1 ? 1 + rubber((d.p - 1) * d.w, d.w) / d.w : Math.max(0, d.p));
+        },
+        up: (e) => {
+            const d = panelDrag.current;
+            if (!d || e.pointerId !== d.id) return;
+            panelDrag.current = null;
+            if (!d.on) return;
+            const v = d.v.velocity();
+            setConfig(d.p + project(v) > 0.5, v);
+            setTimeout(() => { panelDragged.current = false; });
+        },
+    }
+    useEffect(() => {
+        const root = document.documentElement;
+        const call = (name) => (e) => panelGesture.current[name](e);
+        const on = { pointerdown: call("down"), pointermove: call("move"), pointerup: call("up"), pointercancel: call("up") };
+        // Once dragging, the page must not scroll under the finger (touch-action can't change mid-gesture).
+        const onTouchMove = (e) => { if (panelDrag.current?.on) e.preventDefault(); };
+        const onClick = (e) => { if (panelDragged.current) { e.stopPropagation(); e.preventDefault(); } };
+        Object.entries(on).forEach(([t, f]) => window.addEventListener(t, f));
+        window.addEventListener("touchmove", onTouchMove, { passive: false });
+        window.addEventListener("click", onClick, true);
+        root.style.touchAction = "pan-y";
+        return () => {
+            Object.entries(on).forEach(([t, f]) => window.removeEventListener(t, f));
+            window.removeEventListener("touchmove", onTouchMove);
+            window.removeEventListener("click", onClick, true);
+            root.style.touchAction = "";
+        };
+    }, [])
 
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -592,9 +664,9 @@ const Home = () => {
 
                 {/* Phones: the panel picks the avatar up: it stays put until the panel's edge reaches it, then rides along
                     at the panel's speed. Wide screens, where the panel ends right of the avatar (shift > 0): the avatar
-                    moves over to meet it. Both are driven by the same --cfg (0 closed, 1 open, index.css), so they can't drift. */}
-                <div className="absolute top-0 right-0 py-4 pr-4 pl-2 z-50"
-                    style={{ transition: CFG_TRANSITION, "--cfg": onConfig ? 1 : 0, "--shift": `${avatarRide.shift}px`, "--panel-w": `${avatarRide.width}px`,
+                    moves over to meet it. Both are driven by the same --cfg (paintCfg), so they can't drift. */}
+                <div ref={avatarRideRef} className="absolute top-0 right-0 py-4 pr-4 pl-2 z-50"
+                    style={{ "--shift": `${avatarRide.shift}px`, "--panel-w": `${avatarRide.width}px`,
                         transform: avatarRide.shift > 0 ? "translateX(calc(var(--shift) * var(--cfg)))" : "translateX(min(0px, calc(var(--shift) + (1 - var(--cfg)) * var(--panel-w))))" }}>
                     <div ref={avatarRef} className="relative">
                         <ProfileInfo name={userName} onConfigClick={toggleConfig}></ProfileInfo>
@@ -602,13 +674,13 @@ const Home = () => {
                         <button type="button" aria-label="Editar nome" tabIndex={onConfig ? 0 : -1}
                             onClick={(e) => { e.stopPropagation(); setEditNameSignal((n) => n + 1); }}
                             className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-secondary dark:text-dark-text-color-tertiary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
-                            <MdOutlineCreate />
+                            <NiEdit size={12} />
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div {...categoryRow} className="flex items-center gap-2 px-4 pt-3 pb-6 -mt-3 -mb-6 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
+            <div {...categoryRow} data-category-row className="flex items-center gap-2 px-4 pt-3 pb-6 -mt-3 -mb-6 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
                 <CategoryBar
                     title={"Todas"}
                     quantity={notes.length}
@@ -631,7 +703,7 @@ const Home = () => {
                     aria-label="Nova categoria"
                     onClick={() => openDialog({ type: "add" })}
                     className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-[var(--primary-color)] text-[var(--primary-color-fg)] shadow-sm hover:brightness-95 duration-300">
-                    <TfiPlus />
+                    <NiPlus size={22} />
                 </button>
             </div>
 
@@ -645,18 +717,19 @@ const Home = () => {
                         className={`fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out" : "animate-menu-in"} origin-top`}>
                         <button className={`${menuItem} rounded-t-3xl dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary`} onClick={() => openDialog({ type: "rename", category: menuShown.category })}>
                             <p>Editar</p>
-                            <MdOutlineCreate />
+                            <NiEdit size={18} />
                         </button>
                         <button className={`${menuItem} rounded-b-3xl text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: menuShown.category })}>
                             <p>Excluir</p>
-                            <BsTrash3 />
+                            <NiTrash size={18} />
                         </button>
                     </div>
                 </div>
             )}
 
 
-            <div onClick={() => setOnConfig(false)} className={`bg-black w-screen h-screen absolute top-0 z-30 duration-300 ${onConfig ? "opacity-20 visible" : "opacity-0 invisible pointer-events-none"}`}></div>
+            <div ref={configBackdropRef} onClick={() => setConfig(false)} style={{ opacity: "calc(var(--cfg) * 0.2)" }}
+                className={`bg-black w-screen h-screen absolute top-0 z-30 ${onConfig ? "" : "pointer-events-none"}`}></div>
 
             <div id="container" className={`flex flex-wrap justify-between mb-28 mt-4 px-4 gap-2 max-w-[768px] mx-auto relative `}>
                 {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">Carregando...</p>}
@@ -692,9 +765,12 @@ const Home = () => {
             </div>
 
             {/* The keyboard-free screen height (index.html), so the keyboard never shortens the panel. */}
-            <div className={`absolute overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 duration-300 ${onConfig ? "visible" : "invisible"}`}>
-                <div ref={panelRef} className="absolute top-0 right-0 h-full overflow-hidden z-40"
-                    style={{ transition: CFG_TRANSITION, "--cfg": onConfig ? 1 : 0, transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
+            {/* Shown while --cfg > 0 (paintCfg). */}
+            <div ref={panelLayerRef} className="absolute overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 invisible">
+                <div ref={panelRef} className="absolute top-0 right-0 h-full z-40"
+                    style={{ transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
+                    {/* Pulled open past its edge (or overshooting), the panel shows more of itself, not a gap. */}
+                    <div aria-hidden="true" className="absolute inset-y-0 left-full w-full bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary" />
                     <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
                 </div>
             </div>
@@ -723,7 +799,7 @@ const Home = () => {
             )}
 
             {(dialogShown?.type === "add" || dialogShown?.type === "rename") && (
-                <Modal icon={MdLabelOutline} closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
+                <Modal icon={NiTag} closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
                     {/* No <form> and no "nome" in the label, like the note title: iOS offered AutoFill (contacts) here
                         because the field sat in a form and looked like a person's name, autoComplete="off" or not. */}
                     <div>
@@ -753,14 +829,14 @@ const Home = () => {
 
             {dialogShown?.type === "pick" && (
                 // The note's current category is the one in the primary color; tapping another moves the note.
-                <Modal icon={MdLabelOutline} closing={dialogClosing} title="Categoria" onClose={() => setDialog(null)}>
+                <Modal icon={NiTag} closing={dialogClosing} title="Categoria" onClose={() => setDialog(null)}>
                     <div className="flex flex-wrap justify-center gap-2 mt-4">
                         {[{ name: "" }, ...categories].map(({ name }) => {
                             const on = dialogShown.note.category === name;
                             return (
                                 <button key={name} type="button" onClick={() => handleSetCategory(dialogShown.note, name)} aria-pressed={on} aria-label={name ? undefined : "Nenhuma"}
                                     className={`h-11 rounded-full ${name ? "px-4" : "w-11 grid place-items-center"} text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95"}`}>
-                                    {name || <MdDoNotDisturbAlt size={18} />}
+                                    {name || <NiNone size={18} />}
                                 </button>
                             );
                         })}
@@ -782,7 +858,7 @@ const Home = () => {
                 data-new-note // a new note's editor grows out of here (lib/morph.js)
                 onClick={() => openEditor()}>
 
-                <TfiPlus />
+                <NiPlus size={22} />
             </button>
         </>
     )

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Noted is a personal notes app with **one user: its creator**. Every feature exists to solve his own problems, not a general audience's. Don't add multi-user, onboarding, i18n, or "what if other people use it" concerns. The UI is in Portuguese (pt-BR).
 
 Target platforms, in priority order:
-1. **iPhone Safari as a home-screen app** ("Add to Home Screen", PWA standalone mode). This is the main way it's used. Any UI change must work there: no Safari bars, safe areas, the on-screen keyboard, touch (no hover), iOS-specific quirks.
+1. **iPhone Safari as a home-screen app** ("Add to Home Screen", PWA standalone mode). The device is an **iPhone 15 Pro Max on iOS 27.0.1**: a modern phone with a current WebKit (120Hz ProMotion, `linear()` easing, View Transitions, `@property`), so there's no need to cater to old iOS versions. This is the main way it's used. Any UI change must work there: no Safari bars, safe areas, the on-screen keyboard, touch (no hover), iOS-specific quirks.
 2. **Chrome on desktop.**
 
 Desktop Chrome rendering correctly doesn't prove a change works on the iPhone PWA. Check iOS behavior explicitly.

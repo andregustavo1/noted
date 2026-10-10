@@ -1,0 +1,11 @@
+<!doctype html><html class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="--primary-color:#22c55e;--primary-color-fg:#000"><div id="root"></div>
+<script type="module">
+import React from "react"; import { createRoot } from "react-dom/client";
+import "/src/fonts.css"; import "/src/index.css";
+import C from "/src/components/Cards/ReminderCalendar.jsx";
+import Modal, { ModalButtons } from "/src/components/Cards/Modal.jsx";
+import { NiClock } from "/src/components/Icons/NotedIcons.jsx";
+const h = React.createElement;
+createRoot(document.getElementById("root")).render(h(Modal, { icon: NiClock, title: "Lembrete", onClose() {} }, h(C), h(ModalButtons, { confirm: "Salvar" })));
+</script></body></html>

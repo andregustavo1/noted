@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MdSearch } from "react-icons/md";
-import { IoMdClose } from "react-icons/io";
+import { NiClose, NiSearch } from "../Icons/NotedIcons";
 
 // What the last press landed on; it fires before the input's blur.
 let lastPress = null;
@@ -88,7 +87,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden, onOpenChange, e
                             handleSearchClick();
                         }
                     }}>
-                        <MdSearch className="text-light-text-color-primary dark:text-dark-text-color-primary text-2xl" />
+                        <NiSearch className="text-light-text-color-primary dark:text-dark-text-color-primary text-[22px]" />
                     </div>
 
                     <input
@@ -110,11 +109,11 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden, onOpenChange, e
                     {value && (
                         // Clears the text only: the bar stays open, the field focused (and the keyboard up). preventDefault
                         // keeps the press from blurring the field, which would end the search (closeSearch).
-                        <IoMdClose
-                            className="text-light-text-color-tertiary dark:text-dark-text-color-tertiary shrink-0 w-5 h-5 text-xl hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary cursor-pointer"
+                        <NiClose
+                            className="text-light-text-color-tertiary dark:text-dark-text-color-tertiary shrink-0 w-5 h-5 text-[18px] hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary cursor-pointer"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={onClearSearch}
-                        ></IoMdClose>
+                        ></NiClose>
                     )}
                 </div>
             </div>
