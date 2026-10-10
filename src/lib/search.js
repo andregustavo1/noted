@@ -38,6 +38,23 @@ const wordMatches = (queryWord, noteWord) => {
     return noteWord.length > queryWord.length && editDistance(queryWord, noteWord.slice(0, queryWord.length)) <= tolerance;
 };
 
+// Every occurrence of query in text, as [start, end) offsets into text: plain substring search, ignoring case and
+// accents ("acao" finds "Ação"). Each character is folded on its own so the offsets map back to the original text.
+export const findAll = (text, query) => {
+    const q = normalize(query);
+    if (!q.trim()) return [];
+    let folded = "";
+    const at = [];
+    for (let i = 0; i < text.length; i++) {
+        const f = normalize(text[i]);
+        folded += f;
+        for (let k = 0; k < f.length; k++) at.push(i);
+    }
+    const out = [];
+    for (let i = folded.indexOf(q); i !== -1; i = folded.indexOf(q, i + q.length)) out.push([at[i], at[i + q.length - 1] + 1]);
+    return out;
+};
+
 export const noteMatches = (note, query) => {
     const queryWords = words(query);
     if (!queryWords.length) return true;

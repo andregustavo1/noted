@@ -1,0 +1,516 @@
+NÍVEL 1 — FUNDAMENTOS
+☐ Juros simples vs. compostos: J = C × i × t vs. M = C × (1 + i)^t
+☐ Taxa nominal vs. taxa efetiva: por que 12% a.a. capitalizados mensalmente não equivalem a 12% a.a. efetivos
+☐ Conversão de taxas equivalentes: ao dia, ao mês, ao ano
+☐ Convenções de contagem de dias no Brasil: base 252 dias úteis (CDI, Selic, títulos públicos, DI Futuro) vs. bases 360 e 365
+☐ Taxa over e "% do CDI": como 110% do CDI é aplicado sobre a taxa diária, e não sobre a anual
+☐ Valor do dinheiro no tempo e valor presente: VP = VF / (1 + i)^t; VF = VP × (1 + i)^t
+☐ Desconto racional vs. desconto comercial (bancário): antecipação de recebíveis e duplicatas
+☐ Inflação, juros nominais e juros reais: equação de Fisher, IPCA
+☐ Indicadores-base: Selic, CDI, TR, IPCA — o que cada um representa e quem define
+☐ Leituras e cursos obrigatóriosLer "Matemática Financeira" (Assaf Neto): juros simples e compostos, taxas equivalentes, desconto e valor presente
+
+MÓDULO — FUNDAMENTOS DE ECONOMIA
+Microeconomia essencial
+☐ Escassez, custo de oportunidade e incentivos: a lógica por trás de toda decisão econômica
+☐ Oferta e demanda: formação de preços, elasticidade, por que o preço da gasolina ou do café dispara
+☐ Estruturas de mercado: concorrência, monopólio, oligopólio, cartel e o papel do Cade
+☐ Falhas de mercado: externalidades, bens públicos, assimetria de informação — por que existe regulação
+☐ Controle de preços e tabelamento: escassez, ágio e mercado paralelo (ex.: Plano Cruzado)
+
+Macroeconomia: medindo a economia
+☐ PIB pelas óticas da produção, da renda e da demanda (C + I + G + X − M); PIB nominal vs. real; PIB per capita
+☐ Limites do PIB: desigualdade (índice de Gini), economia informal, IDH
+☐ Ciclo econômico: expansão, pico, recessão, recuperação; o que é recessão técnica
+☐ Mercado de trabalho: desemprego (PNAD Contínua), informalidade, desalento, salário real
+☐ Crescimento de longo prazo: capital, trabalho, produtividade, educação e instituições — por que a produtividade brasileira está estagnada há décadas
+☐ PIB potencial e hiato do produto: base para a regra de Taylor no Nível 3
+☐ Poupança, investimento e taxa de investimento: por que o Brasil investe pouco
+☐ Curva de Phillips: a relação entre desemprego e inflação, e quando ela falha
+
+Política fiscal
+☐ Orçamento público: receitas, despesas obrigatórias vs. discricionárias, PPA, LDO e LOA
+☐ Resultado primário, resultado nominal e o peso dos juros na conta do governo
+☐ Dívida pública: bruta vs. líquida, dívida/PIB, quem financia o governo e como isso afeta a Selic
+☐ Regras fiscais: Lei de Responsabilidade Fiscal, teto de gastos (2016) e arcabouço fiscal (2023)
+☐ Previdência pública: o maior gasto do governo, déficit e a reforma de 2019
+☐ Sistema tributário: impostos diretos vs. indiretos, regressividade, carga tributária
+☐ Reforma tributária do consumo: IBS, CBS, Imposto Seletivo e a transição até 2033
+☐ Multiplicador fiscal, política anticíclica e efeito deslocamento (crowding out)
+☐ Credibilidade fiscal: por que anúncios de gastos movem o dólar e os juros futuros
+
+Escolas de pensamento econômico
+☐ Clássicos: Adam Smith, David Ricardo e a mão invisível
+☐ Marx e a crítica ao capitalismo: o que influenciou e onde as previsões falharam
+☐ Keynesianismo: demanda agregada e o papel do Estado nas crises
+☐ Monetarismo: Milton Friedman e "a inflação é sempre um fenômeno monetário"
+☐ Escola austríaca: Mises, Hayek e o ciclo de crédito
+☐ Novos clássicos e novos keynesianos: expectativas racionais e o consenso que guia os bancos centrais hoje
+☐ Desenvolvimentismo e estruturalismo da Cepal: o debate brasileiro sobre industrialização
+☐ MMT (Teoria Monetária Moderna) e suas críticas
+☐ Por que economistas discordam: diferenças de valores vs. diferenças de evidência
+
+Leituras e cursos obrigatórios
+☐ Ler "Introdução à Economia" (Gregory Mankiw)
+☐ Fazer os cursos de microeconomia e macroeconomia da Khan Academy
+☐ Ler um Relatório de Acompanhamento Fiscal da Instituição Fiscal Independente (IFI)
+
+
+NÍVEL 2 — APLICAÇÃO PRÁTICA
+☐ Sistemas de amortização: Tabela Price vs. SAC (imóveis, veículos)
+☐ CET (Custo Efetivo Total): por que a taxa anunciada nunca é o custo real
+☐ Produtos de renda fixa: CDB, LCI/LCA, Tesouro Direto (Selic, Prefixado, IPCA+), poupança — como os juros incidem em cada um
+☐ Regra da poupança: 0,5% a.m. + TR com Selic acima de 8,5% a.a.; 70% da Selic + TR abaixo disso
+☐ Crédito privado: debêntures (incluindo incentivadas), CRI e CRA, risco do emissor
+☐ FGC: o que cobre, limites por CPF e instituição, e o que fica de fora (Tesouro, debêntures, CRI/CRA)
+☐ Fundos de renda fixa: come-cotas, taxa de administração e impacto no retorno líquido
+☐ Tributação: tabela regressiva de IR (22,5% / 20% / 17,5% / 15%) e IOF — confira a regra vigente, pois houve propostas recentes de mudança na tabela e na isenção de LCI/LCA
+☐ Retorno líquido: sempre comparar investimentos após IR e taxas, nunca pela taxa bruta
+☐ Crédito ao consumidor: cartão, rotativo, cheque especial, parcelamento — por que são as taxas mais altas do mercado
+☐ Spread bancário: diferença entre custo de captação e taxa cobrada, e seus componentes (inadimplência, impostos, margem)
+☐ Aspectos legais: juros de mora, multa, limites de encargos e a discussão sobre capitalização de juros no direito brasileiro
+☐ Ferramentas: HP12C (ou app) e Excel/Planilhas (VF, VP, TAXA, PGTO, XTIR, XVPL, DIATRABALHOTOTAL para contar dias úteis)
+
+Leituras e cursos obrigatórios
+☐ Ler "Matemática Financeira" (Assaf Neto): séries de pagamentos e sistemas de amortização
+☐ Ler "Mercado Financeiro" (Assaf Neto): produtos de renda fixa e instituições brasileiras
+☐ Fazer os cursos do Tesouro Direto e os cursos de educação financeira da B3
+
+
+MÓDULO — FINANÇAS PESSOAIS
+Organização
+☐ Fluxo de caixa pessoal: receitas, gastos fixos e variáveis; métodos 50/30/20, envelopes e orçamento base zero
+☐ Inflação pessoal: por que o seu custo de vida sobe diferente do IPCA
+
+Crédito e dívidas
+☐ Dívida boa vs. dívida ruim: quando o crédito cria e quando destrói patrimônio
+☐ Score, Cadastro Positivo, SPC/Serasa e o Registrato do Banco Central
+☐ Sair das dívidas: priorizar pelo custo, portabilidade de crédito, renegociação e a Lei do Superendividamento (14.181/2021)
+☐ Consignado e crédito com garantia (imóvel, veículo): quando fazem sentido
+☐ Financiamento imobiliário: SFH, SFI, uso do FGTS e amortização extraordinária (reduzir prazo vs. parcela)
+☐ Consórcio: como funciona, taxa de administração, quando compensa vs. financiamento
+☐ Comprar vs. alugar imóvel: custo de oportunidade e premissas
+☐ Carro: à vista, financiado, assinatura ou aplicativo — custo total de propriedade
+
+Proteção
+☐ Seguros: vida, saúde, residencial, auto — quais riscos vale a pena transferir
+☐ Planos de saúde: coparticipação, reajustes e o papel da ANS
+☐ Golpes financeiros: Day trading, trading, pirâmides, esquemas Ponzi, promessas de rendimento garantido, golpes via Pix e engenharia social; como checar se uma instituição é autorizada (Banco Central, CVM)
+☐ Direitos do consumidor bancário: tarifas, ouvidoria, Procon e Consumidor.gov.br
+
+Renda, trabalho e impostos pessoais
+☐ Empreender: MEI, Simples Nacional, Lucro Presumido e separar as finanças pessoais das da empresa
+☐ Imposto de Renda Pessoa Física: tabela progressiva, deduções, declaração simplificada vs. completa e a faixa de isenção (confira a regra vigente)
+☐ IR sobre investimentos: renda fixa, ações (isenção até R$ 20 mil/mês em vendas), day trade, FIIs, exterior, DARF e ganho de capital
+
+Aposentadoria e longo prazo
+☐ INSS: regras pós-reforma, tempo de contribuição e cálculo do benefício
+☐ Previdência privada: PGBL vs. VGBL, tabela progressiva vs. regressiva, taxas
+☐ Independência financeira: quanto acumular, regra dos 4%, taxa de retirada segura e seus limites no Brasil
+☐ Planejamento sucessório: inventário, testamento, ITCMD e noções de holding familiar
+
+Comportamento
+☐ Finanças comportamentais: aversão à perda, ancoragem, contabilidade mental, viés de confirmação, efeito manada
+☐ Consumo e status: inflação de estilo de vida, marketing e crédito fácil
+☐ Automatizar: pagar a si mesmo primeiro e aportes automáticos
+☐ Dinheiro na família: finanças do casal, acordos e educação financeira dos filhos
+
+Leituras e cursos obrigatórios
+☐ Ler "A Psicologia Financeira" (Morgan Housel)
+☐ Ler "Rápido e Devagar" (Daniel Kahneman)
+☐ Consultar o seu Registrato e usar a Calculadora do Cidadão (Banco Central)
+
+
+MÓDULO — DINHEIRO, BANCOS E SISTEMA FINANCEIRO
+
+O que é dinheiro
+☐ Funções da moeda: meio de troca, unidade de conta e reserva de valor
+☐ História do dinheiro: escambo, metais, papel-moeda, moeda bancária e moeda digital
+☐ Agregados monetários: base monetária, M1, M2, M3 e M4
+☐ Como os bancos criam dinheiro: o empréstimo gera o depósito; multiplicador monetário e seus limites
+☐ Depósito compulsório e reservas bancárias
+
+Sistema financeiro nacional
+☐ Estrutura: CMN, Banco Central, CVM, Susep, Previc; bancos, corretoras, cooperativas e fintechs
+☐ Concentração bancária e por que o crédito é caro no Brasil
+☐ Bancos públicos e crédito direcionado: BNDES, Caixa, Banco do Brasil, crédito rural e imobiliário
+☐ Acordos de Basileia: capital mínimo e por que bancos quebram
+☐ Corridas bancárias e quebras: Silicon Valley Bank e Credit Suisse (2023) e casos brasileiros
+☐ Shadow banking: crédito fora dos bancos e seus riscos
+
+Inovação financeira
+☐ Pix, Pix Automático e Open Finance: o que mudam na concorrência bancária
+☐ Moedas digitais de bancos centrais (CBDCs) e o projeto Drex: o que é e como evoluiu
+☐ Bitcoin: blockchain, escassez programada, volatilidade, custódia, a tese de "ouro digital" e suas críticas
+☐ Stablecoins: lastro, riscos e uso crescente em pagamentos internacionais
+☐ Regulação de criptoativos no Brasil (Lei 14.478/2022) e tributação
+☐ Tokenização de ativos: o que é e o que promete
+
+Leituras e cursos obrigatórios
+☐ Ler "A Ascensão do Dinheiro" (Niall Ferguson)
+☐ Ler "Moedas, Bancos e Mercados Financeiros" (Mishkin): a parte de moeda, bancos e oferta monetária
+☐ Ler o whitepaper do Bitcoin (Satoshi Nakamoto, 2008)
+
+
+MÓDULO — INVESTIMENTOS ALÉM DA RENDA FIXA
+Renda variável, outras classes de ativos e como montar uma carteira. A renda fixa está no Nível 2.
+
+Fundamentos de carteira
+☐ Risco e retorno: volatilidade, correlação e prêmio de risco
+☐ Diversificação e alocação de ativos: perfil de investidor (suitability), horizonte e classes
+☐ Rebalanceamento e disciplina para manter a estratégia
+☐ Investimento passivo vs. ativo: índices, ETFs e o impacto das taxas no longo prazo
+☐ Por que a maioria não bate o índice: os dados (relatórios SPIVA) e o mito do market timing
+
+Ações
+☐ O que é uma ação: sócio da empresa, ON vs. PN, IPO, B3 e Ibovespa
+☐ Demonstrações financeiras: DRE, balanço patrimonial e fluxo de caixa — o essencial para ler um resultado trimestral
+☐ Valuation: P/L, P/VP, EV/EBITDA, dividend yield, ROE e fluxo de caixa descontado (onde o valor presente volta)
+☐ Dividendos, juros sobre capital próprio (JCP) e recompra de ações
+☐ Por que a bolsa cai quando os juros sobem: taxa de desconto e custo de oportunidade
+☐ Análise fundamentalista vs. técnica; investimento vs. especulação; os dados sobre day trade
+
+Outras classes de ativos
+☐ Fundos imobiliários (FIIs): tijolo vs. papel, vacância, dividendos e tributação
+☐ Fundos multimercado, de ações e de previdência: taxas de administração e de performance
+☐ Investir no exterior: ETFs internacionais, BDRs, conta global, risco cambial e tributação
+☐ Ouro e commodities como investimento
+☐ Criptoativos na carteira: tamanho da posição e riscos
+☐ Derivativos para pessoa física: opções e futuros, alavancagem e risco de perder mais que o capital
+
+Leituras e cursos obrigatórios
+☐ Ler "Um Passeio Aleatório por Wall Street" (Burton Malkiel)
+☐ Ler "O Investidor Inteligente" (Benjamin Graham)
+☐ Estudar os materiais educacionais do Portal do Investidor (CVM)
+
+
+MÓDULO ESPECIAL — ECONOMIA MONETÁRIA APROFUNDADA
+
+Estudo aprofundado da inflação
+☐ Tipos de inflação: de demanda, de custos e inercial — causas diferentes, remédios diferentes
+☐ Índices oficiais: IPCA, INPC, IGP-M e IGP-DI — para que serve cada um e por que divergem
+☐ Deflação e hiperinflação: Alemanha 1923, Brasil pré-Plano Real
+☐ Expectativas de inflação: Boletim Focus e por que a expectativa também move preços
+☐ Meta contínua de inflação (desde jan/2025): meta de 3% com tolerância de 1,5 ponto, medida pelo IPCA acumulado em 12 meses, mês a mês; descumprimento quando fica fora da banda por 6 meses seguidos. Estudar também o regime anterior (ano-calendário) e por que mudou
+
+Regimes de juros negativos (NIRP)
+☐ O que significa: taxa nominal abaixo de zero — o credor paga para emprestar, o poupador paga para guardar
+☐ Onde aconteceu: Japão, Zona do Euro, Suíça, Dinamarca e Suécia, principalmente após 2014
+☐ Como terminou: Suécia saiu em 2019, BCE e Suíça em 2022, Japão em 2024 — e o que a saída revelou sobre a eficácia da política
+☐ Por que um banco central faz isso: combater deflação, forçar bancos a emprestar, estimular consumo e investimento
+☐ Consequências: pressão sobre bancos e fundos de pensão, migração para ativos de risco, efeito limitado sobre consumo
+☐ Por que não ocorre no Brasil: histórico inflacionário e estrutura de juros altos
+
+Valor presente vs. valor futuro: como decidir
+A fórmula está no Nível 1; aqui o foco é a decisão.
+☐ A pergunta certa: R$ 1.000 hoje valem mais ou menos que R$ 1.100 daqui a 1 ano? Depende da taxa de desconto
+☐ Custo de oportunidade: use a melhor alternativa disponível (ex.: CDI) como taxa de desconto
+☐ Use a taxa LÍQUIDA de impostos. Exemplo com CDI a 12% a.a.:
+   • Taxa bruta: 1.100 / 1,12 ≈ R$ 982 → à vista parece melhor
+   • Taxa líquida (IR de 17,5% em 1 ano): 12% × 0,825 ≈ 9,9% → 1.100 / 1,099 ≈ R$ 1.001 → praticamente empate
+☐ Onde se aplica: negociação de preços, à vista vs. a prazo, avaliação de propostas de investimento
+
+Leituras e cursos obrigatórios
+☐ Ler "Moedas, Bancos e Mercados Financeiros" (Mishkin): a parte de política monetária e inflação
+
+
+=== MÓDULO ESPECIAL — INVESTINDO EM REGIME DE JUROS NEGATIVOS ===
+Complementa o tema de juros negativos do módulo de Economia Monetária: aqui o foco é reconhecer o regime e saber o que fazer com o dinheiro dentro dele.
+
+O que é, na prática
+☐ Juro nominal negativo vs. juro real negativo: os dois regimes, e por que o segundo é muito mais comum (inclusive no Brasil)
+☐ Como o juro negativo chega ao investidor: taxa sobre reservas dos bancos, tarifas sobre depósitos e títulos com rendimento negativo
+☐ Por que alguém compra um título que rende menos que zero: exigência regulatória, proteção contra deflação, aposta em ganho de capital e câmbio
+☐ Limite inferior efetivo: por que os juros não caem muito abaixo de zero (o papel-moeda como alternativa)
+☐ Repressão financeira: juro real negativo como forma silenciosa de reduzir a dívida pública às custas do poupador
+
+Como identificar o regime
+☐ Sinais do banco central: taxa de política ou de depósito abaixo de zero, forward guidance, quantitative easing e controle da curva de juros
+☐ Juro real ex-ante e ex-post: taxa nominal menos a inflação esperada (Focus, inflação implícita) e menos a inflação realizada
+☐ Sinais na curva: títulos soberanos com rendimento negativo, curva achatada perto de zero, NTN-B ou títulos indexados com taxa real negativa
+☐ Contexto que antecede o regime: deflação ou inflação muito baixa, hiato do produto negativo, crise bancária, envelhecimento e excesso de poupança
+☐ Sinais de saída: inflação voltando, mudança na comunicação do banco central e curva inclinando
+
+O que acontece com cada classe de ativo
+☐ Caixa e depósitos: perda nominal ou real garantida — guardar dinheiro passa a custar
+☐ Títulos: preços sobem enquanto os juros caem, duration vira fonte de ganho e o risco de reversão cresce
+☐ Ações: expansão de múltiplos, ações de crescimento vs. de valor e a corrida por dividendos
+☐ Imóveis e fundos imobiliários: valorização com crédito barato e risco de bolha
+☐ Ouro: custo de oportunidade zero ou negativo favorece o metal
+☐ Crédito privado e high yield: compressão dos spreads e a "busca por rendimento" (reach for yield)
+☐ Câmbio: moedas de juro negativo como fonte de funding do carry trade (iene, franco suíço)
+
+Estratégias e armadilhas
+☐ Preservar poder de compra: ativos reais e títulos indexados à inflação
+☐ Carry trade: tomar recursos em moeda de juro negativo e aplicar em moeda de juro alto — e como o desmonte destrói posições (iene, agosto de 2024)
+☐ Alongar duration vs. o risco de reversão: 2022, o pior ano para títulos em décadas
+☐ Para o investidor brasileiro: aplicar em países com juro negativo, risco cambial, e como agir quando o juro real fica negativo aqui
+☐ Como instituições se adaptaram: fundos de pensão, seguradoras e bancos na Europa e no Japão
+☐ Armadilhas: bolhas de ativos, alavancagem barata e o risco de saída abrupta do regime
+
+Estudos de caso
+☐ Japão (2016–2024): juro negativo, controle da curva de juros e a saída
+☐ Zona do Euro (2014–2022): títulos alemães com rendimento negativo e a virada de 2022
+☐ Suíça e Dinamarca: juro negativo para defender o câmbio; hipotecas com juro negativo na Dinamarca (2019)
+☐ Brasil (2020–2021): Selic a 2% com inflação em alta, juro real negativo, migração da renda fixa para ativos de risco e a reversão
+
+Leituras e cursos obrigatórios
+☐ Ler "How have central banks implemented negative policy rates?" (BIS Quarterly Review, março de 2016)
+☐ Ler o comunicado do Banco do Japão de março de 2024 sobre o fim do juro negativo
+
+
+=== MÓDULO ESPECIAL — O LASTRO DO REAL E A INFLUÊNCIA DO DÓLAR E DOS JUROS AMERICANOS ===
+O que sustenta o valor da nossa moeda e por que decisões em Washington mexem com o seu bolso. Os tópicos avançados (paridade de juros e risco-país) estão no Nível 4, onde são estudados com cálculo.
+
+Como o Real é lastreado hoje
+☐ Padrão-ouro: cada unidade de moeda trocável por uma quantidade fixa de ouro
+☐ Bretton Woods (1944) e o fim da conversibilidade em 1971 (Nixon Shock)
+☐ Moeda fiduciária: o Real não tem lastro físico; seu valor vem da confiança no Estado emissor
+☐ Papel do Banco Central: emissão, base monetária e uso da Selic para preservar o poder de compra
+☐ Reservas internacionais: amortecedor de confiança e de câmbio, não lastro da moeda
+☐ O que sustenta o Real na prática: credibilidade fiscal, inflação controlada, estabilidade institucional, expectativas
+
+O dólar como moeda de referência global
+☐ Por que o dólar domina: confiança nas instituições dos EUA, herança de Bretton Woods, petrodólar
+☐ Moeda do comércio e da dívida mundial: transações e dívidas de emergentes precificadas em dólar
+☐ O Fed: o FOMC define a Fed Funds Rate, o juro que mais influencia o fluxo global de capital
+
+Como os juros americanos afetam o Brasil (visão intuitiva)
+☐ Fluxo de capitais: quando o Fed sobe os juros, o diferencial de juros diminui — o investidor passa a ganhar mais nos EUA sem correr o risco Brasil, e o prêmio para ficar aqui deixa de compensar. O Real tende a se desvalorizar
+☐ Câmbio e repasse cambial: dólar mais forte encarece importações e pressiona a inflação interna
+☐ Resposta do Copom: o cenário externo pesa na decisão da Selic
+☐ Dívida pública: juros americanos mais altos elevam o custo de captação externa do Brasil
+
+Leituras e cursos obrigatórios
+☐ Ler "Exorbitant Privilege" (Barry Eichengreen)
+
+
+=== MÓDULO — HISTÓRIA ECONÔMICA ===
+As crises e viradas que explicam por que as regras de hoje existem. Padrão-ouro e Bretton Woods estão no módulo do Lastro do Real; a hiperinflação alemã, no de Economia Monetária.
+
+Mundo
+☐ Revolução Industrial e o nascimento do capitalismo moderno
+☐ Crash de 1929 e a Grande Depressão: o erro de política monetária e o New Deal
+☐ Pós-guerra: Plano Marshall e os "30 anos gloriosos" de crescimento
+☐ Choques do petróleo e estagflação dos anos 1970; Paul Volcker e os juros americanos acima de 15%
+☐ Thatcher, Reagan e a onda liberal dos anos 1980; o Consenso de Washington
+☐ Crise da dívida latino-americana (1982)
+☐ Japão: a bolha de 1990 e as décadas perdidas
+☐ Crises dos emergentes: México (1994), Ásia (1997), Rússia (1998), Argentina (2001)
+☐ Bolha pontocom (2000)
+☐ Crise de 2008: subprime, Lehman Brothers e o quantitative easing
+☐ Crise do euro (2010–2012) e a Grécia
+☐ Ascensão da China: reformas de Deng Xiaoping e a entrada na OMC (2001)
+☐ Pandemia: estímulos, inflação de 2021–2023 e o maior ciclo global de alta de juros em décadas
+
+Brasil
+☐ Ciclos da economia colonial e agroexportadora: açúcar, ouro e café
+☐ Industrialização: Vargas e a substituição de importações; JK e o Plano de Metas
+☐ Milagre econômico (1968–1973) e o endividamento externo
+☐ Década perdida (anos 1980): crise da dívida, moratória de 1987 e inflação crônica
+☐ Planos de estabilização que falharam: Cruzado, Bresser, Verão e Collor (o confisco da poupança)
+☐ Plano Real (1994): URV, âncora cambial e o fim da hiperinflação
+☐ Crise de 1999 e o tripé macroeconômico: metas de inflação, câmbio flutuante e superávit primário
+☐ Boom das commodities (2003–2011) e a ascensão da classe C
+☐ Nova Matriz Econômica, crise fiscal e a recessão de 2014–2016
+☐ Reformas recentes: teto de gastos, reforma trabalhista, Previdência, autonomia do Banco Central (2021), arcabouço fiscal e reforma tributária
+☐ Pandemia no Brasil e o ciclo de juros a partir de 2021
+
+Leituras e cursos obrigatórios
+☐ Ler "Os Senhores das Finanças" (Liaquat Ahamed)
+☐ Ler "Economia Brasileira Contemporânea" (Giambiagi, Villela, Castro e Hermann)
+☐ Ler "A Ordem do Progresso" (Marcelo de Paiva Abreu, org.)
+☐ Ler "Saga Brasileira" (Míriam Leitão)
+
+
+=== MÓDULO — GEOECONOMIA: BRASIL E MUNDO ===
+Como comércio, moedas, energia e poder entre países moldam preços, juros e o câmbio no Brasil.
+
+Comércio internacional
+☐ Vantagem comparativa e absoluta: por que países comerciam
+☐ Tarifas, cotas e protecionismo: quem ganha e quem perde
+☐ OMC e o sistema multilateral de comércio, e a paralisia do seu órgão de apelação
+☐ Acordos e blocos: Mercosul, acordo Mercosul–União Europeia, USMCA, RCEP
+☐ Guerra comercial EUA–China e a escalada de tarifas americanas desde 2025, inclusive sobre o Brasil
+☐ Cadeias globais de valor, nearshoring e friend-shoring
+
+Balanço de pagamentos e câmbio
+☐ Balanço de pagamentos: balança comercial, serviços, renda, conta corrente, conta financeira e investimento direto (IDP)
+☐ Déficit em conta corrente: quando é problema e quando não é
+☐ Regimes cambiais: fixo, flutuante, flutuação suja e currency board (Argentina, 1991)
+☐ Atuação do Banco Central no câmbio: swaps cambiais, leilões de linha e uso das reservas
+☐ Câmbio real, competitividade e "doença holandesa"
+☐ O que move o dólar no Brasil: fiscal, diferencial de juros, commodities, fluxo e aversão global ao risco
+
+O Brasil no mundo
+☐ Potência de commodities: petróleo, minério de ferro, soja, carnes e café; termos de troca
+☐ China como maior parceira comercial: dependência e oportunidades
+☐ Agronegócio: competitividade, Embrapa, logística e questão ambiental
+☐ Petrobras, pré-sal e a política de preços dos combustíveis
+☐ Grau de investimento: como as agências de rating avaliam países e por que o Brasil o perdeu em 2015
+
+Instituições e ordem global
+☐ FMI, Banco Mundial e BIS: o que fazem e quando intervêm
+☐ G7 vs. G20 e a disputa por influência
+☐ BRICS e o Novo Banco de Desenvolvimento
+
+Poder monetário
+☐ Hegemonia do dólar: o "privilégio exorbitante", Treasuries como ativo seguro e a dívida americana
+☐ Euro: moeda única sem união fiscal
+☐ Sanções financeiras: SWIFT, o congelamento das reservas russas (2022) e o dólar como instrumento de poder
+☐ Desdolarização: yuan, comércio em moedas locais e seus limites reais
+☐ Bancos centrais comprando ouro: motivos e implicações
+☐ CBDCs e stablecoins na disputa geopolítica
+
+Grandes forças
+☐ China: modelo de crescimento, crise imobiliária (Evergrande), dívida dos governos locais e o yuan
+☐ EUA: déficit, dívida pública e a independência do Fed
+☐ Energia: Opep+, guerra na Ucrânia, gás na Europa e transição energética
+☐ Minerais críticos: lítio, terras raras e o potencial do Brasil
+☐ Tecnologia: semicondutores, Taiwan e a corrida econômica pela inteligência artificial
+☐ Demografia: envelhecimento (Japão, China, Europa, Brasil) e o efeito sobre crescimento, juros e previdência
+☐ Clima como risco econômico: eventos extremos, seguros e mercado de carbono
+
+Leituras e cursos obrigatórios
+☐ Ler "Principles for Dealing with the Changing World Order" (Ray Dalio)
+☐ Ler "Trade Wars Are Class Wars" (Matthew Klein e Michael Pettis)
+☐ Ler "A Guerra dos Chips" (Chris Miller)
+☐ Ler a edição mais recente do World Economic Outlook (FMI)
+
+
+=== NÍVEL 3 — INTERMEDIÁRIO-AVANÇADO ===
+
+Matemática financeira de séries
+☐ Anuidades, perpetuidades, VPL e TIR
+
+Curva de juros
+☐ Estrutura a termo: o que é, como se forma, o que a inclinação sinaliza
+☐ Teorias da curva: hipótese das expectativas, preferência por liquidez, segmentação de mercado
+☐ Taxas a termo (forwards): extrair da curva a taxa esperada entre duas datas futuras
+☐ Inflação implícita (breakeven): diferença entre a curva prefixada e a curva IPCA+, e como ler o que o mercado precifica
+☐ Construção da curva: bootstrapping, interpolação flat forward (padrão no DI) e o modelo de Svensson usado pela ANBIMA
+
+Mercado de juros
+☐ DI Futuro (DI1) e contratos futuros de juros na B3: como o mercado precifica a Selic esperada
+☐ Marcação a mercado: por que o preço de um título oscila antes do vencimento
+
+Política monetária
+☐ Como o Copom decide a Selic e os mecanismos de transmissão
+☐ Juro neutro: a taxa que nem estimula nem contrai a economia, e por que é estimada, não observada
+☐ Regra de Taylor: Selic em função do desvio da inflação e do hiato do produto
+☐ Dominância fiscal: quando a situação fiscal reduz a eficácia dos juros contra a inflação
+☐ Leitura de comunicados e atas do Copom e do Relatório de Política Monetária (antigo Relatório de Inflação)
+
+Leituras e cursos obrigatórios
+☐ Ler "Finanças Corporativas" (Assaf Neto): VPL, TIR e avaliação de investimentos
+☐ Ler a metodologia das curvas de juros e inflação implícita da ANBIMA
+☐ Ler as especificações do contrato DI1 e os materiais educacionais da B3
+☐ Ler um Relatório de Política Monetária completo do Banco Central
+
+
+=== NÍVEL 4 — EXPERT ===
+Cada bloco tem um projeto prático correspondente na seção de projetos.
+
+☐ Duration (Macaulay e modificada) e convexidade: sensibilidade de títulos e carteiras a mudanças de juros
+☐ Precificação de títulos públicos: LTN, NTN-F e NTN-B por fluxo de caixa descontado, incluindo o VNA da NTN-B e as metodologias oficiais do Tesouro
+☐ Swaps e derivativos de taxa de juros: hedge, arbitragem, swap DI × pré e DI × IPCA
+☐ Opções de juros e opções digitais de Copom (B3): como o mercado atribui probabilidades às decisões
+☐ Análise de risco de crédito: rating, spread de crédito, spread soberano
+☐ Risco-país e prêmio de risco: EMBI+ e CDS de 5 anos como medida do quanto o Brasil paga a mais que as Treasuries
+☐ Relação juros-câmbio-inflação: paridade coberta e descoberta de juros, cupom cambial, impacto quantitativo do Fed sobre a curva brasileira
+
+Leituras e cursos obrigatórios
+☐ Ler "Opções, Futuros e Outros Derivativos" (John Hull): swaps e derivativos de juros
+☐ Ler um livro de renda fixa de Frank Fabozzi: duration, convexidade e precificação
+☐ Ler as metodologias de cálculo dos títulos públicos (Tesouro Nacional)
+
+
+=== PROJETOS PRÁTICOS (CHECKPOINTS DE DOMÍNIO) ===
+Uma etapa só está concluída quando você consegue fazer o projeto dela sozinho, sem tutorial.
+
+Nível 1
+☐ Calcular o rendimento de um CDB de 110% do CDI por 30 dias úteis
+   → Sucesso: valor bate com o extrato ou simulador do banco
+
+Fundamentos de Economia
+☐ Explicar a evolução do PIB, do desemprego e do resultado primário no último ano com dados do IBGE e do Tesouro
+   → Sucesso: números corretos e explicação clara para um leigo, sem jargão
+
+Nível 2
+☐ Planilha de financiamento Price vs. SAC com CET
+   → Sucesso: parcelas e CET batem com a simulação de um banco real
+☐ Comparar CDB, LCI e Tesouro pelo retorno líquido em 1, 2 e 3 anos
+   → Sucesso: ranking muda corretamente conforme prazo e IR
+
+Finanças Pessoais
+☐ Montar seu orçamento, patrimônio líquido e plano de reserva de emergência e aposentadoria
+   → Sucesso: plano com valores, prazos e taxa real, acompanhado mês a mês
+☐ Fazer a sua própria declaração de IR
+   → Sucesso: declaração entregue sem cair na malha fina
+
+Dinheiro e Bancos
+☐ Mostrar como um empréstimo cria dinheiro, com os lançamentos no balanço do banco e do cliente
+   → Sucesso: lançamentos fecham e você explica o efeito sobre M1 e M2
+
+Investimentos
+☐ Escrever a sua política de investimentos: alocação, rebalanceamento e regras
+   → Sucesso: cada classe justificada por risco, prazo e objetivo
+☐ Avaliar uma empresa da B3 por fluxo de caixa descontado e por múltiplos
+   → Sucesso: premissas explícitas e comparação fundamentada com o preço de mercado
+
+Juros Negativos
+☐ Montar uma carteira hipotética para um investidor europeu em 2019 e acompanhar o resultado até 2023
+   → Sucesso: explica o desempenho de cada ativo pela trajetória dos juros, incluindo a reversão de 2022
+
+História Econômica
+☐ Linha do tempo de inflação, Selic e câmbio no Brasil desde 1980
+   → Sucesso: cada virada ligada à sua causa (plano, crise ou choque)
+
+Geoeconomia
+☐ Montar o balanço de pagamentos do Brasil de um ano com dados do Banco Central
+   → Sucesso: totais batem com a publicação oficial
+☐ Analisar um choque recente (tarifa, guerra ou sanção) e seu efeito sobre câmbio, inflação e juros no Brasil
+   → Sucesso: cadeia de causa e efeito completa e sustentada por dados
+
+Nível 3
+☐ Montar a curva de juros com os vértices de DI Futuro do dia
+   → Sucesso: taxas interpoladas próximas às publicadas pela B3/ANBIMA
+☐ Calcular forwards e a inflação implícita entre prefixado e IPCA+
+   → Sucesso: resultado coerente com o publicado pela ANBIMA
+☐ Analisar uma reunião do Copom a partir do comunicado e da ata
+   → Sucesso: sua leitura antecipa a reação do DI futuro e do dólar no dia seguinte
+
+Nível 4
+☐ Precificar uma NTN-B com dados do Tesouro
+   → Sucesso: preço igual ao do site do Tesouro Direto
+☐ Simular o efeito de +1 ponto na Selic sobre uma carteira
+   → Sucesso: variação estimada por duration e convexidade próxima da reprecificação completa
+
+
+=== RECURSOS RECOMENDADOS E CERTIFICAÇÕES ===
+Os livros e cursos obrigatórios estão dentro de cada etapa. Aqui ficam as fontes de consulta contínua, as certificações e os hábitos de prática.
+
+Fontes primárias
+• Metodologias de cálculo dos títulos públicos (Tesouro Nacional)
+• Especificações do contrato DI1 e materiais educacionais da B3
+• Comunicados, atas do Copom, Boletim Focus e Relatório de Política Monetária (Banco Central)
+• Curvas de juros e inflação implícita da ANBIMA
+• IBGE: PIB, IPCA e PNAD Contínua
+• Tesouro Nacional e Instituição Fiscal Independente (IFI): resultado fiscal e dívida pública
+• Banco Central: estatísticas do setor externo (balanço de pagamentos) e séries do SGS
+• Comex Stat: exportações e importações brasileiras
+• FMI (World Economic Outlook) e FRED: dados dos EUA e do mundo
+• Whitepaper do Bitcoin (Satoshi Nakamoto, 2008)
+• Registrato e Calculadora do Cidadão (Banco Central): ferramentas de finanças pessoais
+
+Certificações como marcos de progresso
+☐ CPA-20 (ANBIMA): ao concluir o Nível 2
+☐ CEA (ANBIMA): ao concluir o Nível 3
+☐ CFA ou CGA: referência para o Nível 4
+☐ CFP (Planejar): referência para finanças pessoais e planejamento financeiro
+
+Prática
+• Simuladores de investimento e os projetos práticos acima
+• Acompanhar a agenda econômica: Boletim Focus, Copom, IPCA, PIB e, nos EUA, decisões do Fed, CPI e payroll
+• Ler uma notícia econômica por dia e explicar o porquê por trás dela
+• Manter um caderno de anotações e exercícios por tópico

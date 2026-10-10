@@ -405,6 +405,9 @@ const Home = () => {
     };
 
     const [searchQuery, setSearchQuery] = useState("");
+    // The search bar is open (even empty), and searchEnd tells it to end the search (a note opened from it closed).
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchEnd, setSearchEnd] = useState(0);
     const setActiveCategory = (name) => changeSettings({ activeCategory: name });
 
     useEffect(() => {
@@ -438,8 +441,8 @@ const Home = () => {
         });
     }, [notes, categoryList, settings.categoryOrder]);
 
-    // Searching looks through every note, so "Todas" shows as selected while there's a query.
-    const currentCategory = searchQuery.trim() ? "" : categories.some((c) => c.name === settings.activeCategory) ? settings.activeCategory : "";
+    // Searching looks through every note, so "Todas" shows as selected as soon as the search opens.
+    const currentCategory = searchOpen || searchQuery.trim() ? "" : categories.some((c) => c.name === settings.activeCategory) ? settings.activeCategory : "";
 
     const visibleNotes = useMemo(() => {
         return sortNotes(notes.filter((note) =>
@@ -461,16 +464,21 @@ const Home = () => {
     const openDialog = (next) => { setCategoryMenu(null); setDialogName(next.category?.name ?? ""); setDialog(next); };
 
     // Opening a note ends the search: the query clears and the bar closes (SearchBar closes itself once the query is
-    // empty and the field has lost focus; the blur here covers a tap that left the field focused).
+    // empty and the field has lost focus; the blur here covers a tap that left the field focused). For a note picked
+    // from the results that waits until the editor has closed: clearing at once brought the category filter back in
+    // the same commit, so a note from another category lost its card (and one in the same category moved), and the
+    // editor had no card to grow out of or shrink back into (lib/morph.js). A new note still ends it right away, so
+    // it lands in the list it will be in.
     const openEditor = (note = null) => {
         document.getElementById("search-bar")?.blur();
-        setSearchQuery("");
+        if (!note) setSearchQuery("");
         setEditorError("");
         editorNoteId.current = note?.id ?? null;
         setEditor({ note });
     };
 
-    const closeEditor = useCallback(() => setEditor(null), []);
+    // Called once the editor's closing has played.
+    const closeEditor = useCallback(() => { setEditor(null); setSearchQuery(""); setSearchEnd((n) => n + 1); }, []);
 
     notesCovered = onConfig || Boolean(editor);
 
@@ -528,6 +536,7 @@ const Home = () => {
         setPendingDelete(null);
         animateNotes(() => setNotes((prev) => prev.filter((n) => n.id !== note.id)));
         queueOp({ type: "deleteNote", id: note.id });
+        if (editor) { setSearchQuery(""); setSearchEnd((n) => n + 1); } // deleted from the open editor: it closes, and the search ends with it (openEditor)
         setEditor(null);
     };
 
@@ -579,7 +588,7 @@ const Home = () => {
     return (
         <>
             <div className="max-w-[768px] relative mx-auto">
-                <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+                <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} onSearchOpenChange={setSearchOpen} searchEnd={searchEnd} />
 
                 {/* Phones: the panel picks the avatar up: it stays put until the panel's edge reaches it, then rides along
                     at the panel's speed. Wide screens, where the panel ends right of the avatar (shift > 0): the avatar
@@ -629,7 +638,7 @@ const Home = () => {
             {menuShown && (
                 // Same menu as the card's, narrower; fixed so the scrolling chip row can't clip it. The backdrop closes it
                 // on click, not on press: closing on press let the tap's click fall through to the note underneath.
-                <div className={`fixed inset-x-0 top-px bottom-0 z-[60] touch-none ${menuClosing ? "pointer-events-none" : ""}`} onClick={() => setCategoryMenu(null)}>
+                <div className={`fixed inset-0 z-[60] touch-none ${menuClosing ? "pointer-events-none" : ""}`} onClick={() => setCategoryMenu(null)}>
                     <div
                         style={{ left: Math.max(8, Math.min(menuShown.rect.left + menuShown.rect.width / 2 - 75, document.documentElement.clientWidth - 158)), top: menuShown.rect.bottom + 4 }}
                         onClick={(e) => e.stopPropagation()}
@@ -770,6 +779,7 @@ const Home = () => {
                 // Own view-transition layer, so reordering cards glide under the button instead of over it.
                 style={{ viewTransitionName: "fab" }}
                 aria-label="Nova nota"
+                data-new-note // a new note's editor grows out of here (lib/morph.js)
                 onClick={() => openEditor()}>
 
                 <TfiPlus />

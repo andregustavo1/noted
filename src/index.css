@@ -60,17 +60,24 @@
         color: var(--dark-text-color-primary);
     }
 
-    /* See index.html. 1px, opaque, above everything (dialogs, the editor, the side panel's backdrop), no animation:
-       a translucent, fading or covered strip makes Safari fall back to the color of what's under it. */
+    /* See index.html. WebKit (LocalFrameView::fixedContainerEdges) hit-tests the point 4px below the top edge, at the
+       center, and takes the CSS background-color of the first fixed element there, provided it is wider than 90% of
+       the viewport, taller than 10px (thinner boxes count as borders and get pixel-sampled instead) and not under
+       opacity 0.1. So: 12px tall, above everything. It reads the CSS color, not pixels, so the strip paints nothing:
+       background-clip: text on an element with no text clips the background away entirely (the computed
+       background-color stays, which is what the sampler reads). Never hide it through opacity or visibility, which
+       the sampler does honor. */
     .status-tint {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        height: 1px;
+        height: 12px;
         z-index: 2147483647;
         pointer-events: none;
         background-color: var(--light-bg-color-secondary);
+        -webkit-background-clip: text;
+        background-clip: text;
     }
 
     .dark .status-tint {
@@ -276,6 +283,21 @@ input[type="password"]::-webkit-inner-spin-button {
 /* Raised a touch on the cards, where the editor's 55% reads low. */
 .strike-done {
     background-position-y: 55%;
+}
+
+/* "Buscar na nota" matches (NoteEditor, CSS Custom Highlight API); the current one in full primary color. */
+::highlight(note-search) {
+    background-color: color-mix(in srgb, var(--primary-color) 35%, transparent);
+}
+
+::highlight(note-search-current) {
+    background-color: var(--primary-color);
+    color: var(--primary-color-fg);
+}
+
+/* The note body while a press in it may become a selection drag: the markers ignore the pointer (NoteEditor). */
+[data-pressing] [contenteditable="false"] {
+    pointer-events: none;
 }
 
 /* contentEditable rows have no placeholder of their own. */

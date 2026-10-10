@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SearchBar from "../SearchBar/SearchBar";
 
-const Navbar = ({ searchQuery, onSearchChange }) => {
+const Navbar = ({ searchQuery, onSearchChange, onSearchOpenChange, searchEnd }) => {
     const showSearch = Boolean(onSearchChange);
 
     const onClearSearch = () => {
@@ -10,8 +10,10 @@ const Navbar = ({ searchQuery, onSearchChange }) => {
 
     const [logoToggle, setLogoToggle] = useState(false)
 
-    const logoToggleHidden = () => {
-        setLogoToggle(!logoToggle)
+    // Told whether the search bar is opening (logo out) or closing, rather than toggled: SearchBar calls it a couple of
+    // frames after the tap, when a toggle could read a stale value.
+    const logoToggleHidden = (hidden) => {
+        setLogoToggle(hidden)
     }
 
     return (
@@ -30,6 +32,8 @@ const Navbar = ({ searchQuery, onSearchChange }) => {
                             }}
                             onClearSearch={onClearSearch}
                             logoHidden={logoToggleHidden}
+                            onOpenChange={onSearchOpenChange}
+                            endSignal={searchEnd}
                         ></SearchBar>
                     </div>
                 )}

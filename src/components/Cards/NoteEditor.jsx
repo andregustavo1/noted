@@ -1,7 +1,7 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { IoMdCheckmark, IoMdClose } from "react-icons/io";
-import { MdChevronRight, MdKeyboardArrowDown, MdChecklist, MdContentCopy, MdFormatAlignCenter, MdFormatAlignJustify, MdFormatAlignLeft, MdFormatAlignRight, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo, MdAccessTime } from "react-icons/md";
+import { MdChevronRight, MdKeyboardArrowDown, MdKeyboardArrowUp, MdSearch, MdChecklist, MdContentCopy, MdFormatAlignCenter, MdFormatAlignJustify, MdFormatAlignLeft, MdFormatAlignRight, MdFormatBold, MdFormatIndentDecrease, MdFormatIndentIncrease, MdFormatItalic, MdFormatListBulleted, MdFormatListNumbered, MdFormatStrikethrough, MdFormatUnderlined, MdLabelOutline, MdRedo, MdRestartAlt, MdTitle, MdUndo, MdAccessTime } from "react-icons/md";
 import { SlOptions } from "react-icons/sl";
 import { RiPushpin2Fill, RiUnpinLine } from "react-icons/ri";
 import { HiOutlineDuplicate } from "react-icons/hi";
@@ -9,9 +9,13 @@ import { BsTrash3 } from "react-icons/bs";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
 import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine, renumber } from "../../lib/lines";
 import LineMarker from "./LineMarker";
+import { findAll } from "../../lib/search";
 import { canMorph, closeInto, openFrom } from "../../lib/morph";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
+
+// How long after a new note's keyboard is let up the caret waits for a keyboard that never comes (no on-screen keyboard).
+const CARET_FALLBACK = 500;
 
 // Folded headings of a note, on this device: [[heading text, which one of that text], ...].
 const foldKey = (id) => `noted:folds:${id}`;
@@ -104,6 +108,71 @@ const splitAt = (el, offset) => {
     return [html(null, point), html(point, null)];
 };
 
+// One line of the note. Memoized: with hundreds of lines, re-rendering them all on every keystroke made typing lag.
+// Its props are plain values and refs (actions holds the editor's current handlers), so only rows that changed render.
+const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isFolded, foldable: canFold, active, justChecked, only, selecting }) {
+    const line = parseLine(raw);
+    const foldable = line.heading && canFold;
+    const island = selecting ? { pointerEvents: "none" } : undefined;
+    return (
+        <div data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={lineStyle(line)}
+            className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden ? "hidden" : ""}`}>
+            {line.heading && (
+                // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
+                // so nothing is clipped). The glyph of MdChevronRight ends 5px before its 20px box, so the box ends 5px into
+                // the text: the chevron's tip (antialiased to nothing) meets the text, the stroke stays 1px off. One line tall
+                // at the heading's size. Shown while folded;
+                // otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
+                <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
+                    onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.toggleFold(index)} tabIndex={-1}
+                    style={{ height: "1lh", ...island }}
+                    className={`absolute -left-[15px] top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (active ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
+                    {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
+                    <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
+                </button>
+            )}
+            {/* The marker slots (checkbox, bullet, number) are visibility:hidden with their content made visible again.
+                Finding the text position under a point skips hidden boxes, so with the islands ignoring touches while
+                selecting (island), a selection dragged over a checkbox resolves to the start of that row's text. Before,
+                it resolved inside the non-editable checkbox, and the selection froze there until the finger left it. */}
+            {line.check !== undefined && (
+                // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
+                // The hit area grows up, down and to the left, not to the right: a tap near the text's start is for the text.
+                <span contentEditable={false} suppressContentEditableWarning style={island} className="invisible relative top-[0.5px] h-[1.625em] shrink-0 flex items-center select-none">
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.toggleCheck(index)} aria-pressed={line.done}
+                    className={`visible relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked ? "animate-check-pop" : ""}`}>
+                    {/* The card preview's IoMdCheckmark traced as a stroke, so it can draw in. Always in the DOM, just hidden
+                        while unticked: a selection dragged onto the box lands on a position inside the button, and the browsers
+                        resolve that differently for an empty button and one with a child (see locate), so both states keep the child. */}
+                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1" className={line.done ? "" : "opacity-0"}>
+                        <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={line.done && justChecked ? "animate-check-draw" : ""} />
+                    </svg>
+                </button>
+                </span>
+            )}
+            {line.list && line.check === undefined && !line.heading && (
+                <span contentEditable={false} suppressContentEditableWarning className="invisible shrink-0 flex select-none">
+                    <LineMarker line={line} style={{ ...island, visibility: "visible" }} />
+                </span>
+            )}
+            <div className={`relative flex-1 min-w-0 transition-opacity duration-500 ${line.done ? "opacity-60" : ""}`}>
+                <div
+                    ref={(el) => { rows.current[index] = el; }}
+                    data-placeholder={only ? "" : undefined}
+                    className={`min-h-[1.625em] whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
+                />
+                {/* An invisible copy of the text over the row, whose background draws the strike line. */}
+                {/* overflow-hidden: a space where the text wraps hangs past the box, and the line (the span's background) would paint it into the padding. */}
+                {line.check !== undefined && (
+                    <div aria-hidden contentEditable={false} className="strike absolute inset-0 overflow-hidden pointer-events-none select-none whitespace-pre-wrap break-words">
+                        <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: trimEnd(line.text) }} />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+});
+
 // saved is the note as stored (null until a new note is first saved); the "..." menu acts on it.
 const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, onDuplicate, onDelete, onMessage, fixedToolbar }) => {
     const [title, setTitle] = useState(note?.title ?? "");
@@ -111,13 +180,25 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Play the exit animation, then let Home unmount the editor (100ms = animate-pop-out).
     const [closing, setClosing] = useState(false);
-    // An existing note opens out of its card and closes back into it (lib/morph.js); otherwise the editor pops.
-    const [morph] = useState(() => canMorph(note?.id));
+    // The editor opens out of the note's card, or the + button for a new note, and closes back into it (lib/morph.js);
+    // otherwise it pops.
+    const [morph, setMorph] = useState(() => canMorph(note?.id));
+    // While it grows the panel keeps the full height: a new note's focused title raises the keyboard mid-opening,
+    // and shrinking to the visual viewport then would cut the box the opening is clipping to.
+    const [growing, setGrowing] = useState(false);
+    const [allRows, setAllRows] = useState(false); // see firstRows
+    const [closingRows, setClosingRows] = useState(null); // see keepOnlyVisibleRows
     const panelRef = useRef(null);
     const backdropRef = useRef(null);
+    const titleRef = useRef(null);
+    // A new note grown out of the + button holds its keyboard back until the box has grown, see the opening below.
+    const [holdKeyboard, setHoldKeyboard] = useState(() => !note && morph);
+    // Its caret stays hidden until the keyboard is up too, rather than blinking alone in the meantime.
+    const [hideCaret, setHideCaret] = useState(() => !note && morph);
     const morphing = useRef(null);
     const close = () => {
         if (morphing.current === "closing") return;
+        keepOnlyVisibleRows();
         // saved: a new note closes into the card it became.
         if (closeInto(panelRef.current, backdropRef.current, saved?.id ?? note?.id, morphing.current, onClose)) { morphing.current = "closing"; return; }
         morphing.current?.forEach((a) => a.cancel());
@@ -207,6 +288,26 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         return set;
     });
     const hidden = foldedRows(lines, keys, folded);
+    // Rows rendered so far: all of them, or while opening, up to the 60th one not folded away (see allRows).
+    let firstRows = lines.length;
+    if (!allRows) for (let i = 0, shown = 0; i < lines.length; i++) if (!hidden.has(i) && ++shown > 60) { firstRows = i; break; }
+    // The same on the way out: a long note closes with only the rows on screen, so the closing animation doesn't stutter
+    // carrying hundreds of rows. Dropped before its first frame, with the scroll moved so nothing on screen shifts.
+    const [fromRow, toRow] = closingRows ?? [0, firstRows];
+    const keepOnlyVisibleRows = () => {
+        const box = bodyRef.current;
+        if (!box) return;
+        const { top, bottom } = box.getBoundingClientRect();
+        const shown = rowBoxes.current.slice(0, lines.length).flatMap((el, i) => {
+            const r = el?.getBoundingClientRect();
+            return r && r.height && r.bottom > top && r.top < bottom ? [i] : [];
+        });
+        if (!shown.length) return;
+        const from = shown[0];
+        const before = rowBoxes.current[from].getBoundingClientRect().top;
+        flushSync(() => setClosingRows([from, shown.at(-1) + 1]));
+        box.scrollTop += rowBoxes.current[from].getBoundingClientRect().top - before;
+    };
     useEffect(() => {
         if (!noteId) return;
         const seen = {};
@@ -242,26 +343,28 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Scroll the note body (never the page, iOS would pan it) so the row and the toolbar under it are in view.
     // The view follows the focus: it glides to the caret's row when the caret moves to another row and as a row
     // grows while typing. Both rects are read as they are now, so a call during a glide just aims the same glide again.
-    // pad is the room to keep under the row (the toolbar's); instant skips the glide.
-    const reveal = (el, { pad = parseFloat(bodyRef.current?.style.scrollPaddingBottom) || 0, instant = false } = {}) => {
+    // pad is the room to keep under the row (the toolbar's); instant skips the glide. el can also be a Range (a search match).
+    // center: put it in the middle of the visible note instead (a search match), even when it's already in view.
+    // dry: only work out where the scroll would go, without scrolling.
+    const reveal = (el, { pad = parseFloat(bodyRef.current?.style.scrollPaddingBottom) || 0, instant = false, center = false, dry = false } = {}) => {
         const box = bodyRef.current;
         if (!el || !box) return;
-        const r = el.parentElement.getBoundingClientRect(), b = box.getBoundingClientRect();
+        const b = box.getBoundingClientRect();
+        let r;
+        if (el instanceof Range) r = el.getBoundingClientRect();
+        else {
+            // The row's offsets, not its rect: a row mid-slide (the FLIP effect, below) would throw the aim off.
+            const row = el.closest("[data-line]") ?? el.parentElement;
+            const rowTop = b.top + row.offsetTop - box.scrollTop;
+            r = { top: rowTop, bottom: rowTop + row.offsetHeight };
+        }
         let top = box.scrollTop;
-        if (r.bottom > b.bottom - pad) top += r.bottom - (b.bottom - pad);
+        if (center) top = Math.max(0, Math.min(top + (r.top + r.bottom) / 2 - (b.top + b.bottom - pad) / 2, box.scrollHeight - box.clientHeight));
+        else if (r.bottom > b.bottom - pad) top += r.bottom - (b.bottom - pad);
         else if (r.top < b.top) top -= b.top - r.top;
-        if (Math.abs(top - box.scrollTop) >= 1) box.scrollTo({ top, behavior: instant ? "auto" : "smooth" });
+        if (!dry && Math.abs(top - box.scrollTop) >= 1) box.scrollTo({ top, behavior: instant ? "auto" : "smooth" });
+        return top; // where the scroll is headed
     };
-    // Reveal when the keyboard is the reason (it just took part of the screen). iOS looks for the caret right after
-    // the focus and, if it is under the keyboard, pans the whole page (which the viewport handler then undoes: a
-    // visible jump). So first, instantly, just enough for the row to clear the keyboard: what iOS would do itself,
-    // and nothing at all for a row that already clears it. Then the rest, the toolbar's room, glides: the caret is
-    // in view the whole way, so there is nothing for iOS to pan to.
-    const revealForKeyboard = (el) => {
-        reveal(el, { pad: 0, instant: true });
-        reveal(el);
-    };
-
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
     // (Enter, Backspace merges, undo, rows shifting under an inserted line).
     useLayoutEffect(() => {
@@ -274,21 +377,73 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const activeRow = useRef(0);
     const [activeIndex, setActiveIndex] = useState(0);
     const focusAfterRender = useRef(null);
+    const scrollBefore = useRef(0); // the note body's scroll before a row edit, to tell a clamp (below) from a scroll
+    const flipFrom = useRef(null); // each row's place (by key) before a row edit, for the slide below
     const update = (nextLines, focus) => {
         tap.current = null;
+        scrollBefore.current = bodyRef.current?.scrollTop ?? 0;
+        flipFrom.current = new Map(lines.map((_, i) => [keys[i], rowBoxes.current[i]?.offsetTop]));
         setContent(renumber(nextLines).join("\n"));
         focusAfterRender.current = focus;
         if (focus) { activeRow.current = focus.index; setActiveIndex(focus.index); unfoldFor(nextLines, focus.index); }
+    };
+    // Runs fn once the note body's scroll has reached target (or 700ms on): polled on a timer, as frames can stall.
+    const afterScroll = (target, fn) => {
+        const box = bodyRef.current, started = Date.now();
+        const poll = () => { if (Math.abs(box.scrollTop - target) < 1 || Date.now() - started > 700) fn(); else setTimeout(poll, 50); };
+        poll();
     };
     useLayoutEffect(() => {
         if (!focusAfterRender.current) return;
         const { index, caret } = focusAfterRender.current;
         focusAfterRender.current = null;
-        const el = rows.current[index];
+        const el = rows.current[index], box = bodyRef.current;
         if (!el) return;
         if (document.activeElement !== hostRef.current) hostRef.current.focus({ preventScroll: true });
-        setSelection(el, caret);
-        reveal(el);
+        // Scrolls are asked for a few frames on: one asked for in the same commit as the rows' change runs as a
+        // jump on iOS. A timer, not frames: those stall while the screen is off, and the rest must still happen.
+        const later = (fn) => setTimeout(fn, 50);
+        // Rows that got shorter at the end (a row deleted there): the browser clamps the scroll, a jump (on iOS
+        // only later, in its own time, so the clamp is worked out here rather than read). Hold the scroll where
+        // it was with room under the rows (nothing moves), glide down to where the clamp goes, then drop the room.
+        const max = box.scrollHeight - box.clientHeight;
+        const lost = scrollBefore.current - max;
+        if (lost > 0) {
+            box.style.paddingBottom = `${136 + lost}px`;
+            box.scrollTop = scrollBefore.current;
+            setSelection(el, caret); // the row above the deleted one: in view
+            later(() => { box.scrollTo({ top: max, behavior: "smooth" }); afterScroll(max, () => { box.style.paddingBottom = "136px"; }); });
+            return;
+        }
+        const target = reveal(el, { dry: true });
+        if (Math.abs(target - box.scrollTop) < 1) return setSelection(el, caret);
+        // The row is out of view: a caret put there has WebKit scroll to it itself, in a jump. So the caret waits,
+        // parked as under a rising keyboard (typing puts it there at once), while the row glides into view.
+        if (parked.current) clearTimeout(parked.current.timer);
+        parked.current = { range: rangeAt(el, caret), timer: setTimeout(() => unpark(true), 700) };
+        hostRef.current.style.caretColor = "transparent";
+        later(() => { box.scrollTo({ top: target, behavior: "smooth" }); afterScroll(target, () => unpark(true)); });
+    });
+    // After a row edit, the rows slide to their new places (150ms) instead of jumping: each one is first held at
+    // its old place with a transform, then released (FLIP). New rows just appear; the toolbar glides on its own.
+    useLayoutEffect(() => {
+        const from = flipFrom.current;
+        if (!from) return;
+        flipFrom.current = null;
+        const moved = [];
+        lines.forEach((_, i) => {
+            const box = rowBoxes.current[i], was = from.get(keys[i]);
+            if (!box || was === undefined || hidden.has(i)) return;
+            const delta = was - box.offsetTop;
+            if (!delta) return;
+            box.style.transition = "none";
+            box.style.transform = `translateY(${delta}px)`;
+            moved.push(box);
+        });
+        if (!moved.length) return;
+        void moved[0].offsetHeight; // the old place takes hold before the transition starts
+        moved.forEach((box) => { box.style.transition = "transform 150ms cubic-bezier(0.23, 1, 0.32, 1)"; box.style.transform = ""; });
+        setTimeout(() => moved.forEach((box) => { box.style.transition = ""; }), 200);
     });
 
     // Where a DOM point falls, as [row, text offset]. A point outside a row's text (on a marker, between rows or on
@@ -322,7 +477,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (!sel.rangeCount || !hostRef.current?.contains(sel.anchorNode)) return null;
         const range = sel.getRangeAt(0);
         const start = locate(range.startContainer, range.startOffset, false);
-        const end = locate(range.endContainer, range.endOffset, true);
+        // A caret outside every row's text (on the host between rows, on a strike overlay) resolves one way as a
+        // start and another as an end: taken as a span it ran backwards (start on the row after, end on the row
+        // before), and a Backspace then inserted a line and gave it a duplicate key (ghost rows, lost focus).
+        const end = range.collapsed ? start : locate(range.endContainer, range.endOffset, true);
         if (!start || !end) return null;
         return { start, end, collapsed: start[0] === end[0] && start[1] === end[1], multi: start[0] !== end[0] };
     };
@@ -399,12 +557,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // Edits that cross rows, from the browser's beforeinput (Enter and Backspace arrive here on phones too).
     const onBeforeInput = (e) => {
+        if (parked.current) unpark(true); // typed before the keyboard was up: the edit goes where the caret was tapped
         const span = getSpan();
         if (!span) return;
         const type = e.inputType;
+        // Dragging selected text is off: the drop was already ignored, so the drag only deleted the text it carried.
+        if (type === "deleteByDrag" || type === "insertFromDrop") return e.preventDefault();
         // Typing closes the toolbar's open menu (the toolbar itself stays).
         if (!type.startsWith("format")) setMenuOpen(null);
         const [index, offset] = span.start;
+        // A caret outside every row's text goes into its row first (the selectionchange snap may not have run
+        // yet), or the browser would edit the host itself, between the rows.
+        if (span.collapsed && !rows.current[index]?.contains(window.getSelection().anchorNode)) setSelection(rows.current[index], offset);
         const line = parseLine(lines[index]);
         const next = [...lines];
         if (type === "historyUndo" || type === "historyRedo") {
@@ -464,8 +628,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         } else if (span.multi && (type === "insertText" || type === "insertReplacementText")) {
             e.preventDefault();
             replaceSpan(span, [escapeHtml(e.data ?? e.dataTransfer?.getData("text/plain") ?? "")]);
-        } else if (type === "insertFromDrop") {
-            e.preventDefault();
         }
     };
 
@@ -530,6 +692,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const onPointerDown = (e) => {
         press.current = null;
         if (e.target.closest("[contenteditable=false]")) return; // checkboxes and markers
+        // A press that may become a drag: the markers ignore the pointer from now on (index.css), not only once
+        // `selecting` renders, or a quick drag reached a checkbox first and the selection froze on it (see Row).
+        const host = hostRef.current;
+        host.dataset.pressing = "";
+        const release = () => { delete host.dataset.pressing; };
+        window.addEventListener("pointerup", release, { once: true });
+        window.addEventListener("pointercancel", release, { once: true });
         if (e.pointerType === "mouse") return commitTap(e.clientX, e.clientY);
         press.current = { x: e.clientX, y: e.clientY };
     };
@@ -540,7 +709,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     };
     const placeTapCaret = () => {
         const t = tap.current;
-        if (!t || Date.now() - t.time > 1000) return;
+        if (!t || Date.now() - t.time > 1000 || parked.current) return;
         const sel = window.getSelection();
         const el = rows.current[t.row];
         if (!el || !sel.isCollapsed || el.contains(sel.anchorNode)) return;
@@ -552,6 +721,78 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             const r = el.getBoundingClientRect();
             setSelection(el, t.x < r.left ? 0 : rowLength(t.row));
         }
+    };
+    // The keyboard coming up on a phone. iOS reads the first caret it is told of once the note is focused (sent
+    // the moment the caret is placed) and, if that one would end up under the keyboard, pans the whole page along
+    // with it (then undone here: a visible ping-pong). Scrolling the row clear beforehand is a jump of its own. So,
+    // with the keyboard on its way, the note is focused with the caret parked on a row at the top of the visible
+    // note, invisibly (where it belongs is kept), and iOS sees nothing to reveal. Once the keyboard is there (the
+    // viewport handler, or a timeout when no resize comes: a hardware keyboard) the row glides into view and, the
+    // glide over, the caret goes back. The last known keyboard height says whether one is coming (a first iPhone
+    // keyboard has a typical stand-in); none on a desktop.
+    const keyboardHeight = () => Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 340 : 0);
+    const keyboardComing = () => { const v = window.visualViewport; return Boolean(keyboardHeight()) && (!v || v.height > appHeight() - 100); };
+    const parked = useRef(null); // { range, timer } while the caret is parked
+    const rangeAt = (el, offset) => { const r = document.createRange(); r.setStart(...pointAt(el, offset)); r.collapse(true); return r; };
+    // Focus the note body with the caret at range (a point inside a row's text), parked while the keyboard comes up.
+    const focusWithCaret = (range) => {
+        const host = hostRef.current;
+        const top = rows.current[rowAtY(bodyRef.current.getBoundingClientRect().top + 1)];
+        if (document.activeElement === host || !keyboardComing() || !top) {
+            if (document.activeElement !== host) host.focus({ preventScroll: true });
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return;
+        }
+        if (parked.current) clearTimeout(parked.current.timer);
+        // A row that stays in view above the keyboard, toolbar room and all, keeps its caret from the start: iOS
+        // has nothing to reveal, and waiting out the keyboard only held the caret back. The rest is parked.
+        const node = range.startContainer, rowBox = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement).closest("[data-line]");
+        const shown = Boolean(rowBox) && rowBox.getBoundingClientRect().bottom + 80 <= appHeight() - keyboardHeight() - 16;
+        parked.current = { range, shown, timer: setTimeout(() => unpark(true), 700) };
+        if (!shown) host.style.caretColor = "transparent";
+        // A focused element shorter than the area above the keyboard gets centered there by iOS, pan and all
+        // (a short note); a taller one is left where it is as long as the caret shows. So, a screen tall for now.
+        host.style.minHeight = `${appHeight()}px`;
+        // Before the focus: the caret iOS is told of.
+        if (shown) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
+        else setSelection(top, 0);
+        if (document.activeElement !== host) host.focus({ preventScroll: true });
+    };
+    // The keyboard is there: the tapped row glides into view and the caret goes back once the scroll has settled
+    // (put back under the keyboard, iOS could pan for it again). now: at once, something is about to type.
+    const unpark = (now) => {
+        const p = parked.current;
+        if (!p) return;
+        clearTimeout(p.timer);
+        const host = hostRef.current, box = bodyRef.current;
+        const restore = () => {
+            if (parked.current !== p) return;
+            parked.current = null;
+            clearTimeout(p.timer);
+            host.style.caretColor = "";
+            host.style.minHeight = "";
+            if (document.activeElement !== host || p.shown) return; // shown: the caret was there all along
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(p.range);
+        };
+        if (now || document.activeElement !== host) return restore();
+        if (p.settling) return; // already gliding
+        p.settling = true;
+        const target = reveal(rows.current[activeRow.current]) ?? box.scrollTop;
+        const started = Date.now();
+        // Polled on a timer, not a frame: frames stall while the screen is off, and the caret must still come back.
+        // Never before 350ms: the viewport resizes as the keyboard starts coming up (about 250ms), and a caret put
+        // back while it is still moving gets revealed by iOS all the same (a pan, even with the row in view).
+        const settle = () => {
+            if (parked.current !== p) return;
+            const elapsed = Date.now() - started;
+            if ((Math.abs(box.scrollTop - target) < 1 && elapsed >= 350) || elapsed > 700) restore();
+            else p.timer = setTimeout(settle, 50);
+        };
+        settle();
     };
 
     const onKeyDown = (e) => {
@@ -570,7 +811,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const selectionRef = useRef(null);
     selectionRef.current = () => {
         const sel = window.getSelection();
-        if (!sel.rangeCount || !hostRef.current?.contains(sel.anchorNode)) return;
+        if ((parked.current && !parked.current.shown) || !sel.rangeCount || !hostRef.current?.contains(sel.anchorNode)) return;
         const pos = locate(sel.anchorNode, sel.anchorOffset, false);
         if (!pos) return;
         // Right after a tap the caret belongs in the tapped row, wherever the browser put it.
@@ -593,6 +834,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (pos[0] !== activeRow.current) { activeRow.current = pos[0]; setActiveIndex(pos[0]); }
         // Only a caret: while a selection is dragged the browser scrolls after the finger, and this would pull back.
         if (sel.isCollapsed) reveal(rows.current[pos[0]]);
+        // Where the toolbar is on screen right before it moves to or from the dock, for placeToolbar to slide it from.
+        if (!sel.isCollapsed !== selecting) dockFrom.current = toolbarBoxRef.current?.getBoundingClientRect();
         setSelecting(!sel.isCollapsed);
         if (menuOpen) rerender((n) => n + 1);
     };
@@ -614,6 +857,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Enter doesn't reopen it).
     const [toolbarClosed, setToolbarClosed] = useState(false);
     const showToolbar = focused && !toolbarClosed;
+    // Its fade and grow in (and out) start two frames after showToolbar flips. It flips in the focus and blur
+    // handlers, the same moment the whole note re-renders, the overlay resizes for the keyboard and the caret's row
+    // scrolls into view; on the iPhone a 150ms transition started there was over by the time it got drawn.
+    const [toolbarIn, setToolbarIn] = useState(false);
+    useEffect(() => {
+        let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => setToolbarIn(showToolbar)); });
+        return () => cancelAnimationFrame(frame);
+    }, [showToolbar]);
     // One toolbar for the whole note, moved under the caret's row. While text is selected it docks at the bottom of
     // the visible note instead: under the row it covered the selection and clashed with the phone's own
     // Cut/Copy/Paste menu, which appears right by the selection.
@@ -622,8 +873,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // selection handle dragged over one hits the row and resolves to the start of its text. Hitting the island gives
     // WebKit a non-editable position (its nearest candidate: the previous row's strike overlay, or nothing), and iOS
     // then sets the selection with that as its base, which WebKit shrinks out of the editable text: the selection
-    // vanishes (start handle) or lands a row up (end handle).
-    const island = selecting ? { pointerEvents: "none" } : undefined;
+    // vanishes (start handle) or lands a row up (end handle). Applied in Row.
+    // The rows' handlers, read when clicked, so passing them doesn't re-render every row (see Row).
+    const rowActions = useRef();
+    rowActions.current = { toggleFold, toggleCheck };
     // The "Barra de ferramentas fixa" setting keeps it docked there the whole time, just above the keyboard.
     const docked = selecting || Boolean(fixedToolbar);
     const toolbarBoxRef = useRef(null);
@@ -631,23 +884,70 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // wherever it was hidden) and just moves between a row and the dock (different coordinate spaces, see below).
     // Docked, its wrapper is sticky at the top of the visible note and the toolbar sits at the bottom of that: CSS
     // holds it there through a scroll. Following scrollTop from JS lagged on iOS (scroll events trail the compositor).
+    // Into and out of the dock it slides (400ms) from where it was on screen: top/left can't glide there, the two
+    // places are measured from different boxes. So it's moved at once and a translate takes it back and lets it go.
     const toolbarWasShown = useRef(false);
+    const wasDocked = useRef(docked);
+    const dockFrom = useRef(null);
+    const slide = useRef(null);
     const placeToolbar = () => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
-        const glide = showToolbar && toolbarWasShown.current && !docked;
+        const from = wasDocked.current !== docked && showToolbar && toolbarWasShown.current ? dockFrom.current : null;
+        wasDocked.current = docked;
+        dockFrom.current = null;
+        const glide = showToolbar && toolbarWasShown.current && !docked && !from;
         // Opening and closing always animate (the toolbar emerges from its corner by the row, and shrinks back).
         const ease = "cubic-bezier(0.23, 1, 0.32, 1)";
-        const fade = `opacity 150ms ${ease}, transform 150ms ${ease}`;
+        const fade = `opacity 200ms ${ease}, transform 200ms ${ease}`;
         box.style.transition = glide ? `${fade}, top 150ms ${ease}, left 150ms ${ease}` : fade;
         toolbarWasShown.current = showToolbar;
         // Hidden: stay put while shrinking away (a fold moves the caret to the heading); placed again when it reopens.
         if (!showToolbar) return;
         box.style.top = `${docked ? body.clientHeight - box.offsetHeight - 12 : row.offsetTop + row.offsetHeight + 8}px`;
         box.style.left = `${docked ? (box.offsetParent.clientWidth - box.offsetWidth) / 2 : row.offsetLeft}px`;
+        if (!from) return;
+        slide.current?.cancel(); // from already includes where an unfinished slide had it
+        const to = box.getBoundingClientRect();
+        // transform, not translate: Safari runs transform animations off the main thread, which is busy with the
+        // selection right then. (The shown toolbar's own transform is scale(1), so nothing else is overridden.)
+        // Gentler than ease: Safari draws 60 frames a second, and ease covered 60% of the way by the third frame, so
+        // on the iPhone the slide read as a jump (Chrome, at 120+, showed it fine). This one gets halfway by the fourth.
+        const run = box.animate([{ transform: `translate(${from.left - to.left}px, ${from.top - to.top}px)` }, { transform: "translate(0px, 0px)" }], { duration: 400, easing: "cubic-bezier(0.32, 0.72, 0, 1)" });
+        slide.current = run;
+        // Into the dock it waits, held where it was, for two frames: iOS draws its selection handles and menu right
+        // then, and the slide's first frames were lost to that (it jumped most of the way). Frames are timed by iOS,
+        // so a busy moment holds this back until it's over. Out of the dock nothing competes, so it starts at once.
+        if (docked) {
+            run.pause();
+            requestAnimationFrame(() => requestAnimationFrame(() => { if (run.playState === "paused") run.play(); }));
+        }
     };
     useLayoutEffect(placeToolbar);
+    // TEMP: samples the toolbar on every frame for 600ms after it opens, closes or (un)docks, and sends them to the
+    // dev server's log: [ms since the change, ms since the previous frame, opacity, transform, top on screen].
+    useEffect(() => {
+        if (!import.meta.env.DEV) return;
+        const box = toolbarBoxRef.current;
+        if (!box) return;
+        const t0 = performance.now(), samples = [];
+        let last = t0, frame;
+        const tick = (now) => {
+            const cs = getComputedStyle(box);
+            samples.push([Math.round(now - t0), Math.round(now - last), +(+cs.opacity).toFixed(2), cs.transform.replace(/matrix\(|\)/g, "").split(",").map((v) => +(+v).toFixed(2)).join(" "), Math.round(box.getBoundingClientRect().top)]);
+            last = now;
+            if (now - t0 < 600) frame = requestAnimationFrame(tick);
+            else fetch("/__log", { method: "POST", body: JSON.stringify({ event: `in=${toolbarIn} docked=${docked}`, ua: navigator.userAgent.slice(0, 60), samples }) });
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [toolbarIn, docked]); // eslint-disable-line react-hooks/exhaustive-deps
     const [menuOpen, setMenuOpen] = useState(null); // "list" | "style" | "heading" | "align" | null
+    // The menu on screen: the open one, or the one just closed while it shrinks away (animate-menu-out).
+    const [shownMenu, setShownMenu] = useState(null);
+    if (menuOpen && menuOpen !== shownMenu) setShownMenu(menuOpen);
+    const menu = menuOpen ?? shownMenu;
+    const menuClosing = !menuOpen && Boolean(shownMenu);
     // A menu opens under the toolbar, often off the visible part of the note (behind the keyboard): glide to it.
     // The room reveal() keeps under the row already counts the menu by now (scrollPaddingBottom, above).
     useEffect(() => {
@@ -674,12 +974,18 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (!viewport) return;
         const update = () => {
             if (viewport.height < 100) return; // nothing visible (backgrounded); not a keyboard
-            setVvHeight(viewport.height);
+            // Synchronous, so the reveal below measures the overlay at its new height.
+            flushSync(() => setVvHeight(viewport.height));
             const keyboard = appHeight() - viewport.height;
             if (keyboard > 100 && isField(document.activeElement)) localStorage.setItem("keyboardHeight", Math.round(keyboard));
             // iOS pans the whole page to reveal the caret (the dashboard shows through and the screen jumps).
             // Undo it: the overlay already fits the visible area and the row is scrolled into view inside it instead.
             window.scrollTo(0, 0);
+            // The keyboard is up (or changed): only now put a parked caret back and bring its row into view, in
+            // one glide. Scrolling ahead of the keyboard, on focus, and again once its real height arrived,
+            // jumped the screen twice.
+            if (parked.current) unpark();
+            else if (document.activeElement === hostRef.current) reveal(rows.current[activeRow.current]);
         };
         viewport.addEventListener("resize", update);
         viewport.addEventListener("scroll", update);
@@ -687,37 +993,37 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             viewport.removeEventListener("resize", update);
             viewport.removeEventListener("scroll", update);
         };
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- unpark and reveal only touch refs
     // The note body got focus and the keyboard is about to come up: shrink the overlay to the last known keyboard
-    // height right away, so by the time iOS looks, the caret is already above the keyboard and there is nothing to
-    // pan the page to. Only before the keyboard is up, so it never leaves a gap under the note.
-    // Before the first keyboard on an iPhone there is no measured height; a tall typical one keeps the first focus
-    // from panning too (too tall only leaves a gap under the note until the real height arrives, a moment later;
-    // too short would leave the row under the keyboard).
+    // height right away, so the row is revealed against the keyboard-free area (onBodyFocus) and the toolbar never
+    // sits behind the keyboard. Only before the keyboard is up, so it never leaves a gap under the note. Before the
+    // first keyboard on an iPhone there is no measured height; a tall typical one stands in (too tall only leaves a
+    // gap under the note until the real height arrives, a moment later). Returns whether a keyboard is expected.
     const shrinkForKeyboard = () => {
-        const keyboard = Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 340 : 0);
-        const viewport = window.visualViewport;
-        if (keyboard && (!viewport || viewport.height > appHeight() - 100)) setVvHeight((h) => Math.min(h, appHeight() - keyboard));
+        if (!keyboardComing()) return false;
+        setVvHeight((h) => Math.min(h, appHeight() - keyboardHeight()));
+        return true;
     };
-    // Keep the caret's row in view inside the note body whenever the visible area changes (the keyboard's real
-    // height arriving, or a different keyboard).
-    useEffect(() => {
-        if (focused) revealForKeyboard(rows.current[activeRow.current]);
-    }, [vvHeight, focused]);
     // Any field focused (keyboard up on phones): the close button becomes a check that just ends the editing.
     const [typing, setTyping] = useState(false);
     const isField = (el) => el?.matches("input, textarea, [contenteditable]") ?? false;
-    // The note body got focus: the keyboard is about to come up. The overlay is shrunk to the keyboard's height and
-    // the row brought clear of it right here, synchronously, so when iOS looks for the caret an instant later it is
-    // already in view. typing is set here too (the outer onFocus sets it again, later in the same event), as the
-    // overlay's height depends on it.
+    // The note body got focus. typing is set here too (the outer onFocus sets it again, later in the same event),
+    // as the overlay's height depends on it. With no keyboard coming (desktop, or one already up) the row is
+    // revealed right away, in a glide; with one coming, the caret is parked (park, above) by whatever places it
+    // next, and the row revealed once the keyboard is there.
     const onBodyFocus = () => {
-        flushSync(() => { setFocused(true); setTyping(true); shrinkForKeyboard(); });
-        revealForKeyboard(rows.current[activeRow.current]);
+        let shrunk;
+        flushSync(() => { setFocused(true); setTyping(true); shrunk = shrinkForKeyboard(); });
+        if (!shrunk) reveal(rows.current[activeRow.current]);
+    };
+    // "Concluir" puts the keyboard away and ends the selection too (a blurred body kept it highlighted).
+    const done = () => {
+        window.getSelection().removeAllRanges();
+        document.activeElement?.blur();
     };
     // Wait a tick on blur so a press on the toolbar doesn't flicker it.
     const onBlur = () => setTimeout(() => {
-        if (document.activeElement !== hostRef.current) { setFocused(false); setMenuOpen(null); }
+        if (document.activeElement !== hostRef.current) { setFocused(false); setMenuOpen(null); unpark(); }
     }, 0);
 
     // Lock the dashboard scroll while the editor is open.
@@ -733,13 +1039,42 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         };
     }, []);
 
+    // A long note opens with only its first screens of rows, so the opening's first frame isn't held up building
+    // hundreds of rows nobody sees yet; the rest mount once the opening has played (morph) or popped in.
+    useEffect(() => {
+        if (morph) return;
+        const timeout = setTimeout(() => setAllRows(true), 250);
+        return () => clearTimeout(timeout);
+    }, [morph]);
+
     // Opens out of the card (lib/morph.js) before the first paint.
     useLayoutEffect(() => {
         if (!morph) return;
-        const running = openFrom(panelRef.current, backdropRef.current, note.id);
+        const running = openFrom(panelRef.current, backdropRef.current, note?.id);
+        // The card is gone after all: pop open instead (still before the first paint).
+        if (!running) { setMorph(false); setHoldKeyboard(false); setHideCaret(false); if (!note) titleRef.current?.focus(); return; }
         morphing.current = running;
+        setGrowing(true);
+        let live = true; // a StrictMode remount's cancelled first opening must not end the second one's growing
+        running[0].finished.then(() => setAllRows(true), () => {}).finally(() => { if (live) setGrowing(false); });
+        // A new note's keyboard waits for the box to settle, so nothing else moves while it grows. iOS only raises it for
+        // a focus inside the tap (a focus from a timer, even one set here, got no keyboard), so the title is focused now
+        // with inputmode="none" (focused, no keyboard) and switched to "text" once the opening has finished: WebKit
+        // reloads the keyboard of a focused field whose inputmode changes, tap or not. The caret shows when the keyboard
+        // arrives (the visual viewport shrinks), or after CARET_FALLBACK without one (desktop, a hardware keyboard).
+        let fallback = 0;
+        const showCaret = () => { clearTimeout(fallback); window.visualViewport?.removeEventListener("resize", showCaret); setHideCaret(false); };
+        if (!note) {
+            titleRef.current?.focus({ preventScroll: true });
+            running[0].finished.then(() => {
+                if (!live) return;
+                setHoldKeyboard(false);
+                window.visualViewport?.addEventListener("resize", showCaret);
+                fallback = setTimeout(showCaret, CARET_FALLBACK);
+            }, () => {});
+        }
         // StrictMode mounts twice in dev: the second opening must measure an untransformed panel, not this one's.
-        return () => running.forEach((a) => a.cancel());
+        return () => { live = false; clearTimeout(fallback); window.visualViewport?.removeEventListener("resize", showCaret); running.forEach((a) => a.cancel()); };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // The "..." menu in the header: the card menu's actions plus copying the whole note.
@@ -780,8 +1115,65 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             onMessage("Não foi possível copiar");
         }
     };
+    // "Buscar na nota": a search bar over the header. Matches are painted with the CSS Custom Highlight API (index.css),
+    // so the rows' DOM is never touched; at is the current one, which the arrows and Enter step through (wrapping).
+    // A match in a folded section unfolds it when it becomes the current one.
+    const [searching, setSearching] = useState(false);
+    const [query, setQuery] = useState("");
+    const [current, setCurrent] = useState(0);
+    const searchInput = useRef(null);
+    const matches = useMemo(() => (searching ? lines.flatMap((raw, row) => findAll(plain(parseLine(raw).text), query).map(([start, end]) => ({ row, start, end }))) : []),
+        [searching, query, content]); // eslint-disable-line react-hooks/exhaustive-deps
+    const at = matches.length ? Math.min(current, matches.length - 1) : -1;
+    const step = (by) => { if (matches.length) setCurrent((at + by + matches.length) % matches.length); };
+    // flushSync, then focus in the same tap: iOS only raises the keyboard for a focus inside the user's gesture.
+    const openSearch = () => { flushSync(() => setSearching(true)); searchInput.current?.focus(); };
+    // The field goes away with the focus in it, and browsers don't always report that blur: typing would stay on.
+    const closeSearch = () => { setSearching(false); setQuery(""); setCurrent(0); setTyping(false); };
+    const matchRange = (m) => {
+        const el = rows.current[m.row];
+        if (!el?.isConnected) return null;
+        const r = document.createRange();
+        r.setStart(...pointAt(el, m.start));
+        r.setEnd(...pointAt(el, m.end));
+        return r;
+    };
+    // After every render: the rows' HTML may have been replaced (the layout effect above), which collapses old ranges.
+    // With no matches left (search closed or cleared) they're removed, and the note body is nudged to repaint: iOS
+    // kept painting the last highlights over the text until something else redrew those lines.
+    const painted = useRef(false);
+    useLayoutEffect(() => {
+        if (!window.CSS?.highlights) return;
+        const all = [], cur = [];
+        matches.forEach((m, i) => { const r = matchRange(m); if (r) (i === at ? cur : all).push(r); });
+        if (all.length || cur.length) {
+            CSS.highlights.set("note-search", new Highlight(...all));
+            CSS.highlights.set("note-search-current", new Highlight(...cur));
+            painted.current = true;
+            return;
+        }
+        if (!painted.current) return;
+        painted.current = false;
+        CSS.highlights.delete("note-search");
+        CSS.highlights.delete("note-search-current");
+        const host = hostRef.current;
+        if (!host) return;
+        host.style.opacity = "0.999";
+        requestAnimationFrame(() => requestAnimationFrame(() => { host.style.opacity = ""; }));
+    });
+    useEffect(() => () => { window.CSS?.highlights?.delete("note-search"); window.CSS?.highlights?.delete("note-search-current"); }, []);
+    // Bring the current match into view, unfolding its section first if it's folded away.
+    useEffect(() => {
+        const m = matches[at];
+        if (!m) return;
+        if (hidden.has(m.row)) return unfoldFor(lines, m.row);
+        const r = matchRange(m);
+        if (r) reveal(r, { center: true });
+    }, [at, query, folded, allRows]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Actions on the stored note save pending edits first, so they see (and keep) what was just typed.
     const OPTIONS = [
+        { label: "Buscar na nota", icon: MdSearch, run: openSearch, big: true },
         { label: saved?.is_pinned ? "Desfixar" : "Fixar", icon: saved?.is_pinned ? RiPushpin2Fill : RiUnpinLine, run: () => onPin(saved), needsSaved: true },
         { label: "Categoria", icon: MdLabelOutline, run: () => onCategory(saved), needsSaved: true },
         { label: "Duplicar", icon: HiOutlineDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
@@ -800,16 +1192,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     return (
         <>
-            {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard.
-                It and the editor start 1px down: the top edge is left to the status bar strip (index.html), since iOS
-                takes the bar's color from any fixed element touching that edge, whatever is in front. */}
-            <div ref={backdropRef} className={`fixed inset-x-0 top-px bottom-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`} />
+            {/* Phones: an opaque backdrop over the whole screen, so nothing of the dashboard shows around or behind the keyboard. */}
+            <div ref={backdropRef} className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
         {/* Grown out of its card (morph): that is the entrance, so no fade or pop of its own. */}
-        <div className={`fixed inset-x-0 top-px z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`}
+        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
             // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
-            style={{ height: typing ? vvHeight - 1 : "calc(var(--app-height, 100dvh) - 1px)" }}>
+            style={{ height: typing && !growing ? vvHeight : "var(--app-height, 100dvh)" }}>
             <div
                 ref={panelRef}
                 onFocus={(e) => setTyping(isField(e.target))}
@@ -819,7 +1209,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 {/* relative z-10: the header's menu opens over the note body. */}
                 <div className="relative z-10 flex items-center justify-between gap-1.5">
                     <input
-                        autoFocus={!note}
+                        ref={titleRef}
+                        autoFocus={!note && !morph} // grown out of the + button: focused by the opening (above)
+                        inputMode={holdKeyboard ? "none" : "text"}
                         autoComplete="off"
                         name="note-title"
                         value={title}
@@ -831,18 +1223,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             tap.current = null;
                             activeRow.current = 0;
                             setActiveIndex(0);
-                            hostRef.current.focus({ preventScroll: true });
-                            setSelection(rows.current[0], 0);
+                            focusWithCaret(rangeAt(rows.current[0], 0));
                         }}
                         placeholder="Título"
                         // Styled like the big heading inside the note.
-                        className={`${headingSize("#")} text-light-text-color-primary dark:text-dark-text-color-primary bg-transparent outline-none w-full min-w-0`}
+                        className={`${headingSize("#")} text-light-text-color-primary dark:text-dark-text-color-primary bg-transparent outline-none w-full min-w-0 ${hideCaret ? "caret-transparent" : ""}`}
                     />
 
-                    {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). */}
+                    {/* onMouseDown preventDefault keeps the focused field (and the phone keyboard). Greyed out with
+                        aria-disabled, not disabled: a disabled button lets the press through to the header, which took
+                        the focus (and the keyboard) away. */}
                     {[[-1, "Desfazer", MdUndo, history.i === 0], [1, "Refazer", MdRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
-                        <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => go(step)} disabled={off} aria-label={label} title={label}
-                            className={`${headerButton} text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
+                        <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => !off && go(step)} aria-disabled={off} aria-label={label} title={label}
+                            className={`${headerButton} text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary aria-disabled:opacity-40 aria-disabled:active:scale-100 aria-disabled:hover:bg-light-bg-color-secondary dark:aria-disabled:hover:bg-dark-bg-color-primary aria-disabled:cursor-default`}>
                             <Icon />
                         </button>
                     ))}
@@ -852,24 +1245,71 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             className={`${headerButton} text-base bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary`}>
                             <SlOptions />
                         </button>
-                        {optionsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right animate-menu-in"
-                                onMouseDown={(e) => e.preventDefault()}>
-                                {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off }) => (
-                                    <button key={label} type="button" disabled={(needsSaved && !saved) || off}
-                                        onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
-                                        className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
-                                        <span>{label}</span>
-                                        <Icon />
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                        {/* Always rendered so closing animates too (same transition as the card menu). */}
+                        <div className={`absolute right-0 top-full mt-2 w-[210px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary overflow-hidden origin-top-right transition-[opacity,transform,visibility] ${optionsOpen ? "opacity-100 visible scale-100 duration-200 ease-out" : "opacity-0 invisible scale-90 duration-100 ease-in"}`}
+                            onMouseDown={(e) => e.preventDefault()}>
+                            {OPTIONS.map(({ label, icon: Icon, run, needsSaved, danger, stayOpen, off, big }) => (
+                                <button key={label} type="button" disabled={(needsSaved && !saved) || off}
+                                    onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
+                                    className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
+                                    <span>{label}</span>
+                                    <Icon className={big ? "text-[1.2em]" : undefined} />
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    {typing ? (
+                    {searching && (
+                        // Over the whole header row; the X ends the search. onMouseDown preventDefault on the arrows keeps
+                        // the field focused (and the phone keyboard up) while stepping through matches.
+                        <div className="absolute inset-0 z-20 flex items-center gap-1.5 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary animate-fade-in">
+                            <div className="flex-1 min-w-0 h-11 flex items-center gap-2 pl-4 pr-3 rounded-full bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary">
+                                <MdSearch className="shrink-0 text-2xl text-light-text-color-tertiary dark:text-dark-text-color-tertiary" />
+                                <input
+                                    ref={searchInput}
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
+                                    enterKeyHint="search"
+                                    name="note-search"
+                                    aria-label="Buscar na nota"
+                                    placeholder="Buscar na nota"
+                                    value={query}
+                                    onChange={(e) => { setQuery(e.target.value); setCurrent(0); }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Escape") closeSearch();
+                                        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                                        e.preventDefault();
+                                        step(e.shiftKey ? -1 : 1);
+                                    }}
+                                    // text-base: 16px, below that iOS zooms the page in on focus.
+                                    className="flex-1 min-w-0 bg-transparent outline-none text-base"
+                                />
+                                {query.trim() && (
+                                    <span className="shrink-0 text-xs tabular-nums text-light-text-color-tertiary dark:text-dark-text-color-tertiary">
+                                        {matches.length ? `${at + 1}/${matches.length}` : "0"}
+                                    </span>
+                                )}
+                            </div>
+                            {[[-1, "Anterior", MdKeyboardArrowUp], [1, "Próximo", MdKeyboardArrowDown]].map(([by, label, Icon]) => (
+                                <button key={by} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => step(by)} disabled={matches.length < 2} aria-label={label} title={label}
+                                    className={`${headerButton} text-2xl bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
+                                    <Icon />
+                                </button>
+                            ))}
+                            <button type="button" onClick={closeSearch} aria-label="Fechar busca"
+                                className={`${headerButton} text-2xl text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
+                                <IoMdClose />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Not while searching: the search field is focused under its own header (typing, for the keyboard), and
+                        this showed through the search's fade-in as a flash of the check. */}
+                    {typing && !searching ? (
                         // onMouseDown preventDefault: blurring on press would swap this back to the X before the click lands.
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.activeElement?.blur()} aria-label="Concluir"
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={done} aria-label="Concluir"
                             className={`${headerButton} text-lg bg-[var(--primary-color)] text-[var(--primary-color-fg)]`}>
                             <IoMdCheckmark />
                         </button>
@@ -891,27 +1331,31 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                     style={{ paddingBottom: 136, scrollPaddingBottom: showToolbar ? (menuOpen ? 136 : 80) : 0 }}
                     // preventDefault on the empty area: blurring the note on press would close the toolbar before the click refocuses.
                     onMouseDown={(e) => { blankPress.current = e.target === e.currentTarget; if (blankPress.current) e.preventDefault(); }}
-                    // A press on the blank area under the text puts the caret at the end. The last row is made the
-                    // active one before focusing: the focus reveals the active row, and with the previous one (row 0
-                    // on a freshly opened note) it scrolled up there, then glided back down to the caret.
+                    // A press on the blank area goes to the row at its height: under the text, the end of the last
+                    // row; in the side padding, that row's start or end (a near miss of a row isn't a jump to the end).
+                    // The row is made the active one before focusing: the focus reveals the active row, and with the
+                    // previous one (row 0 on a freshly opened note) it scrolled up there, then glided back to the caret.
                     // A drag-select released over the padding also lands its click here (the click goes to the common
                     // ancestor of press and release), and must keep its selection: only a press that began here counts.
                     onClick={(e) => {
                         if (e.target !== e.currentTarget || !blankPress.current) return;
-                        const last = lines.length - 1;
+                        const row = rowAtY(e.clientY);
+                        const box = rows.current[row].getBoundingClientRect();
                         tap.current = null;
-                        activeRow.current = last;
-                        setActiveIndex(last);
-                        hostRef.current.focus({ preventScroll: true });
-                        setSelection(rows.current[last], rowLength(last));
+                        activeRow.current = row;
+                        setActiveIndex(row);
+                        focusWithCaret(rangeAt(rows.current[row], e.clientY <= box.bottom && e.clientX < box.left ? 0 : rowLength(row)));
                     }}>
                     {/* The toolbar, placed under the caret's row by the layout effect above. It stays mounted and fades, so moving
                         between lines just moves it. onMouseDown preventDefault keeps the note focused (and the keyboard open). */}
                     {/* Zero height, so it never moves the rows. Static (invisible to layout) with the toolbar under a row;
                         sticky at the top of the visible note while docked, so the toolbar is placed from there, not from scrollTop. */}
                     <div className={`h-0 z-10 ${docked ? "sticky top-0" : ""}`}>
+                    {/* will-change: a layer of its own, always. Otherwise iOS paints it into the note body's scrolled
+                        content, and on docking (the wrapper turns sticky, a layer of its own) it left that picture behind
+                        under the row: a ghost toolbar that didn't take taps. */}
                     <div ref={toolbarBoxRef}
-                        className={`absolute z-10 origin-top-left ${showToolbar ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}`}
+                        className={`absolute z-10 origin-top-left will-change-transform ${toolbarIn ? "opacity-100 scale-100" : "opacity-0 scale-75"} ${showToolbar ? "" : "pointer-events-none"}`}
                         aria-hidden={!focused}
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
@@ -930,29 +1374,29 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 className="w-11 h-11 grid place-items-center rounded-full text-2xl transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
                                 <MdKeyboardArrowDown />
                             </button>
-                            {menuOpen && (
+                            {menu && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward. The indent menu is centered on its button.
-                                <div style={menuOpen === "indent" && indentRef.current ? { left: indentRef.current.offsetLeft + indentRef.current.offsetWidth / 2 } : undefined}
-                                    className={`flex absolute ${menuOpen === "indent" ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary animate-menu-in ${docked ? (menuOpen === "indent" ? "origin-bottom" : "origin-bottom-left") : menuOpen === "indent" ? "origin-top" : "origin-top-left"}`}>
-                                    {menuOpen === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
+                                <div onAnimationEnd={() => { if (menuClosing) setShownMenu(null); }} style={menu === "indent" && indentRef.current ? { left: indentRef.current.offsetLeft + indentRef.current.offsetWidth / 2 } : undefined}
+                                    className={`flex absolute ${menu === "indent" ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out pointer-events-none" : "animate-menu-in"} ${docked ? (menu === "indent" ? "origin-bottom" : "origin-bottom-left") : menu === "indent" ? "origin-top" : "origin-top-left"}`}>
+                                    {menu === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
                                             className={`text-2xl px-5 ${option(activeList === prefix)}`}><Icon /></button>
                                     ))}
-                                    {menuOpen === "style" && STYLES.map(({ label, icon: Icon, command }) => (
+                                    {menu === "style" && STYLES.map(({ label, icon: Icon, command }) => (
                                         <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
                                             className={`text-2xl px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
                                     ))}
-                                    {menuOpen === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
+                                    {menu === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
                                         <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
                                             className={`text-2xl px-5 ${option(activeLine.align === token)}`}><Icon /></button>
                                     ))}
                                     {/* Less on the left, more on the right (Tab / Shift+Tab too). Stays open for repeated steps. */}
-                                    {menuOpen === "indent" && [[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
+                                    {menu === "indent" && [[-1, "Diminuir recuo", MdFormatIndentDecrease, !activeLine.indent], [1, "Aumentar recuo", MdFormatIndentIncrease, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
                                         <button key={step} type="button" onClick={() => changeIndent(step)} disabled={off} title={label} aria-label={label}
                                             className={`text-2xl px-5 ${option(false)} disabled:pointer-events-none [&:disabled>svg]:opacity-30`}><Icon /></button>
                                     ))}
-                                    {menuOpen === "heading" &&HEADINGS.map(({ label, prefix, menu }) => (
+                                    {menu === "heading" &&HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
                                             className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
                                     ))}
@@ -984,62 +1428,27 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         onPointerUp={onPointerUp}
                         onPointerCancel={() => { press.current = null; }}
                         onClick={placeTapCaret}
+                        // A tap that focuses the note with the keyboard coming: WebKit would focus it and place the
+                        // caret itself, telling iOS of a caret maybe under the keyboard. Done here instead, parked.
+                        onMouseDown={(e) => {
+                            const t = tap.current;
+                            if (!t || Date.now() - t.time > 1000 || document.activeElement === hostRef.current || e.target.closest("[contenteditable=false]") || !keyboardComing()) return;
+                            const el = rows.current[t.row];
+                            if (!el) return;
+                            e.preventDefault();
+                            const point = document.caretRangeFromPoint?.(t.x, t.y);
+                            const r = el.getBoundingClientRect();
+                            focusWithCaret(point && el.contains(point.startContainer) ? point : rangeAt(el, t.x < r.left ? 0 : rowLength(t.row)));
+                        }}
                         onFocus={onBodyFocus}
                         onBlur={onBlur}>
                         {lines.map((raw, index) => {
-                            const line = parseLine(raw);
-                            const icon = line.check !== undefined || (line.list && !line.number && !line.heading);
+                            if (index < fromRow || index >= toRow) return null;
                             const isFolded = folded.has(keys[index]);
-                            const foldable = line.heading && (isFolded || headingSection(lines, index)[1] > index + 1);
                             return (
-                                <div key={keys[index]} data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={lineStyle(line)}
-                                    className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden.has(index) ? "hidden" : ""}`}>
-                                    {line.heading && (
-                                        // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
-                                        // so nothing is clipped). The glyph of MdChevronRight ends 5px before its 20px box, so the box ends 5px into
-                                        // the text: the chevron's tip (antialiased to nothing) meets the text, the stroke stays 1px off. One line tall
-                                        // at the heading's size. Shown while folded;
-                                        // otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
-                                        <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
-                                            onMouseDown={(e) => e.preventDefault()} onClick={() => toggleFold(index)} tabIndex={-1}
-                                            style={{ height: "1lh", ...island }}
-                                            className={`absolute -left-[15px] top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (focused && index === activeIndex ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
-                                            {/* Only the icon turns: turning the button would turn its box (and hit area) too. */}
-                                            <MdChevronRight size={20} className={`shrink-0 transition-transform duration-200 ${isFolded ? "" : "rotate-90"}`} />
-                                        </button>
-                                    )}
-                                    {line.check !== undefined && (
-                                        // One line tall (1.625em = leading-relaxed), so the box centers on the first line of text whatever the font.
-                                        // The hit area grows up, down and to the left, not to the right: a tap near the text's start is for the text.
-                                        <span contentEditable={false} suppressContentEditableWarning style={island} className="h-[1.625em] shrink-0 flex items-center select-none">
-                                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleCheck(index)} aria-pressed={line.done}
-                                            className={`relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked === index ? "animate-check-pop" : ""}`}>
-                                            {/* The card preview's IoMdCheckmark traced as a stroke, so it can draw in. Always in the DOM, just hidden
-                                                while unticked: a selection dragged onto the box lands on a position inside the button, and the browsers
-                                                resolve that differently for an empty button and one with a child (see locate), so both states keep the child. */}
-                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2.1" className={line.done ? "" : "opacity-0"}>
-                                                <path d="M3.75 12.4l5 5L20.25 5.9" strokeDasharray="24" className={line.done && justChecked === index ? "animate-check-draw" : ""} />
-                                            </svg>
-                                        </button>
-                                        </span>
-                                    )}
-                                    {line.list && line.check === undefined && !line.heading && <LineMarker line={line} contentEditable={false} suppressContentEditableWarning style={island} />}
-                                    {/* -top-px: the font sits its letters a touch low in the line, so lift them level with the icon. */}
-                                    <div className={`relative flex-1 min-w-0 transition-opacity duration-500 ${icon ? "-top-px" : ""} ${line.done ? "opacity-60" : ""}`}>
-                                        <div
-                                            ref={(el) => { rows.current[index] = el; }}
-                                            data-placeholder={index === 0 && lines.length === 1 ? "" : undefined}
-                                            className={`min-h-[1.625em] whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
-                                        />
-                                        {/* An invisible copy of the text over the row, whose background draws the strike line. */}
-                                        {/* overflow-hidden: a space where the text wraps hangs past the box, and the line (the span's background) would paint it into the padding. */}
-                                        {line.check !== undefined && (
-                                            <div aria-hidden contentEditable={false} className="strike absolute inset-0 overflow-hidden pointer-events-none select-none whitespace-pre-wrap break-words">
-                                                <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: trimEnd(line.text) }} />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                <Row key={keys[index]} raw={raw} index={index} rows={rows} rowBoxes={rowBoxes} actions={rowActions}
+                                    hidden={hidden.has(index)} isFolded={isFolded} foldable={isFolded || headingSection(lines, index)[1] > index + 1}
+                                    active={focused && index === activeIndex} justChecked={justChecked === index} only={lines.length === 1} selecting={selecting} />
                             );
                         })}
                     </div>

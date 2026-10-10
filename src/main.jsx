@@ -1,9 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
-// Roboto Mono is bundled with the app (no request to Google Fonts on every open).
-import '@fontsource-variable/roboto-mono'
-import '@fontsource-variable/roboto-mono/wght-italic.css'
+// Roboto Mono is bundled with the app (no request to Google Fonts on every open), with its vertical metrics evened
+// out so the caret centers on the capitals (scripts/patch-font.py).
+import './fonts.css'
 import './index.css'
 
 createRoot(document.getElementById('root')).render(

@@ -3,21 +3,24 @@ import { BsExclamationCircle } from "react-icons/bs";
 
 // Centered dialog card, the width of an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 60px.
 // closing plays the exit (menu-out: fade, shrink) while the parent keeps it mounted for 100ms.
-// The backdrop is as tall as the visible area, so with the keyboard up the card glides to the center of what's left
-// (same approach as the NoteEditor's overlay). It is shrunk right at focus time, to the last keyboard height the
-// editor measured, so iOS finds the field already clear of the keyboard and has nothing to pan the page to; the real
-// height follows on the viewport's resize, where any pan iOS did anyway is undone (once, not on every scroll tick).
+// With the keyboard up the card glides to the center of what's left visible. The box that centers it keeps the full
+// height and is moved up by half the keyboard: a transform, which the compositor runs on its own. Animating the box's
+// height instead redid the layout on every frame, right while iOS was busy raising the keyboard. It moves right at
+// focus time, by the last keyboard height the editor measured, so iOS finds the field already clear of the keyboard
+// and has nothing to pan the page to; the real height follows on the viewport's resize, where any pan iOS did anyway
+// is undone (once, not on every scroll tick). While the dialog plays its exit it stays put: the keyboard going down
+// then (saving with Enter) would otherwise drag the fading card along with it.
 const appHeight = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-height")) || window.innerHeight;
-const useVisibleHeight = () => {
+const useVisibleHeight = (closing) => {
     const box = useRef(null);
-    const fit = (h) => { if (box.current) box.current.style.height = `${h}px`; };
+    const leaving = useRef(closing);
+    leaving.current = closing;
+    // Centered on the top h pixels of the screen.
+    const fit = (h) => { if (box.current && !leaving.current) box.current.style.transform = `translateY(${Math.min(0, h - appHeight()) / 2}px)`; };
     const shrinkForKeyboard = () => {
         const keyboard = Number(localStorage.getItem("keyboardHeight")) || (/iPhone/.test(navigator.userAgent) ? 340 : 0);
         const viewport = window.visualViewport;
         if (!keyboard || (viewport && viewport.height <= appHeight() - 100)) return;
-        // From the full height, so the card glides up along with the keyboard rather than appearing already up.
-        fit(appHeight());
-        void box.current?.offsetHeight;
         fit(appHeight() - keyboard);
     };
     const onFocus = (e) => { if (e.target.matches("input, textarea")) shrinkForKeyboard(); };
@@ -48,13 +51,12 @@ const useVisibleHeight = () => {
 };
 
 const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? BsExclamationCircle : null }) => {
-    const backdrop = useVisibleHeight();
+    const backdrop = useVisibleHeight(closing);
     return (
     // The dim covers the whole screen (fixed to the layout viewport, which keeps its full height under the keyboard);
-    // only the box that centers the card follows the visible height. It starts 1px down, leaving the top edge to the
-    // status bar strip (index.html): iOS would take the bar's color from this dim instead.
-    <div className={`fixed inset-x-0 top-px bottom-0 min-h-[calc(var(--app-height,100dvh)-1px)] z-[80] bg-black/20 ${closing ? "animate-fade-out pointer-events-none" : "animate-fade-in"}`} onMouseDown={onClose}>
-    <div {...backdrop} className="h-[var(--app-height,100dvh)] transition-[height] duration-300 ease-out grid place-items-center">
+    // only the box that centers the card follows the visible area.
+    <div className={`fixed inset-0 min-h-[var(--app-height,100dvh)] z-[80] bg-black/20 ${closing ? "animate-fade-out pointer-events-none" : "animate-fade-in"}`} onMouseDown={onClose}>
+    <div {...backdrop} className="h-[var(--app-height,100dvh)] transition-transform duration-300 ease-out grid place-items-center">
         <div
             role="dialog"
             aria-modal="true"

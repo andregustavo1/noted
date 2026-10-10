@@ -90,20 +90,19 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
     const renderLine = (raw, index) => {
         const line = parseLine(raw);
         const check = line.check !== undefined;
-        const icon = check || (line.list && !line.number && !line.heading);
         const fill = isPinned ? "bg-[var(--primary-color-fg)] text-[var(--primary-color)]" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)]";
         return (
             <div key={index} style={lineStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line) : ""}`}>
                 {check && (
-                    <span className="h-[1.625em] shrink-0 flex items-center">
+                    <span className="relative top-[0.5px] h-[1.625em] shrink-0 flex items-center">
                         <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-50"}`}>
                             {line.done && <IoMdCheckmark />}
                         </span>
                     </span>
                 )}
                 {line.list && !check && !line.heading && <LineMarker line={line} style={{ opacity: 0.8 }} />}
-                {/* Lists and headings stay on one line and end in "..."; plain text still wraps. -top-px matches the editor. */}
-                <span className={`relative min-w-0 flex-1 ${icon ? "-top-px" : ""} ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-50" : "opacity-80"}`}>
+                {/* Lists and headings stay on one line and end in "..."; plain text still wraps. */}
+                <span className={`relative min-w-0 flex-1 ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-50" : "opacity-80"}`}>
                     <span className={line.done ? "strike-done" : ""} dangerouslySetInnerHTML={html(line.done ? trimEnd(line.text) : line.text)} />
                 </span>
             </div>
