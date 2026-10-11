@@ -27,20 +27,18 @@ const LangEn = () => <span className="text-sm font-semibold">EN</span>;
 // profile: how far up (px, 0 or less) the name and email row sits, level with the avatar that rides in from the
 // page's header, which the page may be scrolled partly past; null leaves the row out (scrolled clean past it),
 // so the panel starts at "Configurações".
-const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange, editNameSignal }) => {
+const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange, editNameSignal, onMessage }) => {
     const [editing, setEditing] = useState(false);
     // Task reminders on this device (lib/push.js). Asked for on the tap itself: iOS only shows the prompt for one.
     const [push, setPush] = useState(false);
-    const [pushError, setPushError] = useState("");
     useEffect(() => { pushEnabled().then(setPush, () => {}); }, []);
     const togglePush = () => {
-        setPushError("");
         (push ? disablePush().then(() => false) : enablePush())
             .then((on) => {
                 setPush(on);
-                if (!on && !push) setPushError(t("Permissão negada. Ative em Ajustes > Notificações > Noted."));
+                if (!on && !push) onMessage?.(t("Permissão negada. Ative em Ajustes > Notificações > Noted."));
             })
-            .catch((e) => setPushError(e.message));
+            .catch((e) => onMessage?.(e.message));
     };
     const [draft, setDraft] = useState(name);
     const primary = settings.primaryColor;
@@ -155,11 +153,9 @@ const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange,
                         {/* Interface language (lib/i18n.js). */}
                         <Switch dark={dark} on={settings.language === "en"} onToggle={() => onChange({ language: settings.language === "en" ? "pt" : "en" })} label={t("Idioma")} icons={[LangPt, LangEn]} />
 
-                        {/* Reminder notifications: only the home-screen app can get them on iOS. */}
-                        {pushSupported()
-                            ? <Switch dark={dark} on={push} onToggle={togglePush} label={t("Notificações de lembretes")} icons={[NiBellOff, NiBell]} />
-                            : <p className="mt-3 text-sm opacity-60">{t("Para receber lembretes, abra o Noted pela tela de início.")}</p>}
-                        {pushError && <p className="mt-2 text-sm text-red-500">{pushError}</p>}
+                        {/* Reminder notifications: only the home-screen app can get them on iOS (else a popup says so). */}
+                        <Switch dark={dark} on={push} label={t("Notificações de lembretes")} icons={[NiBellOff, NiBell]}
+                            onToggle={pushSupported() ? togglePush : () => onMessage?.(t("Para receber lembretes, abra o Noted pela tela de início."))} />
                     </div>
 
                     <div className="grid mt-6">

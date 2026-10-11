@@ -798,7 +798,7 @@ const Home = () => {
                     style={{ transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
                     {/* Pulled open past its edge (or overshooting), the panel shows more of itself, not a gap. */}
                     <div aria-hidden="true" className="absolute inset-y-0 left-full w-full bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary" />
-                    <ProfileConfig name={userName} email={user?.email} profile={profile} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
+                    <ProfileConfig name={userName} email={user?.email} profile={profile} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} onMessage={setMessage} />
                 </div>
             </div>
 
