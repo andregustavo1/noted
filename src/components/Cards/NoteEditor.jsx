@@ -1,4 +1,5 @@
 import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { t } from "../../lib/i18n";
 import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRestart, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
 import { flushSync } from "react-dom";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
@@ -114,7 +115,7 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                 // the text: the chevron's tip (antialiased to nothing) meets the text, the stroke stays 1px off. One line tall
                 // at the heading's size. Shown while folded;
                 // otherwise only on hover or with the caret on the heading, and not at all with nothing to fold.
-                <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={isFolded ? "Expandir" : "Recolher"} aria-expanded={!isFolded}
+                <button type="button" contentEditable={false} suppressContentEditableWarning aria-label={t(isFolded ? "Expandir" : "Recolher")} aria-expanded={!isFolded}
                     onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.toggleFold(index)} tabIndex={-1}
                     style={{ height: "1lh", ...island }}
                     className={`absolute -left-[15px] top-0 w-5 flex items-center justify-center select-none text-light-text-color-tertiary dark:text-dark-text-color-tertiary after:absolute after:-inset-y-2 after:-left-3 after:right-0 after:content-[''] transition-opacity duration-200 ${headingSize(line.heading)} ${isFolded ? "opacity-100" : ""} ${!isFolded && foldable ? (active ? "opacity-60" : "opacity-0 group-hover:opacity-60") : ""} ${foldable ? "" : "opacity-0 pointer-events-none"}`}>
@@ -417,6 +418,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     });
     // After a row edit, the rows slide to their new places (150ms) instead of jumping: each one is first held at
     // its old place with a transform, then released (FLIP). New rows just appear; the toolbar glides on its own.
+    // Not when the caret's own row is one that moves (the first row deleted: the next one takes its place): the
+    // slide would carry the caret along, from the top down to the row's old place and back up. The rows just
+    // take their new places, and the caret is where it ends up from the first frame.
     useLayoutEffect(() => {
         const from = flipFrom.current;
         if (!from) return;
@@ -426,15 +430,13 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             const box = rowBoxes.current[i], was = from.get(keys[i]);
             if (!box || was === undefined || hidden.has(i)) return;
             const delta = was - box.offsetTop;
-            if (!delta) return;
-            box.style.transition = "none";
-            box.style.transform = `translateY(${delta}px)`;
-            moved.push(box);
+            if (delta) moved.push([box, delta]);
         });
-        if (!moved.length) return;
-        void moved[0].offsetHeight; // the old place takes hold before the transition starts
-        moved.forEach((box) => { box.style.transition = "transform 150ms cubic-bezier(0.23, 1, 0.32, 1)"; box.style.transform = ""; });
-        setTimeout(() => moved.forEach((box) => { box.style.transition = ""; }), 200);
+        if (!moved.length || moved.some(([box]) => box === rowBoxes.current[activeRow.current])) return;
+        moved.forEach(([box, delta]) => { box.style.transition = "none"; box.style.transform = `translateY(${delta}px)`; });
+        void moved[0][0].offsetHeight; // the old place takes hold before the transition starts
+        moved.forEach(([box]) => { box.style.transition = "transform 150ms cubic-bezier(0.23, 1, 0.32, 1)"; box.style.transform = ""; });
+        setTimeout(() => moved.forEach(([box]) => { box.style.transition = ""; }), 200);
     });
 
     // Where a DOM point falls, as [row, text offset]. A point outside a row's text (on a marker, between rows or on
@@ -546,6 +548,29 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         syncFromDom();
     };
 
+    // Backspace at a row's start: drop its list marker, then its indent, then join it to the row above. An empty
+    // first row goes away instead, and the caret moves to the start of the new first row.
+    const backspaceAtStart = (index) => {
+        const line = parseLine(lines[index]);
+        const next = [...lines];
+        if (line.list) {
+            next[index] = line.indent + line.align + line.text;
+            update(next, { index, caret: 0 });
+        } else if (line.indent) {
+            next[index] = lines[index].slice(1);
+            update(next, { index, caret: 0 });
+        } else if (index > 0) {
+            next[index - 1] = lines[index - 1] + line.text;
+            next.splice(index, 1);
+            ids.current.splice(index, 1);
+            update(next, { index: index - 1, caret: rowLength(index - 1) });
+        } else if (!plain(line.text).length && lines.length > 1) {
+            next.splice(0, 1);
+            ids.current.splice(0, 1);
+            update(next, { index: 0, caret: 0 });
+        }
+    };
+
     // Edits that cross rows, from the browser's beforeinput (Enter and Backspace arrive here on phones too).
     const onBeforeInput = (e) => {
         if (parked.current) unpark(true); // typed before the keyboard was up: the edit goes where the caret was tapped
@@ -581,34 +606,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             }
             replaceSpan(span, ["", ""], [null, nextMarker(line)]);
         } else if (type.startsWith("delete")) {
-            if (span.multi) {
+            // Any selection, one row or many: WebKit deleting a row's whole text removes the row's text element
+            // itself (and prunes its empty parent), leaving a row React no longer owns: a ghost row that takes no edits.
+            if (!span.collapsed) {
                 e.preventDefault();
                 replaceSpan(span, [""]);
-            } else if (span.collapsed && offset === 0 && type.endsWith("Backward")) {
-                // Backspace at a row start: drop its list marker, then its indent, then join it to the row above.
-                if (line.list) {
-                    e.preventDefault();
-                    next[index] = line.indent + line.align + line.text;
-                    update(next, { index, caret: 0 });
-                } else if (line.indent) {
-                    e.preventDefault();
-                    next[index] = lines[index].slice(1);
-                    update(next, { index, caret: 0 });
-                } else if (index > 0) {
-                    e.preventDefault();
-                    next[index - 1] = lines[index - 1] + line.text;
-                    next.splice(index, 1);
-                    ids.current.splice(index, 1);
-                    update(next, { index: index - 1, caret: rowLength(index - 1) });
-                } else {
-                    e.preventDefault();
-                    // An empty first row goes away, and the caret moves to the start of the new first row.
-                    if (plain(line.text).length || lines.length === 1) return;
-                    next.splice(0, 1);
-                    ids.current.splice(0, 1);
-                    update(next, { index: 0, caret: 0 });
-                }
-            } else if (span.collapsed && offset === rowLength(index) && type.endsWith("Forward")) {
+            } else if (offset === 0 && type.endsWith("Backward")) {
+                e.preventDefault();
+                backspaceAtStart(index);
+            } else if (offset === rowLength(index) && type.endsWith("Forward")) {
                 e.preventDefault();
                 if (index === lines.length - 1) return;
                 next[index] = lines[index] + parseLine(lines[index + 1]).text;
@@ -616,7 +622,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 ids.current.splice(index + 1, 1);
                 update(next, { index, caret: offset });
             }
-        } else if (span.multi && (type === "insertText" || type === "insertReplacementText")) {
+        } else if (!span.collapsed && (type === "insertText" || type === "insertReplacementText")) {
             e.preventDefault();
             replaceSpan(span, [escapeHtml(e.data ?? e.dataTransfer?.getData("text/plain") ?? "")]);
         }
@@ -804,6 +810,15 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         if (e.key === "Tab") {
             e.preventDefault();
             changeIndent(e.shiftKey ? -1 : 1);
+        } else if (e.key === "Backspace" && !e.nativeEvent.isComposing) {
+            // WebKit sends no beforeinput for a Backspace at the very start of the editable (nothing before the
+            // caret to delete, so it does nothing at all), which is the first row's start: handled from the key.
+            if (parked.current) unpark(true);
+            const span = getSpan();
+            if (span?.collapsed && span.start[0] === 0 && span.start[1] === 0) {
+                e.preventDefault();
+                backspaceAtStart(0);
+            }
         }
     };
 
@@ -1121,7 +1136,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             setCopied(true);
         } catch {
             setOptionsOpen(false);
-            onMessage("Não foi possível copiar");
+            onMessage(t("Não foi possível copiar"));
         }
     };
     // "Buscar na nota": a search bar over the header. Matches are painted with the CSS Custom Highlight API (index.css),
@@ -1194,7 +1209,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // What the open menu should light up: the caret line's heading/list marker; styles come from the selection.
     const activeLine = parseLine(lines[activeRow.current] ?? "");
     const activeList = activeLine.list.replace(/\[[xX]\]/, "[ ]");
-    const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)]");
+    const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] active:bg-[var(--primary-color)] active:text-[var(--primary-color-fg)]");
 
     // Header buttons share one size; undo/redo/options sit on the secondary background.
     const headerButton = "w-11 h-11 shrink-0 grid place-items-center rounded-full transition-[transform,background-color,color,opacity] duration-150 active:scale-90";
@@ -1234,7 +1249,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             setActiveIndex(0);
                             focusWithCaret(rangeAt(rows.current[0], 0));
                         }}
-                        placeholder="Título"
+                        placeholder={t("Título")}
                         // Styled like the big heading inside the note.
                         className={`${headingSize("#")} text-light-text-color-primary dark:text-dark-text-color-primary bg-transparent outline-none w-full min-w-0 ${hideCaret ? "caret-transparent" : ""}`}
                     />
@@ -1243,14 +1258,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         aria-disabled, not disabled: a disabled button lets the press through to the header, which took
                         the focus (and the keyboard) away. */}
                     {[[-1, "Desfazer", NiUndo, history.i === 0], [1, "Refazer", NiRedo, history.i === history.stack.length - 1]].map(([step, label, Icon, off]) => (
-                        <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => !off && go(step)} aria-disabled={off} aria-label={label} title={label}
+                        <button key={step} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => !off && go(step)} aria-disabled={off} aria-label={t(label)} title={t(label)}
                             className={`${headerButton} text-[22px] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary aria-disabled:opacity-40 aria-disabled:active:scale-100 aria-disabled:hover:bg-light-bg-color-secondary dark:aria-disabled:hover:bg-dark-bg-color-primary aria-disabled:cursor-default`}>
                             <Icon />
                         </button>
                     ))}
 
                     <div ref={optionsRef} className="relative shrink-0">
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOptionsOpen((o) => !o); setCopied(false); }} aria-label="Opções" aria-expanded={optionsOpen}
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOptionsOpen((o) => !o); setCopied(false); }} aria-label={t("Opções")} aria-expanded={optionsOpen}
                             className={`${headerButton} text-[22px] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary`}>
                             <NiMore />
                         </button>
@@ -1261,7 +1276,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 <button key={label} type="button" disabled={(needsSaved && !saved) || off}
                                     onClick={() => { if (!stayOpen) setOptionsOpen(false); if (needsSaved) flush(); run(); }}
                                     className={`flex items-center justify-between text-sm py-3 px-4 duration-200 disabled:opacity-40 disabled:pointer-events-none ${danger ? "text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500" : "hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary"}`}>
-                                    <span>{label}</span>
+                                    <span>{t(label)}</span>
                                     <Icon size={18} />
                                 </button>
                             ))}
@@ -1282,8 +1297,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     spellCheck={false}
                                     enterKeyHint="search"
                                     name="note-search"
-                                    aria-label="Buscar na nota"
-                                    placeholder="Buscar na nota"
+                                    aria-label={t("Buscar na nota")}
+                                    placeholder={t("Buscar na nota")}
                                     value={query}
                                     onChange={(e) => { setQuery(e.target.value); setCurrent(0); }}
                                     onKeyDown={(e) => {
@@ -1302,12 +1317,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 )}
                             </div>
                             {[[-1, "Anterior", NiChevronUp], [1, "Próximo", NiChevronDown]].map(([by, label, Icon]) => (
-                                <button key={by} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => step(by)} disabled={matches.length < 2} aria-label={label} title={label}
+                                <button key={by} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => step(by)} disabled={matches.length < 2} aria-label={t(label)} title={t(label)}
                                     className={`${headerButton} text-[22px] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary hover:bg-light-bg-color-tertiary dark:hover:bg-dark-bg-color-tertiary disabled:opacity-40 disabled:pointer-events-none`}>
                                     <Icon />
                                 </button>
                             ))}
-                            <button type="button" onClick={closeSearch} aria-label="Fechar busca"
+                            <button type="button" onClick={closeSearch} aria-label={t("Fechar busca")}
                                 className={`${headerButton} text-[22px] text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
                                 <NiClose />
                             </button>
@@ -1318,12 +1333,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         this showed through the search's fade-in as a flash of the check. */}
                     {typing && !searching ? (
                         // onMouseDown preventDefault: blurring on press would swap this back to the X before the click lands.
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={done} aria-label="Concluir"
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={done} aria-label={t("Concluir")}
                             className={`${headerButton} text-[22px] bg-[var(--primary-color)] text-[var(--primary-color-fg)]`}>
                             <NiCheck />
                         </button>
                     ) : (
-                        <button type="button" onClick={close} disabled={closing} aria-label="Fechar"
+                        <button type="button" onClick={close} disabled={closing} aria-label={t("Fechar")}
                             className={`${headerButton} text-[22px] text-light-text-color-tertiary bg-light-bg-color-secondary dark:text-dark-text-color-tertiary dark:bg-dark-bg-color-primary dark:hover:bg-dark-bg-color-tertiary hover:bg-light-bg-color-tertiary hover:text-light-text-color-primary dark:hover:text-dark-text-color-primary`}>
                             <NiClose />
                         </button>
@@ -1369,17 +1384,17 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         onMouseDown={(e) => e.preventDefault()}>
                         <div ref={toolbarRef} className={`relative w-max ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary flex items-center py-2 px-2 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary text-light-text-color-primary dark:text-dark-text-color-primary rounded-full shadow-lg gap-1 ${docked ? "" : "rounded-tl-none"}`}>
                             {[["list", "Lista", NiListBullet], ["style", "Estilo", NiBold], ["heading", "Título", NiHeading], ["clip", "Copiar, recortar, colar", NiCut], ["indent", "Recuo", NiIndentMore]].map(([id, label, Icon]) => (
-                                <button key={id} ref={(el) => { centerRefs.current[id] = el; }} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={label} aria-expanded={menuOpen === id}
+                                <button key={id} ref={(el) => { centerRefs.current[id] = el; }} type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => setMenuOpen((o) => (o === id ? null : id))} aria-label={t(label)} aria-expanded={menuOpen === id}
                                     className={`w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors ${menuOpen === id ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)] "}`}>
                                     <Icon />
                                 </button>
                             ))}
                             {/* Opens a centered dialog; the keyboard goes down first so the dialog has the whole screen. */}
-                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setMenuOpen(null); document.activeElement?.blur(); setRemindOpen(true); }} aria-label="Lembrete" title="Lembrete"
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setMenuOpen(null); document.activeElement?.blur(); setRemindOpen(true); }} aria-label={t("Lembrete")} title={t("Lembrete")}
                                 className="w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
                                 <NiClock />
                             </button>
-                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label="Fechar barra" title="Fechar barra"
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label={t("Fechar barra")} title={t("Fechar barra")}
                                 className="w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
                                 <NiChevronDown />
                             </button>
@@ -1389,29 +1404,29 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 <div onAnimationEnd={() => { if (menuClosing) setShownMenu(null); }} style={centered && centerRefs.current[menu] ? { left: centerRefs.current[menu].offsetLeft + centerRefs.current[menu].offsetWidth / 2 } : undefined}
                                     className={`flex absolute ${centered ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out pointer-events-none" : "animate-menu-in"} ${docked ? (centered ? "origin-bottom" : "origin-bottom-left") : centered ? "origin-top" : "origin-top-left"}`}>
                                     {menu === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
-                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} title={label} aria-label={label} aria-pressed={activeList === prefix}
+                                        <button key={prefix} type="button" onClick={() => applyList(prefix)} title={t(label)} aria-label={t(label)} aria-pressed={activeList === prefix}
                                             className={`text-[22px] px-5 ${option(activeList === prefix)}`}><Icon /></button>
                                     ))}
                                     {menu === "style" && STYLES.map(({ label, icon: Icon, command }) => (
-                                        <button key={command} type="button" onClick={() => applyStyle(command)} title={label} aria-label={label} aria-pressed={document.queryCommandState(command)}
+                                        <button key={command} type="button" onClick={() => applyStyle(command)} title={t(label)} aria-label={t(label)} aria-pressed={document.queryCommandState(command)}
                                             className={`text-[22px] px-5 ${option(document.queryCommandState(command))}`}><Icon /></button>
                                     ))}
                                     {menu === "clip" && [["copy", "Copiar", NiCopy], ["cut", "Recortar", NiCut], ["paste", "Colar", NiPaste]].map(([action, label, Icon]) => (
-                                        <button key={action} type="button" onClick={() => clipboardAction(action)} title={label} aria-label={label}
+                                        <button key={action} type="button" onClick={() => clipboardAction(action)} title={t(label)} aria-label={t(label)}
                                             className={`text-[22px] px-5 ${option(false)}`}><Icon /></button>
                                     ))}
                                     {menu === "align" && ALIGNS.map(({ label, icon: Icon, token }) => (
-                                        <button key={token} type="button" onClick={() => applyAlign(token)} title={label} aria-label={label} aria-pressed={activeLine.align === token}
+                                        <button key={token} type="button" onClick={() => applyAlign(token)} title={t(label)} aria-label={t(label)} aria-pressed={activeLine.align === token}
                                             className={`text-[22px] px-5 ${option(activeLine.align === token)}`}><Icon /></button>
                                     ))}
                                     {/* Less on the left, more on the right (Tab / Shift+Tab too). Stays open for repeated steps. */}
                                     {menu === "indent" && [[-1, "Diminuir recuo", NiIndentLess, !activeLine.indent], [1, "Aumentar recuo", NiIndentMore, activeLine.indent.length >= MAX_INDENT]].map(([step, label, Icon, off]) => (
-                                        <button key={step} type="button" onClick={() => changeIndent(step)} disabled={off} title={label} aria-label={label}
+                                        <button key={step} type="button" onClick={() => changeIndent(step)} disabled={off} title={t(label)} aria-label={t(label)}
                                             className={`text-[22px] px-5 ${option(false)} disabled:pointer-events-none [&:disabled>svg]:opacity-30`}><Icon /></button>
                                     ))}
                                     {menu === "heading" &&HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
-                                            className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{label}</button>
+                                            className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{t(label)}</button>
                                     ))}
                                 </div>
                             )}
@@ -1471,9 +1486,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             </div>
         </div>
             {remindShown && (
-                <Modal icon={NiClock} closing={remindClosing} title="Lembrete" onClose={() => setRemindOpen(false)}>
+                <Modal icon={NiClock} closing={remindClosing} title={t("Lembrete")} onClose={() => setRemindOpen(false)}>
                     <ReminderCalendar />
-                    <ModalButtons confirm="Salvar" onCancel={() => setRemindOpen(false)} onConfirm={() => setRemindOpen(false)} />
+                    <ModalButtons confirm={t("Salvar")} onCancel={() => setRemindOpen(false)} onConfirm={() => setRemindOpen(false)} />
                 </Modal>
             )}
         </>

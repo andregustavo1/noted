@@ -1,4 +1,5 @@
 import { supabase, unwrap } from "./supabase";
+import { t } from "./i18n";
 
 // Task reminders arrive as Web Push (supabase/functions/send-reminders). iOS only offers it to the home-screen app,
 // and it needs the service worker, which only production builds register (main.jsx).
@@ -18,7 +19,7 @@ const toBytes = (base64url) => Uint8Array.from(atob(base64url.replace(/-/g, "+")
 export const enablePush = async () => {
     if ((await Notification.requestPermission()) !== "granted") return false;
     const reg = await registration();
-    if (!reg) throw new Error("Notificações só funcionam no app instalado (versão publicada).");
+    if (!reg) throw new Error(t("Notificações só funcionam no app instalado (versão publicada)."));
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(KEY) });
     const { endpoint, keys } = sub.toJSON();
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;

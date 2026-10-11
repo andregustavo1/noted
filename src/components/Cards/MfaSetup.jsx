@@ -3,6 +3,7 @@ import { NiLock, NiUnlock } from "../Icons/NotedIcons";
 import { createPortal } from "react-dom";
 import CodeInput from "../Input/CodeInput";
 import Switch from "../Input/Switch";
+import { t } from "../../lib/i18n";
 import Modal, { ModalButtons, useLinger } from "./Modal";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
@@ -27,7 +28,7 @@ const MfaSetup = ({ dark }) => {
             await fn();
         } catch (e) {
             console.error(e);
-            setError(navigator.onLine ? "Algo deu errado, tente novamente" : "Sem conexão");
+            setError(t(navigator.onLine ? "Algo deu errado, tente novamente" : "Sem conexão"));
         }
         setBusy(false);
     };
@@ -48,7 +49,7 @@ const MfaSetup = ({ dark }) => {
         const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: enrolling.id, code: value });
         if (error) {
             setCode("");
-            setError("Código inválido");
+            setError(t("Código inválido"));
             return;
         }
         setEnrolling(null);
@@ -72,26 +73,26 @@ const MfaSetup = ({ dark }) => {
 
     return (
         <div className="grid mt-6">
-            <p className="font-medium text-lg">Verificação 2FA</p>
+            <p className="font-medium text-lg">{t("Verificação 2FA")}</p>
 
-            <Switch dark={dark} on={Boolean(factor || enrolling)} onToggle={toggle} label="Verificação em duas etapas" icons={[NiUnlock, NiLock]} />
+            <Switch dark={dark} on={Boolean(factor || enrolling)} onToggle={toggle} label={t("Verificação em duas etapas")} icons={[NiUnlock, NiLock]} />
 
             {error && !enrolling && <p className="text-red-500 text-sm mt-1 text-center">{error}</p>}
 
             {/* On body: the settings panel slides with a transform, which would pin a fixed overlay to the panel. */}
             {dialogShown && createPortal(
-                <Modal danger closing={dialogClosing} title="Desativar 2FA?" onClose={() => setConfirmOff(false)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3">O login vai pedir só a senha.</p>
-                    <ModalButtons danger confirm="Desativar" onCancel={() => setConfirmOff(false)} onConfirm={disable} />
+                <Modal danger closing={dialogClosing} title={t("Desativar 2FA?")} onClose={() => setConfirmOff(false)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3">{t("O login vai pedir só a senha.")}</p>
+                    <ModalButtons danger confirm={t("Desativar")} onCancel={() => setConfirmOff(false)} onConfirm={disable} />
                 </Modal>,
                 document.body
             )}
 
             {setupShown && createPortal(
-                <Modal icon={NiLock} closing={setupClosing} title="Ativar 2FA" onClose={() => setEnrolling(null)}>
+                <Modal icon={NiLock} closing={setupClosing} title={t("Ativar 2FA")} onClose={() => setEnrolling(null)}>
                     <img src={setupShown.qr_code} alt="QR code" className="w-44 h-44 mx-auto mt-4 bg-white rounded-lg p-2" />
-                    <a href={setupShown.uri} className="grid place-items-center w-full h-11 mt-4 rounded-full font-semibold bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary">Adicionar ao app Senhas</a>
-                    <p className="text-sm mt-4 text-light-text-color-tertiary dark:text-dark-text-color-tertiary">Ou digite a chave (guarde uma cópia):</p>
+                    <a href={setupShown.uri} className="grid place-items-center w-full h-11 mt-4 rounded-full font-semibold bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary">{t("Adicionar ao app Senhas")}</a>
+                    <p className="text-sm mt-4 text-light-text-color-tertiary dark:text-dark-text-color-tertiary">{t("Ou digite a chave (guarde uma cópia):")}</p>
                     <p className="font-mono text-sm break-all select-all mt-1">{setupShown.secret}</p>
                     <CodeInput
                         value={code}
@@ -100,7 +101,7 @@ const MfaSetup = ({ dark }) => {
                         className="w-full mt-4 bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary"
                     />
                     <p className="text-red-500 text-sm mt-1">&nbsp;{error}</p>
-                    <ModalButtons confirm="Ativar" disabled={busy || code.length !== 6} onCancel={() => setEnrolling(null)} onConfirm={() => confirm(code)} />
+                    <ModalButtons confirm={t("Ativar")} disabled={busy || code.length !== 6} onCancel={() => setEnrolling(null)} onConfirm={() => confirm(code)} />
                 </Modal>,
                 document.body
             )}

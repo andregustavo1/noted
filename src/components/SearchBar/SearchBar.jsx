@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { t } from "../../lib/i18n";
 import { NiClose, NiSearch } from "../Icons/NotedIcons";
 
 // What the last press landed on; it fires before the input's blur.
@@ -73,8 +74,9 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden, onOpenChange, e
                 <div className={`relative isolate flex items-center h-11 px-4 w-full transition-transform duration-300 ease-in-out ${toggleSearch ? "translate-x-0" : "translate-x-[calc(100%-36px)] md:translate-x-0"}`}>
                     <div className={`absolute inset-0 -z-10 rounded-3xl shadow-sm bg-light-bg-color-primary dark:bg-dark-bg-color-primary transition-[clip-path] duration-300 ease-in-out ${toggleSearch ? "[clip-path:inset(-8px_-8px_-8px_-8px_round_1.5rem)]" : "[clip-path:inset(-8px_-8px_-8px_36px_round_1.5rem)] md:[clip-path:inset(-8px_-8px_-8px_-8px_round_1.5rem)]"}`} />
                     {/* w-5: the slot stays 20px (the closed bar shows px-4 + 20px = 36px, see translate and clip-path above);
-                        the 24px icon overflows it evenly, its glyph is drawn smaller inside its box. */}
-                    <div className="w-5 grid place-items-center cursor-pointer shrink-0"
+                        the 24px icon overflows it evenly, its glyph is drawn smaller inside its box. The tap target (after:)
+                        spans the bar's height and the px-4 on both sides: the bar's padding, and the input's own. */}
+                    <div className="relative self-stretch w-5 grid place-items-center cursor-pointer shrink-0 after:absolute after:inset-y-0 after:-inset-x-4 after:content-['']"
                     onMouseDown={(e) => e.preventDefault()} // keeps input focused so blur doesn't close before the click toggles
                     onClick={() => {
                         // Closing: leaving the field runs closeSearch (clears, closes the bar). Without focus (the
@@ -95,7 +97,7 @@ const SearchBar = ({ value, onChange, onClearSearch, logoHidden, onOpenChange, e
                         type="text"
                         autoComplete="off"
                         name="search"
-                        placeholder="Buscar notas"
+                        placeholder={t("Buscar notas")}
                         className={`px-4 min-w-0 flex-1 outline-none bg-transparent ${sliding ? "caret-transparent" : "caret-[var(--primary-color)]"}`}
                         value={value}
                         onChange={onChange}

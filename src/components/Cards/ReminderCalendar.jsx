@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { animateSpring, project, tracker } from "../../lib/spring";
 import { NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiRestart } from "../Icons/NotedIcons";
+import { locale, t, weekdays } from "../../lib/i18n";
 
-const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 const REPEATS = [["", "Nunca"], ["d", "Diária"], ["w", "Semanal"], ["m", "Mensal"], ["2m", "2 meses"], ["3m", "3 meses"], ["6m", "6 meses"], ["y", "Anual"]];
 const DRAG = 0.7; // the strip moves this much per px of finger: a heavier drag
 const sameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
@@ -65,7 +65,7 @@ const Wheel = ({ count, value, onChange, format = String, label, loop = true, wi
         if (!step) onTapSelected?.();
     };
     return (
-        <div role="spinbutton" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={count - 1}
+        <div role="spinbutton" aria-label={t(label)} aria-valuenow={value} aria-valuemin={0} aria-valuemax={count - 1}
             className={`relative ${width} overflow-hidden touch-none cursor-grab`} style={{ height: ROW * 3 }}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
             onWheel={(e) => settle(Math.round(pos.current) + Math.sign(e.deltaY))}>
@@ -108,7 +108,7 @@ export default function ReminderCalendar({ value, onChange }) {
     // The month shown, as its first day. new Date(y, m ± 1) rolls the year over by itself.
     const [month, setMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth()));
     const shift = (n) => new Date(month.getFullYear(), month.getMonth() + n);
-    const title = `${month.toLocaleDateString("pt-BR", { month: "long" })} ${month.getFullYear()}`;
+    const title = `${month.toLocaleDateString(locale(), { month: "long" })} ${month.getFullYear()}`;
     const pick = (day) => { setSelected(day); onChange?.(day); };
 
     // Carousel: the previous, current and next months side by side on a strip, moved by `offset` px from centered.
@@ -171,12 +171,12 @@ export default function ReminderCalendar({ value, onChange }) {
             <div className="flex items-center justify-between mb-3">
                 <span className="font-semibold pl-2.5">{title[0].toUpperCase() + title.slice(1)}</span>
                 <div className="flex">
-                    <button type="button" onClick={() => go(-1)} aria-label="Mês anterior" className={arrow}><NiChevronRight className="rotate-180" /></button>
-                    <button type="button" onClick={() => go(1)} aria-label="Próximo mês" className={arrow}><NiChevronRight /></button>
+                    <button type="button" onClick={() => go(-1)} aria-label={t("Mês anterior")} className={arrow}><NiChevronRight className="rotate-180" /></button>
+                    <button type="button" onClick={() => go(1)} aria-label={t("Próximo mês")} className={arrow}><NiChevronRight /></button>
                 </div>
             </div>
             <div className="grid grid-cols-7 text-center mb-1">
-                {WEEKDAYS.map((d, i) => <span key={i} className="text-xs font-semibold opacity-60 pb-1">{d}</span>)}
+                {weekdays().map((d, i) => <span key={i} className="text-xs font-semibold opacity-60 pb-1">{d}</span>)}
             </div>
             <div ref={view} className="overflow-hidden touch-pan-y transition-[height] duration-300"
                 onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onClickCapture={onClickCapture}>
@@ -196,17 +196,17 @@ export default function ReminderCalendar({ value, onChange }) {
                         <Wheel onTapSelected={close} label="Minuto" count={60} value={minute} onChange={setMinute} format={pad} />
                     </div>
                   )],
-                  ["repeat", NiRestart, "Repetir", REPEATS.find(([k]) => k === repeat)[1], toggle("repeat"), (
+                  ["repeat", NiRestart, "Repetir", t(REPEATS.find(([k]) => k === repeat)[1]), toggle("repeat"), (
                     <div key="wheels" className={popup}>
                         {band}
                         <Wheel onTapSelected={close} label="Repetir" count={REPEATS.length} loop={false} width="w-28" value={REPEATS.findIndex(([k]) => k === repeat)}
-                            onChange={(i) => setRepeat(REPEATS[i][0])} format={(i) => REPEATS[i][1]} />
+                            onChange={(i) => setRepeat(REPEATS[i][0])} format={(i) => t(REPEATS[i][1])} />
                     </div>
                   )]].map(([id, Icon, label, shown, onClick, below]) => (
                     <div key={id} data-picker>
                     <label onClick={onClick} className="relative flex items-center gap-2.5 py-1 px-2.5">
                         <Icon className="text-[22px] opacity-60 shrink-0" />
-                        <span className="flex-1">{label}</span>
+                        <span className="flex-1">{t(label)}</span>
                         <span className="text-[var(--primary-color)]">{shown}</span>
                         <span className="flex flex-col -ml-1.5 text-[13px] opacity-60 -space-y-[6px]"><NiChevronUp /><NiChevronDown /></span>
                     </label>

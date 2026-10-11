@@ -5,6 +5,7 @@ import Login from "./pages/Login/Login"
 import MfaCode from "./pages/Login/MfaCode";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { isSupabaseConfigured } from "./lib/supabase";
+import { t } from "./lib/i18n";
 
 const RequireAuth = ({ children }) => {
     const { session, needsMfa, loading } = useAuth();
@@ -34,9 +35,9 @@ const App = () => {
     if (!isSupabaseConfigured) {
         return (
             <div className="max-w-[480px] mx-auto px-4 py-20 text-center">
-                <h1 className="text-2xl font-bold">Supabase não configurado</h1>
+                <h1 className="text-2xl font-bold">{t("Supabase não configurado")}</h1>
                 <p className="mt-4 text-light-text-color-secondary dark:text-dark-text-color-secondary">
-                    Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nas variáveis de ambiente.
+                    {t("Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nas variáveis de ambiente.")}
                 </p>
             </div>
         )

@@ -1,10 +1,11 @@
 import { supabase } from "./supabase";
+import { locale, setLanguage } from "./i18n";
 
 // User settings live on the account (Supabase user_metadata.settings), so every device gets the same ones.
 // localStorage keeps a copy so the page can paint with them before the account loads (see index.html).
 // activeCategory is the chip selected on the dashboard, kept so the app reopens on the same one; categoryOrder the
-// names in the order the user dragged the chips into (Home.jsx).
-export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", cutCorners: false, fixedToolbar: false, sortBy: "date", sortDir: "desc", activeCategory: "", categoryOrder: [] };
+// names in the order the user dragged the chips into (Home.jsx); language "pt" or "en" (lib/i18n.js).
+export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", cutCorners: false, fixedToolbar: false, sortBy: "date", sortDir: "desc", activeCategory: "", categoryOrder: [], language: "pt" };
 
 export const readLocalSettings = () => {
     try {
@@ -22,6 +23,7 @@ const legacyColor = () => {
 };
 
 export const applySettings = (settings) => {
+    setLanguage(settings.language);
     const root = document.documentElement.style;
     root.setProperty("--primary-color", settings.primaryColor);
     root.setProperty("--primary-color-fg", settings.primaryColorFg);
@@ -50,7 +52,7 @@ export const saveSettings = async (settings) => {
 export const sortNotes = (notes, { sortBy, sortDir } = DEFAULT_SETTINGS) => {
     const dir = sortDir === "asc" ? 1 : -1;
     const byField = sortBy === "name"
-        ? (a, b) => (a.title || "").localeCompare(b.title || "", "pt-BR", { sensitivity: "base" }) || a.updated_at.localeCompare(b.updated_at)
+        ? (a, b) => (a.title || "").localeCompare(b.title || "", locale(), { sensitivity: "base" }) || a.updated_at.localeCompare(b.updated_at)
         : (a, b) => a.updated_at.localeCompare(b.updated_at);
     return [...notes].sort((a, b) => (b.is_pinned - a.is_pinned) || dir * byField(a, b));
 };

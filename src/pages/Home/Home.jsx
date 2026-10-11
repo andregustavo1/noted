@@ -14,13 +14,14 @@ import { fetchNotes } from "../../lib/notes";
 import { fetchCategories } from "../../lib/categories";
 import Modal, { ModalButtons, useLinger } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
+import { locale, t } from "../../lib/i18n";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
 import { flush, flushedSince } from "../../lib/sync";
 import { animateSpring, project, rubber, tracker } from "../../lib/spring";
 
 
-const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
+const formatDate = (iso) => new Date(iso).toLocaleDateString(locale());
 
 // Cards glide to their new slots instead of jumping (View Transitions API, styled in index.css).
 // The cards are only named while a transition runs: a named element becomes a stacking context, which would
@@ -31,11 +32,16 @@ const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 // of it (its layers sit above the whole page), so the update just applies. Home sets this flag on every render.
 let reorders = 0;
 let notesCovered = false;
-const animateNotes = (update) => {
+// recolored: the id of a card whose colors change (pin/unpin). Its old snapshot isn't faded out over the new one: the
+// old light text would ghost over the new dark text that sits on the same spot, worst on the thin 80% preview lines,
+// so they looked late next to the title. Its box still glides; the colors switch at once, all together.
+const animateNotes = (update, recolored) => {
     if (!document.startViewTransition || notesCovered) return update();
     reorders++;
     document.documentElement.classList.add("reordering");
-    const done = () => { if (--reorders === 0) document.documentElement.classList.remove("reordering"); };
+    const cut = recolored && document.head.appendChild(document.createElement("style"));
+    if (cut) cut.textContent = `::view-transition-old(note-${recolored}) { animation: none; opacity: 0; } ::view-transition-new(note-${recolored}) { animation: none; }`;
+    const done = () => { cut?.remove(); if (--reorders === 0) document.documentElement.classList.remove("reordering"); };
     // The snapshots are flat images clipped by the image pair, so a card whose corners change (pin/unpin, column
     // change) would jump at the end; the pair's clip is tweened from the old corners to the new ones instead.
     const corners = () => [...document.querySelectorAll(".note-card")].map((el) => {
@@ -240,8 +246,18 @@ const Home = () => {
         [panelRef, avatarRideRef, configBackdropRef].forEach((r) => r.current.style.setProperty("--cfg", p));
         panelLayerRef.current.style.visibility = p > 0 ? "visible" : "";
     }
+    // The panel's profile row (name and email beside the avatar that rides in from the page's header) is only there
+    // while any of the avatar is on screen, and it sits level with the avatar: moved up by the page's scroll, so
+    // cut at the top it still rides in and the row shows cut with it. Opened with the page scrolled clean past
+    // the avatar, the panel starts at "Configurações" instead, and the avatar stays out of sight until the panel
+    // has closed. profile: how far up the row goes (0 or less), or null for no row.
+    const [profile, setProfile] = useState(0)
     const setConfig = (open, velocity = 0) => {
         if (open && !onConfig) {
+            const ride = avatarRideRef.current;
+            const shown = avatarRef.current.getBoundingClientRect().bottom > 0;
+            setProfile(shown ? -Math.max(0, Math.round(window.scrollY)) : null);
+            ride.style.visibility = shown ? "" : "hidden";
             // The avatar ends on the panel's left padding (px-5 = 20px), wherever the header sits.
             const width = panelRef.current.offsetWidth;
             const panelLeft = document.documentElement.clientWidth - width;
@@ -249,7 +265,7 @@ const Home = () => {
         }
         setOnConfig(open);
         stopCfg.current?.();
-        stopCfg.current = animateSpring({ from: cfg.current, to: open ? 1 : 0, velocity, onFrame: paintCfg });
+        stopCfg.current = animateSpring({ from: cfg.current, to: open ? 1 : 0, velocity, onFrame: paintCfg, onDone: open ? undefined : () => { avatarRideRef.current.style.visibility = ""; } });
     }
     const toggleConfig = () => setConfig(!onConfig)
 
@@ -373,7 +389,7 @@ const Home = () => {
             .then(({ saved, dropped, remaining, offline }) => {
                 saved.forEach(replaceNote);
                 dropped.forEach(({ op }) => {
-                    const text = FAILURE_MESSAGE[op.type] ?? "Não foi possível salvar a categoria";
+                    const text = t(FAILURE_MESSAGE[op.type] ?? "Não foi possível salvar a categoria");
                     setMessage(text);
                     if (op.type === "note" && op.id === editorNoteId.current) setEditorError(text);
                 });
@@ -614,11 +630,11 @@ const Home = () => {
 
     // The card moves on tap (pinning doesn't touch updated_at).
     const handlePin = (note) => {
-        animateNotes(() => changeNote(note.id, { is_pinned: !note.is_pinned }));
+        animateNotes(() => changeNote(note.id, { is_pinned: !note.is_pinned }), note.id);
     };
 
     const handleDuplicate = (note) => {
-        animateNotes(() => addNote({ title: note.title ? `${note.title} (cópia)` : "", content: note.content, category: note.category }));
+        animateNotes(() => addNote({ title: note.title ? `${note.title} (${t("cópia")})` : "", content: note.content, category: note.category }));
     };
 
     const handleSetCategory = (note, category) => {
@@ -671,7 +687,7 @@ const Home = () => {
                     <div ref={avatarRef} className="relative">
                         <ProfileInfo name={userName} onConfigClick={toggleConfig}></ProfileInfo>
                         {/* With the panel open the avatar sits at the start of the name: a pencil there shows the name is editable. */}
-                        <button type="button" aria-label="Editar nome" tabIndex={onConfig ? 0 : -1}
+                        <button type="button" aria-label={t("Editar nome")} tabIndex={onConfig ? 0 : -1}
                             onClick={(e) => { e.stopPropagation(); setEditNameSignal((n) => n + 1); }}
                             className={`absolute -bottom-1 -right-1 w-5 h-5 grid place-items-center rounded-full bg-light-bg-color-primary dark:bg-dark-bg-color-primary text-light-text-color-secondary dark:text-dark-text-color-tertiary shadow-sm text-[11px] transition-[opacity,transform] duration-300 ${onConfig ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"}`}>
                             <NiEdit size={12} />
@@ -682,7 +698,7 @@ const Home = () => {
 
             <div {...categoryRow} data-category-row className="flex items-center gap-2 px-4 pt-3 pb-6 -mt-3 -mb-6 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
                 <CategoryBar
-                    title={"Todas"}
+                    title={t("Todas")}
                     quantity={notes.length}
                     isActive={!currentCategory}
                     onClick={() => setActiveCategory("")}
@@ -700,7 +716,7 @@ const Home = () => {
                 ))}
 
                 <button
-                    aria-label="Nova categoria"
+                    aria-label={t("Nova categoria")}
                     onClick={() => openDialog({ type: "add" })}
                     className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-[var(--primary-color)] text-[var(--primary-color-fg)] shadow-sm hover:brightness-95 duration-300">
                     <NiPlus size={22} />
@@ -716,11 +732,11 @@ const Home = () => {
                         onClick={(e) => e.stopPropagation()}
                         className={`fixed w-[150px] grid bg-light-bg-color-primary dark:bg-dark-bg-color-primary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-tertiary rounded-3xl shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out" : "animate-menu-in"} origin-top`}>
                         <button className={`${menuItem} rounded-t-3xl dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary`} onClick={() => openDialog({ type: "rename", category: menuShown.category })}>
-                            <p>Editar</p>
+                            <p>{t("Editar")}</p>
                             <NiEdit size={18} />
                         </button>
                         <button className={`${menuItem} rounded-b-3xl text-red-600 hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white duration-200`} onClick={() => openDialog({ type: "delete", category: menuShown.category })}>
-                            <p>Excluir</p>
+                            <p>{t("Excluir")}</p>
                             <NiTrash size={18} />
                         </button>
                     </div>
@@ -729,15 +745,15 @@ const Home = () => {
 
 
             <div ref={configBackdropRef} onClick={() => setConfig(false)} style={{ opacity: "calc(var(--cfg) * 0.2)" }}
-                className={`bg-black w-screen h-screen absolute top-0 z-30 ${onConfig ? "" : "pointer-events-none"}`}></div>
+                className={`bg-black fixed inset-0 z-30 ${onConfig ? "" : "pointer-events-none"}`}></div>
 
             <div id="container" className={`flex flex-wrap justify-between mb-28 mt-4 px-4 gap-2 max-w-[768px] mx-auto relative `}>
-                {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">Carregando...</p>}
+                {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">{t("Carregando...")}</p>}
 
                 {!loading && loadError && (
                     <div className="w-full text-center mt-10">
-                        <p className="text-light-text-color-secondary dark:text-dark-text-color-secondary">Não foi possível carregar suas notas.</p>
-                        <button onClick={loadNotes} className="mt-3 font-medium underline">Tentar novamente</button>
+                        <p className="text-light-text-color-secondary dark:text-dark-text-color-secondary">{t("Não foi possível carregar suas notas.")}</p>
+                        <button onClick={loadNotes} className="mt-3 font-medium underline">{t("Tentar novamente")}</button>
                     </div>
                 )}
 
@@ -764,14 +780,16 @@ const Home = () => {
                 )}
             </div>
 
-            {/* The keyboard-free screen height (index.html), so the keyboard never shortens the panel. */}
+            {/* Fixed to the screen (the page may be scrolled when it opens), the keyboard-free screen height
+                (index.html) tall, so the keyboard never shortens the panel. */}
             {/* Shown while --cfg > 0 (paintCfg). */}
-            <div ref={panelLayerRef} className="absolute overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 invisible">
+            {/* z-40: fixed, the layer stacks on its own, so the panel's z-index can't lift it over the + button. */}
+            <div ref={panelLayerRef} className="fixed z-40 overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 invisible">
                 <div ref={panelRef} className="absolute top-0 right-0 h-full z-40"
                     style={{ transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
                     {/* Pulled open past its edge (or overshooting), the panel shows more of itself, not a gap. */}
                     <div aria-hidden="true" className="absolute inset-y-0 left-full w-full bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary" />
-                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
+                    <ProfileConfig name={userName} email={user?.email} profile={profile} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} />
                 </div>
             </div>
 
@@ -792,14 +810,14 @@ const Home = () => {
             )}
 
             {deleteShown && (
-                <Modal danger closing={deleteClosing} title="Excluir nota?" onClose={() => setPendingDelete(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3 break-words">"{deleteShown.title || "Noted"}"<br />será excluída.</p>
-                    <ModalButtons danger confirm="Excluir" onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(deleteShown)} />
+                <Modal danger closing={deleteClosing} title={t("Excluir nota?")} onClose={() => setPendingDelete(null)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3 break-words">"{deleteShown.title || "Noted"}"<br />{t("será excluída.")}</p>
+                    <ModalButtons danger confirm={t("Excluir")} onCancel={() => setPendingDelete(null)} onConfirm={() => handleDelete(deleteShown)} />
                 </Modal>
             )}
 
             {(dialogShown?.type === "add" || dialogShown?.type === "rename") && (
-                <Modal icon={NiTag} closing={dialogClosing} title={dialogShown.type === "add" ? "Nova categoria" : "Editar categoria"} onClose={() => setDialog(null)}>
+                <Modal icon={NiTag} closing={dialogClosing} title={t(dialogShown.type === "add" ? "Nova categoria" : "Editar categoria")} onClose={() => setDialog(null)}>
                     {/* No <form> and no "nome" in the label, like the note title: iOS offered AutoFill (contacts) here
                         because the field sat in a form and looked like a person's name, autoComplete="off" or not. */}
                     <div>
@@ -807,34 +825,34 @@ const Home = () => {
                             ref={focusQuiet}
                             autoComplete="off"
                             name="category"
-                            aria-label="Categoria"
+                            aria-label={t("Categoria")}
                             maxLength={40}
                             value={dialogName}
                             onChange={(e) => setDialogName(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && dialogName.trim()) handleCategoryDialog(); }}
-                            placeholder="Categoria"
-                            className="mt-4 w-full h-11 text-sm bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-full px-4 outline-none text-center caret-[var(--primary-color)]"
+                            placeholder={t("Categoria")}
+                            className="mt-4 w-full h-11 text-sm bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-full px-4 outline-none text-center caret-[var(--primary-color)] group-data-[moving]/modal:caret-transparent"
                         />
-                        <ModalButtons confirm="Salvar" disabled={!dialogName.trim()} onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
+                        <ModalButtons confirm={t("Salvar")} disabled={!dialogName.trim()} onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
                     </div>
                 </Modal>
             )}
 
             {dialogShown?.type === "delete" && (
-                <Modal danger closing={dialogClosing} title="Excluir categoria?" onClose={() => setDialog(null)}>
-                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3 break-words">"{dialogShown.category.name}" <br />será excluída.</p>
-                    <ModalButtons danger confirm="Excluir" onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
+                <Modal danger closing={dialogClosing} title={t("Excluir categoria?")} onClose={() => setDialog(null)}>
+                    <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3 break-words">"{dialogShown.category.name}" <br />{t("será excluída.")}</p>
+                    <ModalButtons danger confirm={t("Excluir")} onCancel={() => setDialog(null)} onConfirm={handleCategoryDialog} />
                 </Modal>
             )}
 
             {dialogShown?.type === "pick" && (
                 // The note's current category is the one in the primary color; tapping another moves the note.
-                <Modal icon={NiTag} closing={dialogClosing} title="Categoria" onClose={() => setDialog(null)}>
+                <Modal icon={NiTag} closing={dialogClosing} title={t("Categoria")} onClose={() => setDialog(null)}>
                     <div className="flex flex-wrap justify-center gap-2 mt-4">
                         {[{ name: "" }, ...categories].map(({ name }) => {
                             const on = dialogShown.note.category === name;
                             return (
-                                <button key={name} type="button" onClick={() => handleSetCategory(dialogShown.note, name)} aria-pressed={on} aria-label={name ? undefined : "Nenhuma"}
+                                <button key={name} type="button" onClick={() => handleSetCategory(dialogShown.note, name)} aria-pressed={on} aria-label={name ? undefined : t("Nenhuma")}
                                     className={`h-11 rounded-full ${name ? "px-4" : "w-11 grid place-items-center"} text-sm font-medium duration-200 ${on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95"}`}>
                                     {name || <NiNone size={18} />}
                                 </button>
@@ -854,7 +872,7 @@ const Home = () => {
                 className='w-14 h-14 bg-[var(--primary-color)] text-[var(--primary-color-fg)] text-xl grid place-items-center text-center rounded-full fixed bottom-10 hover:scale-105 hover:brightness-95 active:scale-95 duration-150 ease-out left-1/2 transform -translate-x-1/2 shadow-sm'
                 // Own view-transition layer, so reordering cards glide under the button instead of over it.
                 style={{ viewTransitionName: "fab" }}
-                aria-label="Nova nota"
+                aria-label={t("Nova nota")}
                 data-new-note // a new note's editor grows out of here (lib/morph.js)
                 onClick={() => openEditor()}>
 

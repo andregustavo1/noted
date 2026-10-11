@@ -3,8 +3,10 @@ import Navbar from "../../components/Navbar/Navbar";
 import { useNavigate } from "react-router-dom";
 import PasswordInput from "../../components/Input/PasswordInput";
 import { supabase } from "../../lib/supabase";
+import { t } from "../../lib/i18n";
 
-const authErrorMessage = (error) => {
+const authErrorMessage = (error) => t(authErrorText(error));
+const authErrorText = (error) => {
     switch (error.code) {
         case "invalid_credentials":
             return "E-mail ou senha incorretos";
@@ -200,12 +202,12 @@ const Login = () => {
         if (email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
             setError(false);
         } else {
-            setError("Email inválido");
+            setError(t("Email inválido"));
             return;
         }
 
         if (!password) {
-            setError("Insira uma senha");
+            setError(t("Insira uma senha"));
             return;
         }
 
@@ -231,12 +233,12 @@ const Login = () => {
         if (email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
             setErrorSignUp(false);
         } else {
-            setErrorSignUp("Email inválido");
+            setErrorSignUp(t("Email inválido"));
             return;
         }
 
         if (password.length < 6) {
-            setErrorSignUp("A senha precisa ter ao menos 6 caracteres");
+            setErrorSignUp(t("A senha precisa ter ao menos 6 caracteres"));
             return;
         }
 
@@ -253,7 +255,7 @@ const Login = () => {
         }
 
         if (!data.session) {
-            setErrorSignUp("Confirme seu e-mail para entrar");
+            setErrorSignUp(t("Confirme seu e-mail para entrar"));
             return;
         }
 
@@ -267,7 +269,7 @@ const Login = () => {
             <div className="bg-light-bg-color-primary rounded-lg custom-shadow h-[calc(var(--login-vh,100svh)-5.5rem)] min-h-[584px] max-h-[748px] md:h-[748px] overflow-hidden relative flex justify-between">
                 <div id="panel-white-signin" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-light-bg-color-primary z-10 duration-500 ease-in-out">
                     <form noValidate onSubmit={handleSignIn} className="grid place-items-center">
-                        <h1 className="font-bold text-2xl md:text-3xl text-center">Entrar</h1>
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">{t("Entrar")}</h1>
 
                         <input
                             type="email"
@@ -293,9 +295,9 @@ const Login = () => {
 
                         <p className="text-red-500 mt-0.5">&nbsp;{error}</p>
 
-                        <p className="mt-1">Esqueceu sua senha?</p>
+                        <p className="mt-1">{t("Esqueceu sua senha?")}</p>
 
-                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center hover:bg-black active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out">ENTRAR</button>
+                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center hover:bg-black active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out">{t("ENTRAR")}</button>
                     </form>
                 </div>
 
@@ -303,27 +305,27 @@ const Login = () => {
 
                 <div id="panel-overlay-signup" className="h-1/2 md:h-full z-50 text-white grid place-items-center w-full md:w-1/2 absolute translate-y-[100%] md:translate-y-[0] md:translate-x-[100%] duration-500 ease-in-out">
                     <div className="grid place-items-center px-4 text-center">
-                        <h1 className="font-bold text-2xl md:text-3xl text-center">Bem vindo!</h1>
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">{t("Bem vindo!")}</h1>
 
-                        <p className="mt-4">Ainda não tem uma conta?</p>
+                        <p className="mt-4">{t("Ainda não tem uma conta?")}</p>
 
-                        <button id="signup" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary active:scale-[0.97] [transition:transform_150ms_ease-out,background-color_300ms,color_300ms]">CRIAR CONTA</button>
+                        <button id="signup" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary active:scale-[0.97] [transition:transform_150ms_ease-out,background-color_300ms,color_300ms]">{t("CRIAR CONTA")}</button>
                     </div>
                 </div>
 
                 <div id="panel-overlay-signin" className="h-1/2 md:h-full z-50 text-white grid place-items-center w-full md:w-1/2 absolute translate-y-[-100%] md:translate-y-[0] md:translate-x-[-100%] duration-500 ease-in-out opacity-0">
                     <div className="grid place-items-center px-4 text-center">
-                        <h1 className="font-bold text-2xl md:text-3xl text-center">Bem vindo de volta!</h1>
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">{t("Bem vindo de volta!")}</h1>
 
-                        <p className="mt-4">Já tem uma conta?</p>
+                        <p className="mt-4">{t("Já tem uma conta?")}</p>
 
-                        <button id="sigin" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary active:scale-[0.97] [transition:transform_150ms_ease-out,background-color_300ms,color_300ms]">ENTRAR</button>
+                        <button id="sigin" type="submit" className="rounded-full w-[240px] mt-4 gap-2 py-3 px-6 font-semibold shadow-md text-white flex items-center justify-center border-2 border-white hover:bg-light-bg-color-primary hover:text-primary active:scale-[0.97] [transition:transform_150ms_ease-out,background-color_300ms,color_300ms]">{t("ENTRAR")}</button>
                     </div>
                 </div>
 
                 <div id="panel-white-signup" className="h-1/2 md:h-full grid place-items-center w-full md:w-1/2 absolute bg-light-bg-color-primary translate-y-[50%] md:translate-y-[0] md:translate-x-[50%] duration-500 ease-in-out opacity-0">
                     <form noValidate onSubmit={handleSignUp} className="grid place-items-center">
-                        <h1 className="font-bold text-2xl md:text-3xl text-center">Crie uma conta</h1>
+                        <h1 className="font-bold text-2xl md:text-3xl text-center">{t("Crie uma conta")}</h1>
 
                         <input
                             type="email"
@@ -349,7 +351,7 @@ const Login = () => {
 
                         <p className="text-red-500 mt-0.5">&nbsp;{errorSignUp}</p>
 
-                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center hover:bg-black active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out">CRIAR</button>
+                        <button type="submit" disabled={loading} className="disabled:opacity-60 bg-primary rounded-full w-[240px] mt-3 gap-2 py-3 px-6 font-semibold shadow-md shadow-gray-400 text-white flex items-center justify-center hover:bg-black active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out">{t("CRIAR")}</button>
                     </form>
                 </div>
             </div>

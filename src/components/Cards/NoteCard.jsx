@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { t } from "../../lib/i18n";
 import { NiCheck, NiDuplicate, NiEdit, NiPin, NiPinFilled, NiTag, NiTrash } from "../Icons/NotedIcons";
 import { sanitize, trimEnd } from "../../lib/richtext";
 import { headingSize, lineGap, lineStyle, parseLine } from "../../lib/lines";
@@ -109,7 +110,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
             data-note={id}
             style={{ "--vt": `note-${id}`, minHeight: isPinned ? undefined : size.minHeight }}
             // hidden: its note is open in the editor, which grew out of this card (Home's morphNote).
-            className={`note-card ${hidden ? "invisible" : ""} ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col select-none [-webkit-touch-callout:none] px-4 md:px-8 pt-2 pb-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,border-radius_300ms_ease-in-out,background-color_500ms_ease-in-out,color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
+            className={`note-card ${hidden ? "invisible" : ""} ${corner == null ? "rounded-[1.75rem]" : `rounded-[2.25rem] ${corner}`} w-full flex flex-col select-none [-webkit-touch-callout:none] px-4 md:px-8 pt-2 pb-6 shadow-sm cursor-pointer [transition:transform_150ms_ease-out,border-radius_300ms_ease-in-out,background-color_500ms_ease-in-out] relative ${isNoteOptionsVisible ? "z-30" : "[&:active:not(:has(button:active))]:scale-[0.98]"} ${isPinned ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-primary dark:bg-dark-bg-color-primary"}`}
             // z-30 while the menu is open lifts it over the cards below; no press shrink then, a tap on the menu
             // would shrink the card and the menu with it. A press on one of the card's own buttons (the dots, the
             // pin) makes the card :active too, so the shrink is skipped while a button inside is pressed.
@@ -126,7 +127,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
             {/* Options handle: two short bars centered on top, so the title gets the whole width. */}
             <button
                 ref={noteOptionsBtnRef}
-                aria-label="Opções"
+                aria-label={t("Opções")}
                 onClick={(e) => { e.stopPropagation(); toggleNoteOptions(); }}
                 className={`self-center w-16 h-6 -mt-1 shrink-0 flex flex-col items-center justify-center gap-[3px] transition-colors ${isNoteOptionsVisible && !isPinned ? "text-[var(--primary-color)]" : ""}`}>
                 <span className='w-9 h-[2px] rounded-full bg-current' />
@@ -140,7 +141,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                 <p className='text-[12px] opacity-80'>{date}</p>
 
                 <button
-                    aria-label={isPinned ? "Desfixar" : "Fixar"}
+                    aria-label={t(isPinned ? "Desfixar" : "Fixar")}
                     className={`text-lg cursor-pointer p-3 -m-3`}
                     onClick={(e) => { e.stopPropagation(); onPinNote(); }}>
                     {isPinned ? <NiPinFilled size={18} /> : <NiPin size={18} />}
@@ -151,35 +152,35 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                 <button
                     className='flex items-center justify-between rounded-t-3xl text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onEdit(); }}>
-                    <p>Editar</p>
+                    <p>{t("Editar")}</p>
                     <NiEdit size={18} />
                 </button>
 
                 <button
                     className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onPinNote(); }}>
-                    <p>{isPinned ? "Desfixar" : "Fixar"}</p>
+                    <p>{t(isPinned ? "Desfixar" : "Fixar")}</p>
                     {isPinned ? <NiPinFilled size={18} /> : <NiPin size={18} />}
                 </button>
 
                 <button
                     className='flex items-center justify-between text-sm py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onCategory(); }}>
-                    <p>Categoria</p>
+                    <p>{t("Categoria")}</p>
                     <NiTag size={18} />
                 </button>
 
                 <button
                     className='flex items-center justify-between text-sm  py-3 px-4 hover:bg-light-bg-color-secondary active:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary dark:active:bg-dark-bg-color-tertiary'
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDuplicate(); }}>
-                    <p>Duplicar</p>
+                    <p>{t("Duplicar")}</p>
                     <NiDuplicate size={18} />
                 </button>
 
                 <button
                     onClick={(e) => { e.stopPropagation(); setNoteOptionsVisible(false); onDelete(); }}
                     className='flex items-center justify-between text-sm text-red-600 py-3 px-4 rounded-b-3xl hover:bg-red-500 hover:text-white active:bg-red-500 active:text-white dark:hover:bg-red-500 dark:active:bg-red-500 duration-200'>
-                    <p>Excluir</p>
+                    <p>{t("Excluir")}</p>
                     <NiTrash size={18} />
                 </button>
             </div>

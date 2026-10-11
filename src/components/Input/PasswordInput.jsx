@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { NiEye, NiEyeOff } from "../Icons/NotedIcons";
+import { t } from "../../lib/i18n";
 
 
 const PasswordInput = ({ value, onChange, placeholder }) => {
@@ -15,7 +16,7 @@ const PasswordInput = ({ value, onChange, placeholder }) => {
                 value={value}
                 onChange={onChange}
                 type={isShowPassword ? "text" : "password"}
-                placeholder={placeholder || "Senha"}
+                placeholder={placeholder || t("Senha")}
                 className="bg-light-bg-color-secondary w-[280px] px-4 py-2 rounded-full outline-none"
             />
 
