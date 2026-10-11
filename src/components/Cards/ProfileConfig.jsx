@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { NiBarFixed, NiBarFloating, NiCornersCut, NiCornersRound, NiLogout, NiMoon, NiSortDown, NiSortUp, NiSun } from "../Icons/NotedIcons";
+import { NiBarFixed, NiBarFloating, NiBell, NiBellOff, NiCornersCut, NiCornersRound, NiLogout, NiMoon, NiSortDown, NiSortUp, NiSun } from "../Icons/NotedIcons";
 import { supabase } from "../../lib/supabase";
 import MfaSetup from "./MfaSetup";
 import Switch from "../Input/Switch";
 import { t } from "../../lib/i18n";
+import { disablePush, enablePush, pushEnabled, pushSupported } from "../../lib/push";
 
 // fg is the + icon color that stays readable on bg.
 export const COLORS = [
@@ -28,6 +29,19 @@ const LangEn = () => <span className="text-sm font-semibold">EN</span>;
 // so the panel starts at "Configurações".
 const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange, editNameSignal }) => {
     const [editing, setEditing] = useState(false);
+    // Task reminders on this device (lib/push.js). Asked for on the tap itself: iOS only shows the prompt for one.
+    const [push, setPush] = useState(false);
+    const [pushError, setPushError] = useState("");
+    useEffect(() => { pushEnabled().then(setPush, () => {}); }, []);
+    const togglePush = () => {
+        setPushError("");
+        (push ? disablePush().then(() => false) : enablePush())
+            .then((on) => {
+                setPush(on);
+                if (!on && !push) setPushError(t("Permissão negada. Ative em Ajustes > Notificações > Noted."));
+            })
+            .catch((e) => setPushError(e.message));
+    };
     const [draft, setDraft] = useState(name);
     const primary = settings.primaryColor;
     const dark = settings.theme === "dark";
@@ -140,6 +154,12 @@ const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange,
 
                         {/* Interface language (lib/i18n.js). */}
                         <Switch dark={dark} on={settings.language === "en"} onToggle={() => onChange({ language: settings.language === "en" ? "pt" : "en" })} label={t("Idioma")} icons={[LangPt, LangEn]} />
+
+                        {/* Reminder notifications: only the home-screen app can get them on iOS. */}
+                        {pushSupported()
+                            ? <Switch dark={dark} on={push} onToggle={togglePush} label={t("Notificações de lembretes")} icons={[NiBellOff, NiBell]} />
+                            : <p className="mt-3 text-sm opacity-60">{t("Para receber lembretes, abra o Noted pela tela de início.")}</p>}
+                        {pushError && <p className="mt-2 text-sm text-red-500">{pushError}</p>}
                     </div>
 
                     <div className="grid mt-6">

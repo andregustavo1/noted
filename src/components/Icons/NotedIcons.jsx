@@ -28,6 +28,8 @@ export const NiChevronUp = icon(<path d="M6 14.5l6-6 6 6" />);
 export const NiAlert = icon(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5" />{dot(12, 16, 1.1)}</>);
 export const NiCalendar = icon(<><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>);
 export const NiClock = icon(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>);
+export const NiBell = icon(<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5h4" />);
+export const NiBellOff = icon(<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5h4M4 4l16 16" />);
 
 // Notes
 export const NiEdit = icon(<path d="M4.5 19.5h4l10-10a2.83 2.83 0 0 0-4-4l-10 10zM13 7l4 4" />);

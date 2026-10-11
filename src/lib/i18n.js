@@ -156,6 +156,9 @@ const EN = {
     "6 meses": "6 months",
     "Anual": "Yearly",
     "Notificações só funcionam no app instalado (versão publicada).": "Notifications only work in the installed app (published version).",
+    "Notificações de lembretes": "Reminder notifications",
+    "Permissão negada. Ative em Ajustes > Notificações > Noted.": "Permission denied. Turn it on in Settings > Notifications > Noted.",
+    "Para receber lembretes, abra o Noted pela tela de início.": "To get reminders, open Noted from the home screen.",
 };
 
 const stored = () => {
