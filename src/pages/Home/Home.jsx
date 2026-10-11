@@ -16,6 +16,7 @@ import Modal, { ModalButtons, useLinger } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
 import { t } from "../../lib/i18n";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
+import { isRoutine, localDay, rollover } from "../../lib/routine";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
 import { flush, flushedSince } from "../../lib/sync";
 import { animateSpring, project, rubber, tracker } from "../../lib/spring";
@@ -254,18 +255,8 @@ const Home = () => {
         [panelRef, avatarRideRef, configBackdropRef].forEach((r) => r.current.style.setProperty("--cfg", p));
         panelLayerRef.current.style.visibility = p > 0 ? "visible" : "";
     }
-    // The panel's profile row (name and email beside the avatar that rides in from the page's header) is only there
-    // while any of the avatar is on screen, and it sits level with the avatar: moved up by the page's scroll, so
-    // cut at the top it still rides in and the row shows cut with it. Opened with the page scrolled clean past
-    // the avatar, the panel starts at "Configurações" instead, and the avatar stays out of sight until the panel
-    // has closed. profile: how far up the row goes (0 or less), or null for no row.
-    const [profile, setProfile] = useState(0)
     const setConfig = (open, velocity = 0) => {
         if (open && !onConfig) {
-            const ride = avatarRideRef.current;
-            const shown = avatarRef.current.getBoundingClientRect().bottom > 0;
-            setProfile(shown ? -Math.max(0, Math.round(window.scrollY)) : null);
-            ride.style.visibility = shown ? "" : "hidden";
             // The avatar ends on the panel's left padding (px-5 = 20px), wherever the header sits.
             const width = panelRef.current.offsetWidth;
             const panelLeft = document.documentElement.clientWidth - width;
@@ -273,11 +264,11 @@ const Home = () => {
         }
         setOnConfig(open);
         stopCfg.current?.();
-        stopCfg.current = animateSpring({ from: cfg.current, to: open ? 1 : 0, velocity, onFrame: paintCfg, onDone: open ? undefined : () => { avatarRideRef.current.style.visibility = ""; } });
+        stopCfg.current = animateSpring({ from: cfg.current, to: open ? 1 : 0, velocity, onFrame: paintCfg });
     }
     const toggleConfig = () => setConfig(!onConfig)
 
-    // Phones: a sideways drag anywhere moves the panel 1:1, to open it (leftward, over the notes) or close it (on the
+    // Phones: a sideways drag moves the panel 1:1, to open it (leftward, from the right edge) or close it (anywhere on the
     // panel or the backdrop), rubber-banding when pulled further open. On release it springs open or shut by where
     // the flick would coast to, keeping its speed. Caught mid-flight, it carries on from where it is. A vertical start
     // is left to the page's scroll; the page only pans vertically (touch-action, set below), so sideways moves reach
@@ -290,6 +281,8 @@ const Home = () => {
         down: (e) => {
             if (e.pointerType !== "touch") return;
             if (!onConfig && (editor || dialog || categoryMenu || pendingDelete || e.target.closest("[data-category-row], input, textarea, [contenteditable]"))) return;
+            // Closed: only a pull from the right edge opens it; anywhere else is left to the notes.
+            if (!onConfig && cfg.current === 0 && e.clientX < document.documentElement.clientWidth - 40) return;
             panelDrag.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
         },
         move: (e) => {
@@ -355,6 +348,8 @@ const Home = () => {
     const [categoryList, setCategoryList] = useState(() => cache?.categories ?? []); // { id, name } rows
     const loaded = useRef(Boolean(cache)); // something on screen: a failed fetch is then just logged
     const [loading, setLoading] = useState(!cache);
+    // The server's notes have been asked for once (answered or not): the routine check waits for it (below).
+    const [synced, setSynced] = useState(false);
     const [loadError, setLoadError] = useState(false);
     useEffect(() => {
         if (loaded.current) writeCache(userId, { notes, categories: categoryList });
@@ -381,6 +376,7 @@ const Home = () => {
             if (!loaded.current) setLoadError(true);
         }
         setLoading(false);
+        setSynced(true);
     }, [userId]);
 
     // One pass over the queue at a time; the result lands in the notes (server timestamps) or as a message.
@@ -448,6 +444,7 @@ const Home = () => {
     // the account's version wins once it loads, unless a change made here hasn't reached it yet, and an account
     // without any yet gets this device's.
     const [settings, setSettings] = useState(readLocalSettings);
+    const [settingsReady, setSettingsReady] = useState(false);
     useEffect(() => {
         let active = true;
         const started = Date.now();
@@ -457,7 +454,8 @@ const Home = () => {
                 if (remote) { setSettings(remote); applySettings(remote); }
                 else queueOp({ type: "settings", settings: readLocalSettings() });
             })
-            .catch(console.error);
+            .catch(console.error)
+            .finally(() => { if (active) setSettingsReady(true); });
         return () => { active = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
@@ -504,21 +502,15 @@ const Home = () => {
     // The search bar is open (even empty), and searchEnd tells it to end the search (a note opened from it closed).
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchEnd, setSearchEnd] = useState(0);
-    const setActiveCategory = (name) => changeSettings({ activeCategory: name });
+    // A category always opens at its top, from a chip or a swipe (below).
+    const scrollerRef = useRef(null); // the notes scroll on their own; the header and the chips stay put
+    const setActiveCategory = (name) => { changeSettings({ activeCategory: name }); scrollerRef.current.scrollTop = 0; };
 
     useEffect(() => {
         if (!message) return;
         const timeout = setTimeout(() => setMessage(""), 2500);
         return () => clearTimeout(timeout);
     }, [message]);
-
-    // Lock page scroll while the side panel is open.
-    useEffect(() => {
-        if (!onConfig) return;
-        const prev = document.documentElement.style.overflow;
-        document.documentElement.style.overflow = "hidden";
-        return () => { document.documentElement.style.overflow = prev; };
-    }, [onConfig]);
 
 
     // Stored categories plus any name still only on notes (before the schema migration ran), with note counts.
@@ -540,11 +532,9 @@ const Home = () => {
     // Searching looks through every note, so "Todas" shows as selected as soon as the search opens.
     const currentCategory = searchOpen || searchQuery.trim() ? "" : categories.some((c) => c.name === settings.activeCategory) ? settings.activeCategory : "";
 
-    const visibleNotes = useMemo(() => {
-        return sortNotes(notes.filter((note) =>
-            (!currentCategory || note.category === currentCategory) && noteMatches(note, searchQuery)
-        ), settings);
-    }, [notes, currentCategory, searchQuery, settings]);
+    const notesIn = (category, query = "") => sortNotes(notes.filter((note) => (!category || note.category === category) && noteMatches(note, query)), settings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const visibleNotes = useMemo(() => notesIn(currentCategory, searchQuery), [notes, currentCategory, searchQuery, settings]);
 
     // Editor: null when closed, { note: null } for a new note, { note } to edit one.
     const [editor, setEditor] = useState(null);
@@ -558,6 +548,95 @@ const Home = () => {
     const [dialogShown, dialogClosing] = useLinger(dialog);
     const [deleteShown, deleteClosing] = useLinger(pendingDelete);
     const openDialog = (next) => { setCategoryMenu(null); setDialogName(next.category?.name ?? ""); setDialog(next); };
+
+    // Phones: a sideways swipe anywhere below the chip row (over the notes or the empty space under them) pages
+    // through the chips (Todas, then the categories in row order): left for the next one, right for the one before.
+    // The neighbour's notes are laid out beside the current ones (peek), from their top, level with the top of the
+    // screen, and both follow the finger 1:1. A release that lands switches the chip and the list at once, and the
+    // old list takes the neighbour's place on the other side, so the frame doesn't change while a spring finishes
+    // the move, keeping the finger's speed; a short pull springs back. Caught mid-flight, it carries on from where it
+    // is. Past either end there's no neighbour: the notes rubber-band and spring back. The row scrolls the new chip
+    // into the middle. Not while searching (every chip shows the same notes), nor with a popup or the panel open,
+    // nor from the right edge (that pull opens the panel). A swipe swallows the click that follows it. Window
+    // listeners, like the panel's.
+    const trackRef = useRef(null);
+    const swipe = useRef(null);
+    const swiped = useRef(false);
+    const swipeAt = useRef(0); // where the track is drawn, px
+    const stopSwipe = useRef(null);
+    const [peek, setPeek] = useState(null); // { dir, name, top }: the list laid out beside the notes while swiping
+    const chips = ["", ...categories.map((c) => c.name)];
+    const neighbour = (dir) => chips[chips.indexOf(currentCategory) + dir]; // undefined past either end
+    const showChip = (name) => {
+        const row = document.querySelector("[data-category-row]");
+        const chip = name ? row.querySelector(`[data-chip="${CSS.escape(name)}"]`) : row.firstElementChild;
+        if (chip) row.scrollTo({ left: chip.offsetLeft - row.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2, behavior: "smooth" });
+    };
+    const paintSwipe = (x) => { swipeAt.current = x; trackRef.current.style.transform = x ? `translateX(${x}px)` : ""; };
+    const notesSwipe = useRef(null);
+    notesSwipe.current = {
+        down: (e) => {
+            if (e.pointerType !== "touch" || loading || onConfig || cfg.current > 0 || editor || dialog || categoryMenu || pendingDelete || searchOpen || searchQuery.trim()) return;
+            if (e.clientX >= document.documentElement.clientWidth - 40 || e.clientY <= document.querySelector("[data-category-row]").getBoundingClientRect().bottom) return;
+            swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        },
+        move: (e) => {
+            const s = swipe.current;
+            if (!s || e.pointerId !== s.id) return;
+            if (!s.on) {
+                const dx = e.clientX - s.x, dy = Math.abs(e.clientY - s.y);
+                if (Math.abs(dx) < 10 && dy < 10) return;
+                if (Math.abs(dx) <= dy) { swipe.current = null; return; }
+                stopSwipe.current?.();
+                Object.assign(s, { on: true, x: e.clientX, from: swipeAt.current, v: tracker(), w: trackRef.current.offsetWidth, dir: 0 });
+                swiped.current = true;
+            }
+            s.raw = s.from + e.clientX - s.x;
+            s.v.add(s.raw);
+            const dir = s.raw < 0 ? 1 : -1;
+            if (dir !== s.dir) { // crossed the middle: lay out the neighbour on that side, if there is one
+                s.dir = dir;
+                s.next = neighbour(dir);
+                flushSync(() => setPeek(s.next === undefined ? null : { dir, name: s.next, top: scrollerRef.current.scrollTop }));
+            }
+            paintSwipe(s.next === undefined ? Math.sign(s.raw) * rubber(Math.abs(s.raw), s.w) : s.raw);
+        },
+        up: (e) => {
+            const s = swipe.current;
+            if (!s || e.pointerId !== s.id) return;
+            swipe.current = null;
+            if (!s.on) return;
+            setTimeout(() => { swiped.current = false; });
+            const v = s.v.velocity();
+            const end = s.raw + project(v); // where the flick would coast to
+            const dir = Math.abs(end) > s.w / 3 ? -Math.sign(end) : 0;
+            const next = dir && dir === s.dir ? s.next : undefined; // only onto the neighbour that's laid out
+            const settle = (to, onDone) => { stopSwipe.current = animateSpring({ from: swipeAt.current, to, velocity: v, damping: 1, onFrame: paintSwipe, onDone }); };
+            if (next === undefined) return settle(0, () => setPeek(null));
+            // Lands: the new list starts at its top, where the neighbour was drawn; the old list stays where it stood,
+            // its scroll above the new origin.
+            const y = scrollerRef.current.scrollTop;
+            flushSync(() => { setActiveCategory(next); setPeek({ dir: -dir, name: currentCategory, top: -y }); });
+            paintSwipe(swipeAt.current + dir * s.w);
+            showChip(next);
+            settle(0, () => setPeek(null));
+        },
+    };
+    useEffect(() => {
+        const call = (name) => (e) => notesSwipe.current[name](e);
+        const on = { pointerdown: call("down"), pointermove: call("move"), pointerup: call("up"), pointercancel: call("up") };
+        // Once swiping, the page must not scroll under the finger (touch-action can't change mid-gesture).
+        const onTouchMove = (e) => { if (swipe.current?.on) e.preventDefault(); };
+        const onClick = (e) => { if (swiped.current) { e.stopPropagation(); e.preventDefault(); } };
+        Object.entries(on).forEach(([t, f]) => window.addEventListener(t, f));
+        window.addEventListener("touchmove", onTouchMove, { passive: false });
+        window.addEventListener("click", onClick, true);
+        return () => {
+            Object.entries(on).forEach(([t, f]) => window.removeEventListener(t, f));
+            window.removeEventListener("touchmove", onTouchMove);
+            window.removeEventListener("click", onClick, true);
+        };
+    }, []);
 
     // Opening a note ends the search: the query clears and the bar closes (SearchBar closes itself once the query is
     // empty and the field has lost focus; the blur here covers a tap that left the field focused). For a note picked
@@ -616,6 +695,7 @@ const Home = () => {
             date={formatDate(note.updated_at)}
             content={note.content}
             isPinned={note.is_pinned}
+            streak={isRoutine(note) ? settings.routine?.[note.id]?.streak ?? 0 : undefined}
             onOpen={() => openEditor(note)}
             onEdit={() => openEditor(note)}
             onDelete={() => setPendingDelete(note)}
@@ -623,6 +703,21 @@ const Home = () => {
             onCategory={() => openDialog({ type: "pick", note })}
             onDuplicate={() => handleDuplicate(note)}
         />
+    );
+
+    // Pinned cards span the row; the rest go down two independent columns so cards keep their own heights (masonry
+    // look), alternating tall/short, the other column offset by one so side-by-side cards differ too.
+    const renderList = (list) => (
+        <>
+            {list.filter((n) => n.is_pinned).map((n) => renderCard(n))}
+            <div className="flex w-full gap-2 items-start">
+                {[0, 1].map((col) => (
+                    <div key={col} className="flex-1 min-w-0 flex flex-col gap-2">
+                        {list.filter((n) => !n.is_pinned).filter((_, i) => i % 2 === col).map((n, i) => renderCard(n, (i + col + flip) % 2 === 0, cut(CORNERS[col][((i >> 1) + col + flip) % 2])))}
+                    </div>
+                ))}
+            </div>
+        </>
     );
 
     // Every change goes into the notes right away and into the queue for the server.
@@ -653,6 +748,35 @@ const Home = () => {
         if (editor) { setSearchQuery(""); setSearchEnd((n) => n + 1); } // deleted from the open editor: it closes, and the search ends with it (openEditor)
         setEditor(null);
     };
+
+    // Routine notes (lib/routine.js): once a day has passed, judge its checklist, move the streak and untick the
+    // tasks. It waits for the server's notes and settings (or their failure, offline), so a day another device already
+    // judged isn't judged again from a stale copy, and skips a routine open in the editor (its own copy would win); it
+    // runs again as notes change, on returning to the app (fresh notes) and at midnight (today).
+    // ponytail: two devices judging the same day before either syncs would both count it; add a server-side check if
+    // that ever shows.
+    const [today, setToday] = useState(localDay);
+    useEffect(() => {
+        const midnight = new Date();
+        midnight.setHours(24, 0, 1, 0);
+        const timer = setTimeout(() => setToday(localDay()), midnight - Date.now());
+        return () => clearTimeout(timer);
+    }, [today]);
+    useEffect(() => {
+        if (!synced || !settingsReady) return;
+        const day = localDay();
+        const routine = { ...settings.routine };
+        let changed = false;
+        for (const note of notes) {
+            if (!isRoutine(note) || (editor && editorNoteId.current === note.id)) continue;
+            const result = rollover(routine[note.id], note.content, day);
+            if (!result) continue;
+            routine[note.id] = result.entry;
+            changed = true;
+            if (result.content !== null) changeNote(note.id, { content: result.content });
+        }
+        if (changed) changeSettings({ routine });
+    }, [synced, settingsReady, notes, settings.routine, today, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // The card moves on tap (pinning doesn't touch updated_at).
     const handlePin = (note) => {
@@ -701,7 +825,9 @@ const Home = () => {
 
     return (
         <>
-            <div className="max-w-[768px] relative mx-auto">
+            {/* The screen's height (index.html): the header and the chip row stay put, only the notes scroll. */}
+            <div className="flex flex-col h-[var(--app-height,100dvh)]">
+            <div className="shrink-0 max-w-[768px] w-full relative mx-auto">
                 <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} onSearchOpenChange={setSearchOpen} searchEnd={searchEnd} />
 
                 {/* Phones: the panel picks the avatar up: it stays put until the panel's edge reaches it, then rides along
@@ -722,7 +848,7 @@ const Home = () => {
                 </div>
             </div>
 
-            <div {...categoryRow} data-category-row className="flex items-center gap-2 px-4 pt-3 pb-6 -mt-3 -mb-6 max-w-[768px] mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
+            <div {...categoryRow} data-category-row className="shrink-0 flex items-center gap-2 px-4 pt-3 pb-4 -mt-3 max-w-[768px] w-full mx-auto overflow-x-auto no-scrollbar select-none [&.dragging]:cursor-grabbing [&.dragging_*]:cursor-grabbing">
                 <CategoryBar
                     title={t("Todas")}
                     quantity={notes.length}
@@ -773,37 +899,30 @@ const Home = () => {
             <div ref={configBackdropRef} onClick={() => setConfig(false)} style={{ opacity: "calc(var(--cfg) * 0.2)" }}
                 className={`bg-black fixed inset-0 z-30 ${onConfig ? "" : "pointer-events-none"}`}></div>
 
-            <div id="container" className={`flex flex-wrap justify-between mb-28 mt-4 px-4 gap-2 max-w-[768px] mx-auto relative `}>
-                {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">{t("Carregando...")}</p>}
+            {/* The notes' scroller, and in it the track the swipe moves: the list, and while swiping the other one laid
+                out beside it (peek). The scroller clips sideways, so neither the peek nor the moved track widens it. */}
+            <div ref={scrollerRef} className="flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-y-auto overflow-x-hidden">
+            <div ref={trackRef} className="relative pb-28">
+                <div id="container" className="flex flex-wrap justify-between px-4 gap-2 relative">
+                    {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">{t("Carregando...")}</p>}
 
-                {!loading && loadError && (
-                    <div className="w-full text-center mt-10">
-                        <p className="text-light-text-color-secondary dark:text-dark-text-color-secondary">{t("Não foi possível carregar suas notas.")}</p>
-                        <button onClick={loadNotes} className="mt-3 font-medium underline">{t("Tentar novamente")}</button>
+                    {!loading && loadError && (
+                        <div className="w-full text-center mt-10">
+                            <p className="text-light-text-color-secondary dark:text-dark-text-color-secondary">{t("Não foi possível carregar suas notas.")}</p>
+                            <button onClick={loadNotes} className="mt-3 font-medium underline">{t("Tentar novamente")}</button>
+                        </div>
+                    )}
+
+                    {!loading && renderList(visibleNotes)}
+                </div>
+                {peek && (
+                    // top: level with the top of the scroller (the gap under the chips is the row's padding, which stays put), or, the old list, where it stood.
+                    <div aria-hidden="true" className="absolute inset-x-0 flex flex-wrap justify-between px-4 gap-2 pointer-events-none" style={{ top: peek.top, transform: `translateX(${peek.dir * 100}%)` }}>
+                        {renderList(notesIn(peek.name))}
                     </div>
                 )}
-
-                {!loading && !loadError && notes.length === 0 && (
-                    <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10"></p>
-                )}
-
-                {!loading && !loadError && notes.length > 0 && visibleNotes.length === 0 && (
-                    <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10"></p>
-                )}
-
-                {!loading && visibleNotes.filter((n) => n.is_pinned).map((n) => renderCard(n))}
-
-                {/* Two independent columns so cards keep their own heights (masonry look). */}
-                {!loading && (
-                    <div className="flex w-full gap-2 items-start">
-                        {[0, 1].map((col) => (
-                            <div key={col} className="flex-1 min-w-0 flex flex-col gap-2">
-                                {/* Alternate tall/short down the column; the other column is offset by one so side-by-side cards differ too. */}
-                                {visibleNotes.filter((n) => !n.is_pinned).filter((_, i) => i % 2 === col).map((n, i) => renderCard(n, (i + col + flip) % 2 === 0, cut(CORNERS[col][((i >> 1) + col + flip) % 2])))}
-                            </div>
-                        ))}
-                    </div>
-                )}
+            </div>
+            </div>
             </div>
 
             {/* Fixed to the screen (the page may be scrolled when it opens), the keyboard-free screen height
@@ -817,7 +936,7 @@ const Home = () => {
                     style={{ transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
                     {/* Pulled open past its edge (or overshooting), the panel shows more of itself, not a gap. */}
                     <div aria-hidden="true" className="absolute inset-y-0 left-full w-full bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary" />
-                    <ProfileConfig name={userName} email={user?.email} profile={profile} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} onMessage={setMessage} />
+                    <ProfileConfig name={userName} email={user?.email} onLogout={onLogout} settings={settings} onChange={changeSettings} editNameSignal={editNameSignal} onMessage={setMessage} />
                 </div>
             </div>
 

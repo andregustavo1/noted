@@ -9,7 +9,7 @@ import LineMarker from "./LineMarker";
 // any other, instead of also opening a note.
 let menuClosedAt = 0;
 
-const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, tall, corner, onPinNote, onCategory, onDuplicate, onDelete }) => {
+const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, streak, tall, corner, onPinNote, onCategory, onDuplicate, onDelete }) => {
     const [isNoteOptionsVisible, setNoteOptionsVisible] = useState(false);
     const noteOptionsBtnRef = useRef(null);
     const noteOptionsRef = useRef(null);
@@ -133,7 +133,17 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                 <span className='w-9 h-[2px] rounded-full bg-current' />
                 <span className='w-6 h-[2px] rounded-full bg-current' />
             </button>
-            <h1 className={`${headingSize("#")} truncate min-w-0`}>{title || "Noted"}</h1>
+            {/* A routine note's streak (lib/routine.js) ends the title's line, inside the card's padding like the pin
+                below it; the card only, never the open note. A circle as tall as the title's line, so the row keeps its height. */}
+            <div className="flex items-center gap-2 min-w-0">
+                <h1 className={`${headingSize("#")} truncate min-w-0 flex-1`}>{title || "Noted"}</h1>
+                {streak !== undefined && (
+                    <span aria-label={`${t("Sequência")}: ${streak}`}
+                        className={`size-7 shrink-0 -translate-y-0.5 grid place-items-center rounded-full text-[11px] font-semibold tabular-nums tracking-tighter ${isPinned ? "bg-[var(--primary-color-fg)] text-[var(--primary-color)]" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)]"}`}>
+                        {streak}x
+                    </span>
+                )}
+            </div>
 
             <div className='text-sm leading-relaxed mt-2 break-words whitespace-pre-wrap'>{preview.split("\n").map(renderLine)}</div>
 

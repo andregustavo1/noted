@@ -1193,7 +1193,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // The "..." menu in the header: the card menu's actions plus copying the whole note.
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [reset, setReset] = useState(false);
     const optionsRef = useRef(null);
     useEffect(() => {
         if (!optionsOpen) return;
@@ -1207,18 +1206,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         const timeout = setTimeout(() => setCopied(false), 2000);
         return () => clearTimeout(timeout);
     }, [copied]);
-    // "Resetar checklist" unticks every task (routines done again each day) and answers like "Copiar tudo".
-    useEffect(() => {
-        if (!reset) return;
-        const timeout = setTimeout(() => setReset(false), 2000);
-        return () => clearTimeout(timeout);
-    }, [reset]);
-    const hasDone = lines.some((raw) => parseLine(raw).done);
-    const resetChecks = () => {
-        setJustChecked(null);
-        setContent(lines.map((raw) => (parseLine(raw).done ? raw.replace(/\[[xX]\]/, "[ ]") : raw)).join("\n"));
-        setReset(true);
-    };
     const copyAll = async () => {
         try {
             await navigator.clipboard.writeText(noteText(title, content));
@@ -1291,7 +1278,6 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         { label: "Categoria", icon: NiTag, run: () => onCategory(saved), needsSaved: true },
         { label: "Duplicar", icon: NiDuplicate, run: () => onDuplicate({ ...saved, title: title.trim(), content }), needsSaved: true },
         copied ? { label: "Copiado", icon: NiCheck, run: () => {}, stayOpen: true } : { label: "Copiar tudo", icon: NiCopy, run: copyAll, stayOpen: true },
-        reset ? { label: "Resetado", icon: NiCheck, run: () => {}, stayOpen: true } : { label: "Resetar checklist", icon: NiRestart, run: resetChecks, stayOpen: true, off: !hasDone },
         { label: "Excluir", icon: NiTrash, run: () => onDelete(saved), needsSaved: true, danger: true },
     ];
 

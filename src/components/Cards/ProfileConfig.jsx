@@ -24,10 +24,7 @@ const LangPt = () => <span className="text-sm font-semibold">PT-BR</span>;
 const LangEn = () => <span className="text-sm font-semibold">EN</span>;
 
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
-// profile: how far up (px, 0 or less) the name and email row sits, level with the avatar that rides in from the
-// page's header, which the page may be scrolled partly past; null leaves the row out (scrolled clean past it),
-// so the panel starts at "Configurações".
-const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange, editNameSignal, onMessage }) => {
+const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSignal, onMessage }) => {
     const [editing, setEditing] = useState(false);
     // Task reminders on this device (lib/push.js). Asked for on the tap itself: iOS only shows the prompt for one.
     const [push, setPush] = useState(false);
@@ -94,11 +91,10 @@ const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange,
     return (
         <>
             <div className="h-full max-w-[100vw] flex flex-col shadow-md px-5 bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-l-3xl">
-                {/* The scroll starts at the panel's very top (its padding is inside), so the profile row, moved up to
-                    stay level with a half-scrolled avatar, is cut at the top exactly as the avatar is. */}
                 <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pt-4">
-                {/* pl clears the 40px avatar that slides in over the panel's left padding. */}
-                {profile !== null && <div className="grid pl-[52px] pr-2 h-11 min-w-0" style={{ marginTop: profile }}>
+                {/* The name and email row sits level with the avatar that rides in from the page's header.
+                    pl clears the 40px avatar that slides in over the panel's left padding. */}
+                <div className="grid pl-[52px] pr-2 h-11 min-w-0">
                     {editing ? (
                         <input
                             autoFocus
@@ -117,10 +113,10 @@ const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange,
                         <button onClick={startEditing} title={t("Editar nome")} className="font-medium text-sm truncate text-left">{name}</button>
                     )}
                     <p className="text-light-text-color-tertiary dark:text-dark-text-color-tertiary text-sm truncate">{email}</p>
-                </div>}
+                </div>
 
                 {/* Stays as the panel's header once the profile row has scrolled away above it (sticky). */}
-                <p className={`sticky top-0 z-10 -mx-5 px-5 pt-4 pb-3 font-semibold text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary ${profile !== null ? "mt-4" : ""}`}>{t("Configurações")}</p>
+                <p className="sticky top-0 z-10 -mx-5 px-5 pt-4 pb-3 mt-4 font-semibold text-xl bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary">{t("Configurações")}</p>
 
                 <div className="grid mt-3">
                     <div className="grid">
@@ -149,6 +145,16 @@ const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange,
 
                         {/* Editor toolbar: follows the caret's row, or stays docked above the keyboard (NoteEditor.jsx). */}
                         <Switch dark={dark} on={Boolean(settings.fixedToolbar)} onToggle={() => onChange({ fixedToolbar: !settings.fixedToolbar })} label={t("Barra de ferramentas fixa")} icons={[NiBarFloating, NiBarFixed]} />
+                    </div>
+
+                    <div className="grid mt-6">
+                        <p className="font-medium text-lg">{t("Geral")}</p>
+
+                        {/* Note order on the dashboard: by date or name, and its direction. */}
+                        <div className="flex gap-2 mt-3">
+                            {choices("Ordenar por", SORT_BY, settings.sortBy, "sortBy", "flex-1")}
+                            {choices("Ordem", SORT_DIR, settings.sortDir, "sortDir", "w-[104px] shrink-0")}
+                        </div>
 
                         {/* Interface language (lib/i18n.js). */}
                         <Switch dark={dark} on={settings.language === "en"} onToggle={() => onChange({ language: settings.language === "en" ? "pt" : "en" })} label={t("Idioma")} icons={[LangPt, LangEn]} />
@@ -156,17 +162,9 @@ const ProfileConfig = ({ name, email, profile = 0, onLogout, settings, onChange,
                         {/* Reminder notifications: only the home-screen app can get them on iOS (else a popup says so). */}
                         <Switch dark={dark} on={push} label={t("Notificações de lembretes")} icons={[NiBellOff, NiBell]}
                             onToggle={pushSupported() ? togglePush : () => onMessage?.(t("Para receber lembretes, abra o Noted pela tela de início."))} />
-                    </div>
 
-                    <div className="grid mt-6">
-                        <p className="font-medium text-lg">{t("Ordenar notas")}</p>
-                        <div className="flex gap-2 mt-3">
-                            {choices("Ordenar por", SORT_BY, settings.sortBy, "sortBy", "flex-1")}
-                            {choices("Ordem", SORT_DIR, settings.sortDir, "sortDir", "w-[104px] shrink-0")}
-                        </div>
+                        <MfaSetup dark={dark} />
                     </div>
-
-                    <MfaSetup dark={dark} />
                 </div>
                 </div>
 

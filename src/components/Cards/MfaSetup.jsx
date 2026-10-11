@@ -72,8 +72,7 @@ const MfaSetup = ({ dark }) => {
     };
 
     return (
-        <div className="grid mt-6">
-            <p className="font-medium text-lg">{t("Verificação 2FA")}</p>
+        <div className="grid">
 
             <Switch dark={dark} on={Boolean(factor || enrolling)} onToggle={toggle} label={t("Verificação em duas etapas")} icons={[NiUnlock, NiLock]} />
 

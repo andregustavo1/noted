@@ -4,8 +4,9 @@ import { locale, setLanguage } from "./i18n";
 // User settings live on the account (Supabase user_metadata.settings), so every device gets the same ones.
 // localStorage keeps a copy so the page can paint with them before the account loads (see index.html).
 // activeCategory is the chip selected on the dashboard, kept so the app reopens on the same one; categoryOrder the
-// names in the order the user dragged the chips into (Home.jsx); language "pt" or "en" (lib/i18n.js).
-export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", cutCorners: false, fixedToolbar: false, sortBy: "date", sortDir: "desc", activeCategory: "", categoryOrder: [], language: "pt" };
+// names in the order the user dragged the chips into (Home.jsx); language "pt" or "en" (lib/i18n.js); routine the
+// streak of each routine note, by id (lib/routine.js).
+export const DEFAULT_SETTINGS = { primaryColor: "#00ff00", primaryColorFg: "#000", theme: "light", cutCorners: false, fixedToolbar: false, sortBy: "date", sortDir: "desc", activeCategory: "", categoryOrder: [], language: "pt", routine: {} };
 
 export const readLocalSettings = () => {
     try {

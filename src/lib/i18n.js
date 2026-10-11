@@ -10,7 +10,7 @@ const EN = {
     "Cor primária": "Primary color",
     "Cantos recortados": "Cut corners",
     "Barra de ferramentas fixa": "Fixed toolbar",
-    "Ordenar notas": "Sort notes",
+    "Geral": "General",
     "Ordenar por": "Sort by",
     "Ordem": "Order",
     "Data": "Date",
@@ -28,7 +28,6 @@ const EN = {
     "Roxo": "Purple",
 
     // 2FA
-    "Verificação 2FA": "2FA verification",
     "Verificação em duas etapas": "Two-step verification",
     "Desativar 2FA?": "Turn off 2FA?",
     "O login vai pedir só a senha.": "Login will only ask for the password.",
@@ -94,6 +93,7 @@ const EN = {
     "Fixar": "Pin",
     "Desfixar": "Unpin",
     "Duplicar": "Duplicate",
+    "Sequência": "Streak",
     "Excluir": "Delete",
     "Cancelar": "Cancel",
     "Remover": "Remove",
@@ -112,8 +112,6 @@ const EN = {
     "Fechar": "Close",
     "Copiado": "Copied",
     "Copiar tudo": "Copy all",
-    "Resetado": "Reset",
-    "Resetar checklist": "Reset checklist",
     "Não foi possível copiar": "Couldn't copy",
     "Lista": "List",
     "Estilo": "Style",
