@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { NiAlert } from "../Icons/NotedIcons";
+import { NiAlert, NiClose } from "../Icons/NotedIcons";
 import { t } from "../../lib/i18n";
 
 // Centered dialog card, the width of an unpinned NoteCard: half of #container (max 768px, px-4) minus half the gap-2, plus 60px.
@@ -89,7 +89,8 @@ const useMoving = (box) => {
     return [moving, onAnimationEnd];
 };
 
-const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? NiAlert : null }) => {
+// closeButton adds an × in the top corner, for dialogs whose two buttons don't include a plain "close".
+const Modal = ({ title, onClose, children, label = "modal-title", closing = false, danger = false, icon: Icon = danger ? NiAlert : null, closeButton = false }) => {
     const backdrop = useVisibleHeight(closing);
     const [moving, onAnimationEnd] = useMoving(backdrop.ref);
     return (
@@ -108,7 +109,13 @@ const Modal = ({ title, onClose, children, label = "modal-title", closing = fals
             onMouseDown={(e) => e.stopPropagation()}
             // Stop Escape here so the editor's document listener doesn't close the note too.
             onKeyDown={(e) => { if (e.key === "Escape") { e.nativeEvent.stopPropagation(); onClose(); } }}
-            className={`group/modal bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-[1.75rem] shadow-md outline-none w-[calc((min(100%,768px)-2rem)/2-0.25rem+132px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-8 md:px-8 py-8 text-center ${closing ? "animate-menu-out" : "animate-menu-in"}`}>
+            className={`group/modal relative bg-light-bg-color-primary dark:bg-dark-bg-color-primary rounded-[1.75rem] shadow-md outline-none w-[calc((min(100%,768px)-2rem)/2-0.25rem+132px)] md:w-[calc((min(100%,768px)-2rem)/2-0.25rem+60px)] px-8 md:px-8 py-8 text-center ${closing ? "animate-menu-out" : "animate-menu-in"}`}>
+            {closeButton && (
+                <button type="button" onClick={onClose} aria-label={t("Fechar")} title={t("Fechar")}
+                    className="absolute top-4 right-4 w-9 h-9 grid place-items-center rounded-full text-[22px] opacity-60 hover:opacity-100 hover:bg-light-bg-color-secondary dark:hover:bg-dark-bg-color-tertiary transition-[opacity,background-color]">
+                    <NiClose />
+                </button>
+            )}
             {Icon && (
                 <div className={`mx-auto mb-5 grid place-items-center size-12 rounded-full ${danger ? "bg-red-100 dark:bg-red-500/20 text-red-500" : "bg-[color-mix(in_srgb,var(--primary-color)_15%,transparent)] text-[var(--primary-color)]"}`}>
                     <Icon size={22} />
@@ -123,10 +130,10 @@ const Modal = ({ title, onClose, children, label = "modal-title", closing = fals
 };
 
 // The two-button row every dialog ends with; the confirm is red when `danger`.
-export const ModalButtons = ({ onCancel, onConfirm, confirm, danger, disabled }) => (
+export const ModalButtons = ({ onCancel, onConfirm, confirm, cancel = "Cancelar", danger, disabled }) => (
     <div className="flex gap-2 mt-6">
         <button type="button" onClick={onCancel} className="flex-1 min-w-0 h-11 rounded-full font-semibold bg-light-bg-color-secondary dark:bg-dark-bg-color-tertiary hover:brightness-95 duration-200">
-            {t("Cancelar")}
+            {t(cancel)}
         </button>
         <button type="submit" onClick={onConfirm} disabled={disabled}
             className={`flex-1 min-w-0 h-11 rounded-full font-semibold duration-200 disabled:opacity-40 ${danger ? "text-white bg-red-500 hover:bg-red-600" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)] hover:brightness-95"}`}>

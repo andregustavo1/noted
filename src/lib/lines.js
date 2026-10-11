@@ -1,11 +1,11 @@
 // Note content is one line per row; a line may start with a marker that renders as UI (bullet, checkbox, heading...).
 
 // After the indent (one tab per level): "- ", "– ", "- [ ] ", "1. " or "# " (1-3 hashes).
-// A task may carry a reminder right after its box: "- [ ] <@2026-10-09T18:00:00.000Z w> " (UTC instant, then
-// d/w/m/y to repeat daily/weekly/monthly/yearly). It's part of the marker, so edits to the text keep it.
-// The same pattern is read by the database (supabase/schema.sql, sync_reminders) to schedule the push.
-const LIST = /^(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] (?:<@([^ >]+)(?: ([dwmy]))?> )?)?)/;
-const REMIND = /<@[^>]*> $/;
+// A task may carry one reminder right after its box: "- [ ] <@2026-10-09T18:00:00.000Z w> " (UTC instant, then the
+// repeat: d daily, w weekly, m monthly, 2m/3m/6m every 2/3/6 months, y yearly). It's part of the marker, so edits
+// to the text keep it. The same pattern is read by the database (supabase/schema.sql, sync_reminders).
+const LIST = /^(?:(\d+)\. |(#{1,3}) |[-*–] (?:\[([ xX])\] (?:<@([^ >]+)(?: ([dwmy]|[236]m))?> )?)?)/;
+export const REMIND = /<@[^>]*> $/; // the reminder at the end of a marker
 export const MAX_INDENT = 4;
 
 // Between the indent and the list marker, an alignment: "<c> " center, "<r> " right, "<j> " justify (left has none).
@@ -26,8 +26,8 @@ export const parseLine = (line) => {
     };
 };
 
-// The line with its task reminder set to { at: ISO string, repeat: "" | "d" | "w" | "m" | "y" }, or removed (null).
-// Lines that aren't tasks come back unchanged.
+// The line with its task reminder set to { at: ISO string, repeat: "" | "d" | "w" | "m" | "2m" | "3m" | "6m" | "y" },
+// or removed (null). Lines that aren't tasks come back unchanged.
 export const setReminder = (line, remind) => {
     const { marker, text, check } = parseLine(line);
     if (check === undefined) return line;

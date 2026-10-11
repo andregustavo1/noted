@@ -109,7 +109,7 @@ create policy "Require MFA when enrolled" on public.categories
     as restrictive for all to authenticated using ((select public.require_mfa()));
 
 -- Task reminders (push notifications) ---------------------------------------------------------------------------
--- A task line may carry "<@2026-10-09T18:00:00.000Z w> " after its box (src/lib/lines.js). Saving a note rebuilds
+-- A task line may carry one "<@2026-10-09T18:00:00.000Z w> " after its box (src/lib/lines.js; repeat d/w/m/2m/3m/6m/y). Saving a note rebuilds
 -- its rows in reminders; every minute pg_cron calls the send-reminders Edge Function, which sends what's due.
 -- One-time setup (once, in the SQL Editor), so the cron job knows where the function lives:
 --   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
@@ -159,7 +159,8 @@ set search_path = ''
 as $$
 declare
     step interval := case rep when 'd' then interval '1 day' when 'w' then interval '1 week'
-        when 'm' then interval '1 month' when 'y' then interval '1 year' end;
+        when 'm' then interval '1 month' when '2m' then interval '2 months' when '3m' then interval '3 months'
+        when '6m' then interval '6 months' when 'y' then interval '1 year' end;
     t timestamptz := base;
     k int := 0;
 begin
@@ -206,7 +207,7 @@ begin
             from (
                 select m[1] <> ' ' as done, m[2]::timestamptz as at, coalesce(m[3], '') as rep, m[4] as html
                 from regexp_matches(new.content,
-                    '^\t*(?:<[crj]> )?[-*–] \[([ xX])\] <@(\d{4}-\d\d-\d\dT[0-9:.]+Z)(?: ([dwmy]))?> (.*)$', 'gn') as m
+                    '^\t*(?:<[crj]> )?[-*–] \[([ xX])\] <@(\d{4}-\d\d-\d\dT[0-9:.]+Z)(?: ([dwmy]|[236]m))?> (.*)$', 'gn') as m
             ) lines
         ) parsed
         where next_at is not null and (not done or rep <> '');

@@ -35,6 +35,8 @@ let notesCovered = false;
 // recolored: the id of a card whose colors change (pin/unpin). Its old snapshot isn't faded out over the new one: the
 // old light text would ghost over the new dark text that sits on the same spot, worst on the thin 80% preview lines,
 // so they looked late next to the title. Its box still glides; the colors switch at once, all together.
+// Without the old snapshot, a card that shrinks (unpin: wide to narrow) only has its narrow new snapshot in a corner of
+// the shrinking box, so the box is filled with the new card's background to keep the collapse visible.
 const animateNotes = (update, recolored) => {
     if (!document.startViewTransition || notesCovered) return update();
     reorders++;
@@ -50,7 +52,12 @@ const animateNotes = (update, recolored) => {
     });
     const before = new Map(corners());
     let after = [];
-    const t = document.startViewTransition(() => { flushSync(update); after = corners(); });
+    const t = document.startViewTransition(() => {
+        flushSync(update);
+        after = corners();
+        const card = cut && document.querySelector(`[data-note="${recolored}"]`);
+        if (card) cut.textContent += ` ::view-transition-image-pair(note-${recolored}) { background-color: ${getComputedStyle(card).backgroundColor}; }`;
+    });
     t.ready.then(() => after.forEach(([name, to]) => document.documentElement.animate(
         { borderRadius: [before.get(name) ?? to, to] },
         { duration: 300, easing: EASE, fill: "both", pseudoElement: `::view-transition-image-pair(${name})` },
@@ -783,9 +790,11 @@ const Home = () => {
             {/* Fixed to the screen (the page may be scrolled when it opens), the keyboard-free screen height
                 (index.html) tall, so the keyboard never shortens the panel. */}
             {/* Shown while --cfg > 0 (paintCfg). */}
-            {/* z-40: fixed, the layer stacks on its own, so the panel's z-index can't lift it over the + button. */}
-            <div ref={panelLayerRef} className="fixed z-40 overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 invisible">
-                <div ref={panelRef} className="absolute top-0 right-0 h-full z-40"
+            {/* z-40: fixed, the layer stacks on its own, so the panel's z-index can't lift it over the + button.
+                pointer-events-none: the layer spans the screen, and left of the panel a press must reach the backdrop
+                under it (a tap there closes the panel; a drag there closes it too, from the window's gesture). */}
+            <div ref={panelLayerRef} className="fixed z-40 overflow-hidden w-full h-[var(--app-height,100dvh)] top-0 right-0 invisible pointer-events-none">
+                <div ref={panelRef} className="absolute top-0 right-0 h-full z-40 pointer-events-auto"
                     style={{ transform: "translateX(calc((1 - var(--cfg)) * 100%))" }}>
                     {/* Pulled open past its edge (or overshooting), the panel shows more of itself, not a gap. */}
                     <div aria-hidden="true" className="absolute inset-y-0 left-full w-full bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary" />

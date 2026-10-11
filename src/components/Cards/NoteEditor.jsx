@@ -1,9 +1,9 @@
 import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { t } from "../../lib/i18n";
-import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRestart, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
+import { locale, t } from "../../lib/i18n";
+import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCalendar, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRestart, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
 import { flushSync } from "react-dom";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
-import { HEADINGS, MAX_INDENT, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine, renumber } from "../../lib/lines";
+import { HEADINGS, MAX_INDENT, REMIND, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine, renumber, setReminder } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 import ReminderCalendar from "./ReminderCalendar";
 import Modal, { ModalButtons, useLinger } from "./Modal";
@@ -65,7 +65,7 @@ const noteText = (title, content) => {
 };
 
 // The marker the next item gets when Enter is pressed on this line. A heading is followed by body text.
-const nextMarker = ({ marker, indent, align, number, heading }) => (heading ? indent + align :number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]"));
+const nextMarker = ({ marker, indent, align, number, heading }) => (heading ? indent + align :number ? `${indent}${Number(number) + 1}. ` : marker.replace(/\[[xX]\]/, "[ ]").replace(REMIND, ""));
 
 // Caret helpers: positions are text offsets inside a row's HTML.
 const pointAt = (el, offset) => {
@@ -100,10 +100,17 @@ const splitAt = (el, offset) => {
     return [html(null, point), html(point, null)];
 };
 
+// A line's reminder as the dialog and the chip use it: { at: Date, repeat }.
+const remindOf = (raw) => {
+    const { remind } = parseLine(raw);
+    return remind && { at: new Date(remind.at), repeat: remind.repeat };
+};
+
 // One line of the note. Memoized: with hundreds of lines, re-rendering them all on every keystroke made typing lag.
 // Its props are plain values and refs (actions holds the editor's current handlers), so only rows that changed render.
 const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isFolded, foldable: canFold, active, justChecked, only, selecting }) {
     const line = parseLine(raw);
+    const remind = remindOf(raw);
     const foldable = line.heading && canFold;
     const island = selecting ? { pointerEvents: "none" } : undefined;
     return (
@@ -161,6 +168,16 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                     </div>
                 )}
             </div>
+            {/* The line's reminder date, beside its text and centered on its first line; a tap opens the reminder. */}
+            {remind && (
+                <span contentEditable={false} suppressContentEditableWarning style={island} className="h-[1.625em] shrink-0 flex items-center select-none">
+                    <button type="button" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.openReminder(index)}
+                        className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm text-[var(--primary-color)] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary active:scale-95 transition-transform">
+                        <NiCalendar size={16} />
+                        {remind.at.toLocaleDateString(locale(), { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                    </button>
+                </span>
+            )}
         </div>
     );
 });
@@ -555,7 +572,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Toggle a list marker (or heading) on the selected lines: off when they all have it already.
     const applyList = (prefix) => {
         const indexes = selectedRows();
-        const off = indexes.every((i) => parseLine(lines[i]).list.replace(/\[[xX]\]/, "[ ]") === prefix);
+        const off = indexes.every((i) => parseLine(lines[i]).list.replace(/\[[xX]\]/, "[ ]").replace(REMIND, "") === prefix);
         setRows(indexes, ({ indent, align, text }) => indent + align + (off ? "" : prefix) + text);
     };
     const changeIndent = (step) => setRows(selectedRows(), ({ indent, align, list, text }) =>
@@ -916,7 +933,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // vanishes (start handle) or lands a row up (end handle). Applied in Row.
     // The rows' handlers, read when clicked, so passing them doesn't re-render every row (see Row).
     const rowActions = useRef();
-    rowActions.current = { toggleFold, toggleCheck };
+    rowActions.current = { toggleFold, toggleCheck, openReminder: (index) => openReminder(index) }; // openReminder is declared further down
     // The "Barra de ferramentas fixa" setting keeps it docked there the whole time, just above the keyboard.
     const docked = selecting || Boolean(fixedToolbar);
     const toolbarBoxRef = useRef(null);
@@ -998,9 +1015,34 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // Close the open menu on any press outside the toolbar (which holds both the toggles and the menus) and the note body.
     const toolbarRef = useRef(null);
     const centerRefs = useRef({}); // buttons whose menu opens centered on them
-    // The reminder dialog. ponytail: UI only, Salvar just closes until it's wired to setReminder (lines.js).
+    // The reminder dialog, for the caret's line. The reminder is saved in the line itself (lines.js), one per line;
+    // Salvar on a line that isn't a task makes it one (only tasks ring). The database schedules the push from there.
     const [remindOpen, setRemindOpen] = useState(false);
     const [remindShown, remindClosing] = useLinger(remindOpen || null);
+    const remindRow = useRef(null), remindDraft = useRef(null);
+    const remindAt = (key) => remindOf(lines[keys.indexOf(key)] ?? "");
+    const setRowReminder = (remind) => {
+        const index = keys.indexOf(remindRow.current);
+        if (index < 0) return;
+        const line = parseLine(lines[index]);
+        const task = line.check !== undefined ? lines[index] : `${line.indent}${line.align}- [ ] ${line.text}`;
+        const next = [...lines];
+        next[index] = setReminder(task, remind && { at: remind.at.toISOString(), repeat: remind.repeat });
+        setContent(renumber(next).join("\n"));
+    };
+    const openReminder = (index = activeRow.current) => {
+        document.activeElement?.blur(); // the keyboard goes down, so the dialog has the whole screen
+        remindRow.current = keys[index];
+        setRemindOpen(true);
+    };
+    const saveReminder = () => {
+        if (remindDraft.current) setRowReminder(remindDraft.current);
+        setRemindOpen(false);
+    };
+    const removeReminder = () => {
+        if (remindAt(remindRow.current)) setRowReminder(null);
+        setRemindOpen(false);
+    };
     useEffect(() => {
         if (!menuOpen) return;
         const onDown = (e) => { if (!toolbarRef.current?.contains(e.target) && !bodyRef.current?.contains(e.target)) setMenuOpen(null); };
@@ -1410,8 +1452,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                 </button>
                             ))}
                             {/* Opens a centered dialog; the keyboard goes down first so the dialog has the whole screen. */}
-                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setMenuOpen(null); document.activeElement?.blur(); setRemindOpen(true); }} aria-label={t("Lembrete")} title={t("Lembrete")}
-                                className="w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]">
+                            <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setMenuOpen(null); document.activeElement?.blur(); openReminder(); }} aria-label={t("Lembrete")} title={t("Lembrete")} aria-pressed={!!remindAt(keys[activeIndex])}
+                                // In the primary color while the caret's line has a reminder, like an open menu's button.
+                                className={`w-11 h-11 grid place-items-center rounded-full text-[22px] transition-colors ${remindAt(keys[activeIndex]) ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "bg-light-bg-color-secondary dark:bg-dark-bg-color-primary hover:bg-[var(--primary-color)]"}`}>
                                 <NiClock />
                             </button>
                             <button type="button" tabIndex={showToolbar ? 0 : -1} onClick={() => { setToolbarClosed(true); setMenuOpen(null); }} aria-label={t("Fechar barra")} title={t("Fechar barra")}
@@ -1496,7 +1539,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             return (
                                 <Row key={keys[index]} raw={raw} index={index} rows={rows} rowBoxes={rowBoxes} actions={rowActions}
                                     hidden={hidden.has(index)} isFolded={isFolded} foldable={isFolded || headingSection(lines, index)[1] > index + 1}
-                                    active={focused && index === activeIndex} justChecked={justChecked === index} only={lines.length === 1} selecting={selecting} />
+                                    active={focused && index === activeIndex} justChecked={justChecked === index} only={lines.length === 1} selecting={selecting}
+                                    />
                             );
                         })}
                     </div>
@@ -1506,9 +1550,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             </div>
         </div>
             {remindShown && (
-                <Modal icon={NiClock} closing={remindClosing} title={t("Lembrete")} onClose={() => setRemindOpen(false)}>
-                    <ReminderCalendar />
-                    <ModalButtons confirm={t("Salvar")} onCancel={() => setRemindOpen(false)} onConfirm={() => setRemindOpen(false)} />
+                <Modal icon={NiClock} closeButton closing={remindClosing} title={t("Lembrete")} onClose={() => setRemindOpen(false)}>
+                    <ReminderCalendar value={remindAt(remindRow.current)} onChange={(draft) => { remindDraft.current = draft; }} />
+                    <ModalButtons confirm={t("Salvar")} cancel="Remover" onCancel={removeReminder} onConfirm={saveReminder} />
                 </Modal>
             )}
         </>

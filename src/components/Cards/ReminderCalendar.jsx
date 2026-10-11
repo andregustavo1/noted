@@ -27,9 +27,12 @@ const Wheel = ({ count, value, onChange, format = String, label, loop = true, wi
             el.style.opacity = 1 - d * 0.72;
         });
     };
+    // The value is reported live, whenever another item reaches the middle, so the row above follows the wheel
+    // instead of waiting for the spring to come to rest.
+    const report = (c) => onChange(loop ? ((c % count) + count) % count : Math.max(0, Math.min(count - 1, c)));
     const paint = () => {
         const c = Math.round(pos.current);
-        if (c !== shown.current) { shown.current = c; setCenter(c); } // the layout effect draws once it's rendered
+        if (c !== shown.current) { shown.current = c; setCenter(c); report(c); } // the layout effect draws once it's rendered
         else draw();
     };
     useLayoutEffect(draw);
@@ -38,7 +41,7 @@ const Wheel = ({ count, value, onChange, format = String, label, loop = true, wi
         stop.current?.();
         if (!loop) to = Math.max(0, Math.min(count - 1, to));
         stop.current = animateSpring({ from: pos.current, to, velocity, damping: 1, response: 0.6,
-            onFrame: (x) => { pos.current = x; paint(); }, onDone: () => onChange(((to % count) + count) % count) });
+            onFrame: (x) => { pos.current = x; paint(); }, onDone: () => report(to) });
     };
     const onPointerDown = (e) => {
         stop.current?.();
@@ -82,34 +85,32 @@ const Wheel = ({ count, value, onChange, format = String, label, loop = true, wi
 };
 const pad = (n) => String(n).padStart(2, "0");
 
-// ponytail: UI only. `value`/`onChange` are for whoever wires it to setReminder (lines.js).
-export default function ReminderCalendar({ value, onChange }) {
+// Reports every change as onChange({ at: Date, repeat }) (repeat as in lines.js: "" | "d" | "w" | ...).
+export default function ReminderCalendar({ value, onChange }) { // value: { at, repeat }, the reminder being edited
     const today = new Date();
-    const [selected, setSelected] = useState(value ?? today);
-    const [hour, setHour] = useState(8);
-    const [minute, setMinute] = useState(0);
-    // Hora and Repetir open their wheels under the row ("time" | "repeat" | null), growing the card; a press
-    // anywhere else closes them. A press on either row is left to the row's click, which switches straight from one
-    // to the other: closing on the press collapsed the open wheels mid-tap, and the other row slid out from under it.
+    const [selected, setSelected] = useState(value?.at ?? today);
+    const [hour, setHour] = useState(value?.at.getHours() ?? 8);
+    const [minute, setMinute] = useState(value?.at.getMinutes() ?? 0);
+    // Hora and Repetir open their wheels under the row ("time" | "repeat" | null), growing the card. They stay open
+    // while the rest of the dialog is used (a press elsewhere closing them made a tap on a day only close them);
+    // tapping the row again, or the picked value, closes them, and the other row switches straight over.
     // The wheels stay mounted, so the ones closing keep their content while their space shrinks.
     const [open, setOpen] = useState(null);
     const close = () => setOpen(null);
     const toggle = (id) => () => setOpen((o) => (o === id ? null : id));
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e) => { if (!e.target.closest("[data-picker]")) setOpen(null); };
-        document.addEventListener("pointerdown", onDown);
-        return () => document.removeEventListener("pointerdown", onDown);
-    }, [open]);
     // The band behind the middle row marks the picked value (as on iOS); the wheels come later, so they draw on top.
     const band = <span className="absolute inset-x-2.5 top-1/2 -translate-y-1/2 rounded-full bg-light-bg-color-tertiary dark:bg-dark-bg-color-tertiary" style={{ height: ROW }} />;
     const popup = "relative flex items-center justify-center gap-3 py-1";
-    const [repeat, setRepeat] = useState("");
+    const [repeat, setRepeat] = useState(value?.repeat ?? "");
+    useEffect(() => {
+        onChange?.({ at: new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), hour, minute), repeat });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selected, hour, minute, repeat]);
     // The month shown, as its first day. new Date(y, m ± 1) rolls the year over by itself.
     const [month, setMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth()));
     const shift = (n) => new Date(month.getFullYear(), month.getMonth() + n);
     const title = `${month.toLocaleDateString(locale(), { month: "long" })} ${month.getFullYear()}`;
-    const pick = (day) => { setSelected(day); onChange?.(day); };
+    const pick = (day) => setSelected(day);
 
     // Carousel: the previous, current and next months side by side on a strip, moved by `offset` px from centered.
     // A month change commits at once (title and all) and the strip is shifted by a page the other way so nothing
@@ -203,8 +204,8 @@ export default function ReminderCalendar({ value, onChange }) {
                             onChange={(i) => setRepeat(REPEATS[i][0])} format={(i) => t(REPEATS[i][1])} />
                     </div>
                   )]].map(([id, Icon, label, shown, onClick, below]) => (
-                    <div key={id} data-picker>
-                    <label onClick={onClick} className="relative flex items-center gap-2.5 py-1 px-2.5">
+                    <div key={id}>
+                    <label onClick={onClick} className="relative flex items-center gap-2.5 py-1 px-2.5 cursor-pointer">
                         <Icon className="text-[22px] opacity-60 shrink-0" />
                         <span className="flex-1">{t(label)}</span>
                         <span className="text-[var(--primary-color)]">{shown}</span>

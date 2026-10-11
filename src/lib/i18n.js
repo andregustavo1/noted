@@ -96,6 +96,7 @@ const EN = {
     "Duplicar": "Duplicate",
     "Excluir": "Delete",
     "Cancelar": "Cancel",
+    "Remover": "Remove",
     "Salvar": "Save",
 
     // Editor

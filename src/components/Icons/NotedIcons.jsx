@@ -26,6 +26,7 @@ export const NiChevronRight = icon(<path d="M9.5 6l6 6-6 6" />);
 export const NiChevronDown = icon(<path d="M6 9.5l6 6 6-6" />);
 export const NiChevronUp = icon(<path d="M6 14.5l6-6 6 6" />);
 export const NiAlert = icon(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5" />{dot(12, 16, 1.1)}</>);
+export const NiCalendar = icon(<><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>);
 export const NiClock = icon(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>);
 
 // Notes
