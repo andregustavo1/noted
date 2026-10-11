@@ -14,14 +14,15 @@ import { fetchNotes } from "../../lib/notes";
 import { fetchCategories } from "../../lib/categories";
 import Modal, { ModalButtons, useLinger } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
-import { locale, t } from "../../lib/i18n";
+import { t } from "../../lib/i18n";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
 import { flush, flushedSince } from "../../lib/sync";
 import { animateSpring, project, rubber, tracker } from "../../lib/spring";
 
 
-const formatDate = (iso) => new Date(iso).toLocaleDateString(locale());
+// Day/month/year in either language (the Brazilian order).
+const formatDate = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
 // Cards glide to their new slots instead of jumping (View Transitions API, styled in index.css).
 // The cards are only named while a transition runs: a named element becomes a stacking context, which would
@@ -574,6 +575,24 @@ const Home = () => {
 
     // Called once the editor's closing has played.
     const closeEditor = useCallback(() => { setEditor(null); setSearchQuery(""); setSearchEnd((n) => n + 1); }, []);
+
+    // A tapped reminder notification opens its note (public/sw.js): the app starts with ?note=<id>, or, already
+    // open, gets a message. Notes come from the device's cache, so the note is there before any fetch.
+    const openFromPush = useRef(null);
+    openFromPush.current = (id) => {
+        const note = notes.find((n) => n.id === id);
+        if (note) openEditor(note);
+    };
+    useEffect(() => {
+        const id = new URLSearchParams(window.location.search).get("note");
+        if (id) {
+            window.history.replaceState(null, "", window.location.pathname);
+            openFromPush.current(id);
+        }
+        const onMessage = (e) => { if (e.data?.type === "open-note") openFromPush.current(e.data.note); };
+        navigator.serviceWorker?.addEventListener("message", onMessage);
+        return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
+    }, []);
 
     notesCovered = onConfig || Boolean(editor);
 

@@ -3,9 +3,9 @@ import { locale, t } from "../../lib/i18n";
 import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCalendar, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRestart, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
 import { flushSync } from "react-dom";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
-import { HEADINGS, MAX_INDENT, REMIND, foldedRows, headingSection, headingSize, lineGap, lineStyle, parseLine, renumber, setReminder } from "../../lib/lines";
+import { HEADINGS, MAX_INDENT, REMIND, foldedRows, headingSection, headingSize, lineGap, lineStyle, nextRemind, parseLine, renumber, setReminder } from "../../lib/lines";
 import LineMarker from "./LineMarker";
-import ReminderCalendar from "./ReminderCalendar";
+import ReminderCalendar, { REPEATS } from "./ReminderCalendar";
 import Modal, { ModalButtons, useLinger } from "./Modal";
 import { findAll } from "../../lib/search";
 import { canMorph, closeInto, openFrom } from "../../lib/morph";
@@ -106,6 +106,14 @@ const remindOf = (raw) => {
     return remind && { at: new Date(remind.at), repeat: remind.repeat };
 };
 
+// A reminder's day as people say it: Hoje / Amanhã / Ontem, else "15 out" (with the year when it isn't this one).
+const reminderDay = (at) => {
+    const days = Math.round((new Date(at).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5);
+    if (Math.abs(days) <= 1) return t(["Ontem", "Hoje", "Amanhã"][days + 1]);
+    const year = at.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {};
+    return at.toLocaleDateString(locale(), { day: "numeric", month: "short", ...year }).replace(/ de /g, " ").replace(".", "");
+};
+
 // One line of the note. Memoized: with hundreds of lines, re-rendering them all on every keystroke made typing lag.
 // Its props are plain values and refs (actions holds the editor's current handlers), so only rows that changed render.
 const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isFolded, foldable: canFold, active, justChecked, only, selecting }) {
@@ -167,17 +175,22 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                         <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: trimEnd(line.text) }} />
                     </div>
                 )}
-            </div>
-            {/* The line's reminder date, beside its text and centered on its first line; a tap opens the reminder. */}
-            {remind && (
-                <span contentEditable={false} suppressContentEditableWarning style={island} className="h-[1.625em] shrink-0 flex items-center select-none">
-                    <button type="button" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.openReminder(index)}
-                        className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm text-[var(--primary-color)] bg-light-bg-color-secondary dark:bg-dark-bg-color-primary active:scale-95 transition-transform">
-                        <NiCalendar size={16} />
-                        {remind.at.toLocaleDateString(locale(), { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                {/* The line's reminder under its text: the day and time in the primary color, the repeat (if any) muted.
+                    Gray on a done task. A tap opens the reminder. */}
+                {remind && (
+                    <button type="button" contentEditable={false} suppressContentEditableWarning tabIndex={-1} style={island}
+                        onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.openReminder(index)}
+                        className={`flex items-center gap-3 text-xs -mt-0.5 mb-0.5 select-none ${line.done ? "opacity-60" : ""}`}>
+                        <span className={`flex items-center gap-1 ${line.done ? "opacity-70" : "text-[var(--primary-color)]"}`}>
+                            <NiCalendar size={13} strokeWidth={1.25} className="shrink-0" />
+                            {reminderDay(remind.at)}, {remind.at.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
+                        </span>
+                        {remind.repeat && (
+                            <span className="flex items-center gap-1 opacity-70"><NiRestart size={13} strokeWidth={1.25} className="shrink-0" />{t(REPEATS.find(([k]) => k === remind.repeat)[1])}</span>
+                        )}
                     </button>
-                </span>
-            )}
+                )}
+            </div>
         </div>
     );
 });
@@ -547,14 +560,28 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         else if (changed) setContent(next.join("\n"));
     };
 
-    // Only the box the user just checked animates, not ones that open already checked.
+    // Only the box the user just checked animates, not ones that open already checked. Kept by the row's key, not its
+    // index: a line broken or removed above it would hand the index (and the animation) to another checked row.
+    const CHECK_MS = 520; // the check draws for 520ms (tailwind.config.js: check-draw, 120ms delay + 400ms)
     const [justChecked, setJustChecked] = useState(null);
     const toggleCheck = (index) => {
-        setJustChecked(index);
+        setJustChecked(ids.current[index]);
         const next = [...lines];
-        const { done } = parseLine(lines[index]);
+        const { done, remind } = parseLine(lines[index]);
         next[index] = lines[index].replace(/\[[ xX]\]/, done ? "[ ]" : "[x]");
         setContent(next.join("\n"));
+        // A repeating task done plays its check, then reopens on its next date (as in iOS Reminders): the chip
+        // shows the new date. Found again by row key, and left alone if it was unticked or changed meanwhile.
+        if (done || !remind?.repeat) return;
+        const key = keys[index];
+        setTimeout(() => setContent((current) => {
+            const rows = current.split("\n");
+            const i = ids.current.indexOf(key);
+            const line = parseLine(rows[i] ?? "");
+            if (!line.done || line.remind?.at !== remind.at) return current;
+            rows[i] = setReminder(rows[i].replace(/\[[xX]\]/, "[ ]"), { at: nextRemind(remind.at, remind.repeat).toISOString(), repeat: remind.repeat });
+            return rows.join("\n");
+        }), CHECK_MS + 750); // 750ms after the check finishes drawing
     };
 
     // The rows a toolbar action applies to: every row the selection touches, or the caret's row.
@@ -1270,7 +1297,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
 
     // What the open menu should light up: the caret line's heading/list marker; styles come from the selection.
     const activeLine = parseLine(lines[activeRow.current] ?? "");
-    const activeList = activeLine.list.replace(/\[[xX]\]/, "[ ]");
+    const activeList = activeLine.list.replace(/\[[xX]\]/, "[ ]").replace(REMIND, "");
     const option = (on) => (on ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-fg)] active:bg-[var(--primary-color)] active:text-[var(--primary-color-fg)]");
 
     // Header buttons share one size; undo/redo/options sit on the secondary background.
@@ -1539,7 +1566,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             return (
                                 <Row key={keys[index]} raw={raw} index={index} rows={rows} rowBoxes={rowBoxes} actions={rowActions}
                                     hidden={hidden.has(index)} isFolded={isFolded} foldable={isFolded || headingSection(lines, index)[1] > index + 1}
-                                    active={focused && index === activeIndex} justChecked={justChecked === index} only={lines.length === 1} selecting={selecting}
+                                    active={focused && index === activeIndex} justChecked={justChecked === keys[index]} only={lines.length === 1} selecting={selecting}
                                     />
                             );
                         })}

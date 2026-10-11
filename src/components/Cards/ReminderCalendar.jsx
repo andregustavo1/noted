@@ -3,7 +3,8 @@ import { animateSpring, project, tracker } from "../../lib/spring";
 import { NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiRestart } from "../Icons/NotedIcons";
 import { locale, t, weekdays } from "../../lib/i18n";
 
-const REPEATS = [["", "Nunca"], ["d", "Diária"], ["w", "Semanal"], ["m", "Mensal"], ["2m", "2 meses"], ["3m", "3 meses"], ["6m", "6 meses"], ["y", "Anual"]];
+// eslint-disable-next-line react-refresh/only-export-components
+export const REPEATS = [["", "Nunca"], ["d", "Diária"], ["w", "Semanal"], ["m", "Mensal"], ["2m", "2 meses"], ["3m", "3 meses"], ["6m", "6 meses"], ["y", "Anual"]];
 const DRAG = 0.7; // the strip moves this much per px of finger: a heavier drag
 const sameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
 

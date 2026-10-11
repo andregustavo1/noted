@@ -35,6 +35,25 @@ export const setReminder = (line, remind) => {
     return marker.replace(REMIND, "") + tag + text;
 };
 
+// [months, days] per repeat step.
+const STEPS = { d: [0, 1], w: [0, 7], m: [1, 0], "2m": [2, 0], "3m": [3, 0], "6m": [6, 0], y: [12, 0] };
+
+// When a repeating reminder rings next once its task is done: at plus whole steps in local time, the first after
+// now (done early, the next one; done late, none of the missed ones). A monthly one on the 31st lands on the last
+// day of shorter months, as the database does.
+// ponytail: steps from the date it lands on, so after a 30th the 31st is lost; keep the original day if that matters.
+export const nextRemind = (at, repeat, now = new Date()) => {
+    const [months, days] = STEPS[repeat];
+    const base = new Date(at);
+    for (let k = 1; ; k++) {
+        const t = new Date(base);
+        t.setDate(1);
+        t.setMonth(base.getMonth() + months * k);
+        t.setDate(Math.min(base.getDate(), new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()) + days * k);
+        if (t > now) return t;
+    }
+};
+
 // A numbered line under another of the same indent continues its count (deeper lines in between don't break it,
 // any other line does); every run starts at 1.
 export const renumber = (lines) => {
