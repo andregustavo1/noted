@@ -46,7 +46,9 @@ export const NiCut = icon(<><circle cx="7" cy="17" r="3" /><circle cx="17" cy="1
 export const NiPaste = icon(<><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 5H7.5A2.5 2.5 0 0 0 5 7.5v11A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 16.5 5H15" /></>);
 export const NiUndo = icon(<path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H12" />);
 export const NiRedo = icon(<path d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H12" />);
-export const NiRestart = icon(<path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.5M4 4v4.5h4.5" />);
+// Two arrows chasing each other round a square: up the left side, down the right.
+export const NiRepost = icon(<path d="M3 7l3-3 3 3M6 4v11a3 3 0 0 0 3 3h2.5M21 17l-3 3-3-3M18 20V9a3 3 0 0 0-3-3h-2.5" />);
+export const NiRestart =icon(<path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.5M4 4v4.5h4.5" />);
 
 // Text
 export const NiBold = icon(<path d="M7 5h5.5a3.5 3.5 0 0 1 0 7H7zM7 12h6.5a3.5 3.5 0 0 1 0 7H7z" />);

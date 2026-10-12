@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { animateSpring, project, tracker } from "../../lib/spring";
-import { NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiRestart } from "../Icons/NotedIcons";
+import { NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiRepost } from "../Icons/NotedIcons";
 import { locale, t, weekdays } from "../../lib/i18n";
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -12,7 +12,7 @@ const sameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
 // as the month carousel: `pos` is the fractional item at the middle, the rows are drawn around its nearest whole
 // item and slid by the rest. A flick coasts and lands on a whole item; a tap on a neighbour or the wheel steps to it.
 const ROW = 32;
-const Wheel = ({ count, value, onChange, format = String, label, loop = true, width = "w-12", onTapSelected }) => {
+const Wheel = ({ count, value, onChange, format = String, label, loop = true, width = "w-12", area = "", align = "justify-center", onTapSelected }) => {
     const pos = useRef(value), stop = useRef(null), drag = useRef(null), list = useRef(null);
     const [center, setCenter] = useState(value);
     const shown = useRef(center);
@@ -70,10 +70,12 @@ const Wheel = ({ count, value, onChange, format = String, label, loop = true, wi
     };
     return (
         <div role="spinbutton" aria-label={t(label)} aria-valuenow={value} aria-valuemin={0} aria-valuemax={count - 1}
-            className={`relative ${width} overflow-hidden touch-none cursor-grab`} style={{ height: ROW * 3 }}
+            className={`relative flex ${align} ${area || width} overflow-hidden touch-none cursor-grab`} style={{ height: ROW * 3 }}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
             onWheel={(e) => settle(Math.round(pos.current) + Math.sign(e.deltaY))}>
-            <div ref={list} className="will-change-transform">
+            {/* The numbers keep their own column (width), so each row shrinks and tilts around its own text; the drag and
+                tap area around it can be wider (area), with the column at its align side. */}
+            <div ref={list} className={`${width} shrink-0 will-change-transform`}>
                 {[-2, -1, 0, 1, 2].map((k) => (
                     <div key={center + k} className="flex items-center justify-center text-lg font-semibold"
                         style={{ height: ROW, marginTop: k === -2 ? -ROW : 0 }}>
@@ -101,7 +103,9 @@ export default function ReminderCalendar({ value, onChange }) { // value: { at, 
     const toggle = (id) => () => setOpen((o) => (o === id ? null : id));
     // The band behind the middle row marks the picked value (as on iOS); the wheels come later, so they draw on top.
     const band = <span className="absolute inset-x-2.5 top-1/2 -translate-y-1/2 rounded-full bg-light-bg-color-tertiary dark:bg-dark-bg-color-tertiary" style={{ height: ROW }} />;
-    const popup = "relative flex items-center justify-center gap-3 py-1";
+    // The wheels share the band's whole width (px-2.5 = its inset), so a drag or tap anywhere on it reaches one; the
+    // time's numbers keep hugging the colon (align).
+    const popup = "relative flex items-center justify-center gap-3 py-1 px-2.5";
     const [repeat, setRepeat] = useState(value?.repeat ?? "");
     useEffect(() => {
         onChange?.({ at: new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), hour, minute), repeat });
@@ -193,15 +197,15 @@ export default function ReminderCalendar({ value, onChange }) { // value: { at, 
                 {[["time", NiClock, "Hora", `${pad(hour)}:${pad(minute)}`, toggle("time"), (
                     <div key="wheels" className={popup}>
                         {band}
-                        <Wheel onTapSelected={close} label="Hora" count={24} value={hour} onChange={setHour} format={pad} />
+                        <Wheel onTapSelected={close} label="Hora" count={24} value={hour} onChange={setHour} format={pad} area="flex-1" align="justify-end" />
                         <span className="relative text-lg font-semibold">:</span>
-                        <Wheel onTapSelected={close} label="Minuto" count={60} value={minute} onChange={setMinute} format={pad} />
+                        <Wheel onTapSelected={close} label="Minuto" count={60} value={minute} onChange={setMinute} format={pad} area="flex-1" align="justify-start" />
                     </div>
                   )],
-                  ["repeat", NiRestart, "Repetir", t(REPEATS.find(([k]) => k === repeat)[1]), toggle("repeat"), (
+                  ["repeat", NiRepost, "Repetir", t(REPEATS.find(([k]) => k === repeat)[1]), toggle("repeat"), (
                     <div key="wheels" className={popup}>
                         {band}
-                        <Wheel onTapSelected={close} label="Repetir" count={REPEATS.length} loop={false} width="w-28" value={REPEATS.findIndex(([k]) => k === repeat)}
+                        <Wheel onTapSelected={close} label="Repetir" count={REPEATS.length} loop={false} width="w-28" area="flex-1" value={REPEATS.findIndex(([k]) => k === repeat)}
                             onChange={(i) => setRepeat(REPEATS[i][0])} format={(i) => t(REPEATS[i][1])} />
                     </div>
                   )]].map(([id, Icon, label, shown, onClick, below]) => (

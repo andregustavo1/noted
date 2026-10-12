@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { t } from "../../lib/i18n";
 import { NiCheck, NiDuplicate, NiEdit, NiPin, NiPinFilled, NiTag, NiTrash } from "../Icons/NotedIcons";
-import { sanitize, trimEnd } from "../../lib/richtext";
+import { plain, sanitize, trimEnd } from "../../lib/richtext";
 import { headingSize, lineGap, lineStyle, parseLine } from "../../lib/lines";
 import LineMarker from "./LineMarker";
 
@@ -59,6 +59,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
     const previewLength = isPinned ? 60 : size.previewLength;
     // Lines up to maxLines. List and heading lines stay on one line and end in "..." on their own, so a long one never
     // hides the lines under it; plain text wraps, so it spends the character budget and is cut where that runs out.
+    // Blank lines (spacing in the note) are skipped, so the card shows that many lines that say something.
     const maxLines = isPinned ? 3 : tall ? 5 : 3;
     const all = content.split("\n");
     const shown = [];
@@ -66,7 +67,8 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
     let cut = false; // a plain line cut short; lines left out entirely get no "..."
     for (const raw of all) {
         if (shown.length === maxLines || budget <= 0) break;
-        const { list, text } = parseLine(raw);
+        const { list, text, check } = parseLine(raw);
+        if (check === undefined && !plain(text).trim()) continue;
         if (list) {
             shown.push(raw);
             budget -= Math.min(text.length, 20);

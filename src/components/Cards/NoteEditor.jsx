@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { locale, t } from "../../lib/i18n";
-import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCalendar, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRestart, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
+import { NiAlignCenter, NiAlignJustify, NiAlignLeft, NiAlignRight, NiBold, NiCalendar, NiCheck, NiChevronDown, NiChevronRight, NiChevronUp, NiClock, NiClose, NiCopy, NiCut, NiDuplicate, NiHeading, NiIndentLess, NiIndentMore, NiItalic, NiListBullet, NiListCheck, NiListDash, NiListNumber, NiMore, NiPaste, NiPin, NiPinFilled, NiRedo, NiRepost, NiSearch, NiStrike, NiTag, NiTrash, NiUnderline, NiUndo } from "../Icons/NotedIcons";
 import { flushSync } from "react-dom";
 import { escapeHtml, plain, sanitize, trimEnd } from "../../lib/richtext";
 import { HEADINGS, MAX_INDENT, REMIND, foldedRows, headingSection, headingSize, lineGap, lineStyle, nextRemind, parseLine, renumber, setReminder } from "../../lib/lines";
@@ -8,7 +8,8 @@ import LineMarker from "./LineMarker";
 import ReminderCalendar, { REPEATS } from "./ReminderCalendar";
 import Modal, { ModalButtons, useLinger } from "./Modal";
 import { findAll } from "../../lib/search";
-import { canMorph, closeInto, openFrom } from "../../lib/morph";
+import { canMorph, closeInto, openFrom, scrubInto } from "../../lib/morph";
+import { animateSpring, project, tracker } from "../../lib/spring";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
 
@@ -106,9 +107,11 @@ const remindOf = (raw) => {
     return remind && { at: new Date(remind.at), repeat: remind.repeat };
 };
 
+// Whole days from today to a reminder's day: 0 today, negative when it has passed.
+const daysUntil = (at) => Math.round((new Date(at).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5);
 // A reminder's day as people say it: Hoje / Amanhã / Ontem, else "15 out" (with the year when it isn't this one).
 const reminderDay = (at) => {
-    const days = Math.round((new Date(at).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5);
+    const days = daysUntil(at);
     if (Math.abs(days) <= 1) return t(["Ontem", "Hoje", "Amanhã"][days + 1]);
     const year = at.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {};
     return at.toLocaleDateString(locale(), { day: "numeric", month: "short", ...year }).replace(/ de /g, " ").replace(".", "");
@@ -175,18 +178,22 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                         <span className={line.done ? "done" : ""} dangerouslySetInnerHTML={{ __html: trimEnd(line.text) }} />
                     </div>
                 )}
-                {/* The line's reminder under its text: the day and time in the primary color, the repeat (if any) muted.
-                    Gray on a done task. A tap opens the reminder. */}
+                {/* The line's reminder under its text: the day and time in the primary color once it's due (today or past),
+                    muted before that like the repeat. Gray on a done task. A tap opens the reminder. */}
                 {remind && (
                     <button type="button" contentEditable={false} suppressContentEditableWarning tabIndex={-1} style={island}
                         onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.openReminder(index)}
-                        className={`flex items-center gap-3 text-xs -mt-0.5 mb-0.5 select-none ${line.done ? "opacity-60" : ""}`}>
-                        <span className={`flex items-center gap-1 ${line.done ? "opacity-70" : "text-[var(--primary-color)]"}`}>
+                        className={`flex items-center gap-2 text-xs -mt-0.5 mb-0.5 select-none ${line.done ? "opacity-60" : ""}`}>
+                        <span className={`flex items-center gap-1 ${line.done || daysUntil(remind.at) > 0 ? "opacity-70" : "text-[var(--primary-color)]"}`}>
                             <NiCalendar size={13} strokeWidth={1.25} className="shrink-0" />
-                            {reminderDay(remind.at)}, {remind.at.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
+                            {/* As wide as a usual date ("Nov 10, 08:00" / "10 nov, 08:00"; the font is monospaced), so the repeat
+                                after it starts in the same column on every line; only a longer one (Tomorrow) pushes it. */}
+                            <span className="text-left min-w-[13ch]">
+                                {reminderDay(remind.at)}, {remind.at.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
+                            </span>
                         </span>
                         {remind.repeat && (
-                            <span className="flex items-center gap-1 opacity-70"><NiRestart size={13} strokeWidth={1.25} className="shrink-0" />{t(REPEATS.find(([k]) => k === remind.repeat)[1])}</span>
+                            <span className="flex items-center gap-1 opacity-70"><NiRepost size={13} strokeWidth={1.25} className="shrink-0" />{t(REPEATS.find(([k]) => k === remind.repeat)[1])}</span>
                         )}
                     </button>
                 )}
@@ -227,6 +234,97 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         setClosing(true);
         setTimeout(onClose, 100);
     };
+
+    // Phones: pulled from the left edge, the editor lifts off: it shrinks into its card's spot (the same close as the
+    // button's, lib/morph.js), with a shadow, the backdrop thinning to show the notes behind; then the finger carries
+    // it sideways from there. Let go past a third of the way (or flicked) it settles back on the spot and closes; else
+    // it springs back open where it was. The carrying is the sheet (the panel's wrapper) moved with the finger; it's
+    // let go of as the spring lands either way. Without its card on the page (deleted, filtered out) the sheet just
+    // follows the finger and the usual close pops it out. Window listeners, like the dashboard's gestures.
+    const sheetRef = useRef(null);
+    const sheetDrag = useRef(null);
+    const stopSheet = useRef(null);
+    const scrub = useRef(null); // the scrubbed close in progress, until it ends or is cancelled
+    const paintSheet = (x, y = 0) => {
+        sheetRef.current.style.transform = x || y ? `translate(${x}px, ${y}px)` : "";
+        if (!scrub.current) backdropRef.current.style.opacity = x ? String(1 - x / sheetRef.current.offsetWidth) : "";
+    };
+    // The shadow is a filter on the sheet: a box-shadow on the panel would be cut off by the close's clip-path.
+    const lift = (on) => { sheetRef.current.style.filter = on ? "drop-shadow(0 12px 20px rgb(0 0 0 / 0.25))" : ""; };
+    // The box carried sideways by as far as the finger has moved since taking hold of it, as far as it has (d.t, 0 to 1).
+    const carry = (d, t = d.t) => paintSheet(t * (d.fx - d.x), 0);
+    const sheetGesture = useRef(null);
+    sheetGesture.current = {
+        down: (e) => {
+            if (e.pointerType !== "touch" || closing || morphing.current === "closing" || e.clientX > 40) return;
+            sheetDrag.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        },
+        move: (e) => {
+            const d = sheetDrag.current;
+            if (!d || e.pointerId !== d.id) return;
+            if (!d.on) {
+                const dx = e.clientX - d.x, dy = Math.abs(e.clientY - d.y);
+                if (Math.abs(dx) < 10 && dy < 10) return;
+                if (dx <= dy) { sheetDrag.current = null; return; } // rightward only; a vertical start is a scroll
+                stopSheet.current?.();
+                scrub.current?.cancel(); // caught springing back open: starts over from its place
+                Object.assign(d, { on: true, x: e.clientX, fx: e.clientX, t: 0, v: tracker(), w: sheetRef.current.offsetWidth });
+                const s = scrub.current = scrubInto(panelRef.current, backdropRef.current, saved?.id ?? note?.id, Array.isArray(morphing.current) ? morphing.current : null);
+                if (s) {
+                    morphing.current = null;
+                    // Taking hold: shrinks into its card's spot.
+                    stopSheet.current = animateSpring({ from: 0, to: 1, damping: 1, response: 0.3, onFrame: (t) => { d.t = t; s.seek(t, t); carry(d); } });
+                }
+                lift(true);
+            }
+            d.dx = Math.max(0, e.clientX - d.x);
+            d.fx = e.clientX;
+            d.v.add(d.dx);
+            if (scrub.current) carry(d);
+            else paintSheet(d.dx);
+        },
+        up: (e) => {
+            const d = sheetDrag.current;
+            if (!d || e.pointerId !== d.id) return;
+            sheetDrag.current = null;
+            if (!d.on) return;
+            const v = d.v.velocity();
+            const lands = d.dx + project(v) > d.w / 3; // where the flick would coast to
+            const s = scrub.current;
+            if (!s) {
+                if (lands) return close();
+                stopSheet.current = animateSpring({ from: d.dx, to: 0, velocity: v, damping: 1, onFrame: paintSheet, onDone: () => lift(false) });
+                return;
+            }
+            stopSheet.current?.(); // still being taken hold of: carries on from there
+            const t0 = d.t;
+            if (!lands) {
+                // Back where it was: the box grows back out of the spot as the finger lets go of it.
+                stopSheet.current = animateSpring({ from: t0, to: 0, damping: 1, response: 0.3, onFrame: (t) => { s.seek(t, t); carry(d, t); }, onDone: () => { scrub.current = null; s.cancel(); lift(false); } });
+                return;
+            }
+            morphing.current = "closing";
+            keepOnlyVisibleRows();
+            panelRef.current.parentElement.style.pointerEvents = "none"; // the notes are live again at once
+            // Settles back on the spot, let go of as it gets there (and finishing the shrink if it was cut short).
+            stopSheet.current = animateSpring({ from: 0, to: 1, velocity: v / d.w, damping: 1, response: 0.35,
+                onFrame: (m) => { const t = t0 + (1 - t0) * m; s.seek(t, t); carry(d, (1 - m) * t0); },
+                onDone: () => { scrub.current = null; onClose(); } });
+        },
+    };
+    useEffect(() => {
+        const call = (name) => (e) => sheetGesture.current[name](e);
+        const on = { pointerdown: call("down"), pointermove: call("move"), pointerup: call("up"), pointercancel: call("up") };
+        // Once dragging, the note must not scroll under the finger (touch-action can't change mid-gesture).
+        const onTouchMove = (e) => { if (sheetDrag.current?.on) e.preventDefault(); };
+        Object.entries(on).forEach(([t, f]) => window.addEventListener(t, f));
+        window.addEventListener("touchmove", onTouchMove, { passive: false });
+        return () => {
+            Object.entries(on).forEach(([t, f]) => window.removeEventListener(t, f));
+            window.removeEventListener("touchmove", onTouchMove);
+            stopSheet.current?.();
+        };
+    }, []);
 
     const lastSaved = useRef(note ? JSON.stringify({ title: note.title ?? "", content: note.content ?? "" }) : EMPTY);
     const pending = useRef(null);
@@ -1295,7 +1393,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             <div ref={backdropRef} className={`fixed inset-0 z-[60] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary md:hidden ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`} />
         {/* Full screen on phones; a centered card on wider screens. */}
         {/* Grown out of its card (morph): that is the entrance, so no fade or pop of its own. */}
-        <div className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`}
+        <div ref={sheetRef} className={`fixed inset-x-0 top-0 z-[60] flex justify-center md:px-4 md:pt-0 md:pb-0 ${closing ? "animate-fade-out" : morph ? "" : "animate-fade-in"}`}
             // Only follow the visual viewport while a field is focused (keyboard up); otherwise use the fixed app height
             // from index.html, so a keyboard that left the viewport short doesn't shrink the editor.
             style={{ height: typing && !growing ? vvHeight : "var(--app-height, 100dvh)" }}>
@@ -1500,9 +1598,10 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                         <button key={step} type="button" onClick={() => changeIndent(step)} disabled={off} title={t(label)} aria-label={t(label)}
                                             className={`text-[22px] px-5 ${option(false)} disabled:pointer-events-none [&:disabled>svg]:opacity-30`}><Icon /></button>
                                     ))}
-                                    {menu === "heading" &&HEADINGS.map(({ label, prefix, menu }) => (
+                                    {/* As wide as the icon buttons of the other menus (22px icon + px-5), so every menu has the same size. */}
+                                    {menu === "heading" && HEADINGS.map(({ label, prefix, menu }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} aria-pressed={(activeLine.heading ?? "") === prefix.trim()}
-                                            className={`flex-1 px-3 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{t(label)}</button>
+                                            className={`w-[62px] shrink-0 whitespace-nowrap ${menu} ${option((activeLine.heading ?? "") === prefix.trim())}`}>{t(label)}</button>
                                     ))}
                                 </div>
                             )}

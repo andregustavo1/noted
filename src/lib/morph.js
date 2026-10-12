@@ -112,3 +112,37 @@ export const closeInto = (panel, backdrop, id, running, done) => {
     if (f.middle) copy.animate([{ transform: f.middle }, { transform: "none" }], { ...CLOSE, fill: "forwards" });
     return true;
 };
+
+// The close in a finger's hand (the editor's edge pull): the same shrink into the card, but in two parts set from
+// outside with seek, each at a progress from 0 to 1: shape (the editor's box, to the card's size, look and
+// contents) and move (its place, to the card's spot). The editor shrinks the shape as the finger takes hold, carries
+// the box with the finger, and lets go: the move taken to 1 (then the editor unmounts), or the shape back to 0 and
+// cancelled, which leaves the panel as it was. Null when the card is gone, like closeInto. The panel must be
+// untransformed when this starts. width and height are the card's.
+export const scrubInto = (panel, backdrop, id, running) => {
+    const card = cardOf(id);
+    if (!card) return null;
+    running?.forEach((a) => a.cancel()); // also drops the opening's copy
+    const f = frames(panel, card);
+    const content = [...panel.children];
+    const copy = cover(panel, card, f);
+    const T = { duration: 1000, fill: "both" }; // scrubbed by time: 1000 is the card
+    const { transform: offMove, ...offShape } = f.off;
+    const { transform: onMove, ...onShape } = f.on;
+    const move = panel.animate([{ transform: offMove }, { transform: onMove }], T);
+    // The contents hand over as in closeInto: the note's gone by a third of the way, the card's in by two thirds.
+    const shape = [
+        panel.animate([offShape, onShape], T),
+        ...content.map((el) => el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.3 }, { opacity: 0 }], T)),
+        copy.animate([{ opacity: 0 }, { opacity: 0, offset: 0.2 }, { opacity: 1, offset: 0.65 }, { opacity: 1 }], T),
+        ...(backdrop ? [backdrop.animate([{ opacity: 1 }, { opacity: 0 }], T)] : []),
+        ...(f.middle ? [copy.animate([{ transform: f.middle }, { transform: "none" }], T)] : []),
+    ];
+    [move, ...shape].forEach((a) => a.pause());
+    return {
+        width: f.width,
+        height: f.height,
+        seek: (sh, mv) => { shape.forEach((a) => { a.currentTime = sh * 1000; }); move.currentTime = mv * 1000; },
+        cancel: () => { [move, ...shape].forEach((a) => a.cancel()); copy.remove(); },
+    };
+};

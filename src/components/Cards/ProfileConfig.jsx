@@ -8,10 +8,10 @@ import { disablePush, enablePush, pushEnabled, pushSupported } from "../../lib/p
 
 // fg is the + icon color that stays readable on bg.
 export const COLORS = [
-    { name: "Verde", bg: "#20a64f", fg: "#000" },
     { name: "Vermelho", bg: "#8d0000", fg: "#fff" },
     { name: "Laranja", bg: "#e15b00", fg: "#fff" },
     { name: "Amarelo", bg: "#edbb07", fg: "#000" },
+    { name: "Verde", bg: "#20a64f", fg: "#000" },
     { name: "Ciano", bg: "#2575a2", fg: "#fff" },
     { name: "Azul escuro", bg: "#13466b", fg: "#fff" },
     { name: "Roxo", bg: "#691392", fg: "#fff" },
