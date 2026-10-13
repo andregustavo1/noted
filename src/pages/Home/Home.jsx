@@ -281,8 +281,8 @@ const Home = () => {
         down: (e) => {
             if (e.pointerType !== "touch") return;
             if (!onConfig && (editor || dialog || categoryMenu || pendingDelete || e.target.closest("[data-category-row], input, textarea, [contenteditable]"))) return;
-            // Closed: only a pull from the right edge opens it; anywhere else is left to the notes.
-            if (!onConfig && cfg.current === 0 && e.clientX < document.documentElement.clientWidth - 40) return;
+            // Closed (or closing): only a pull from the right edge opens it; anywhere else is left to the notes.
+            if (!onConfig && e.clientX < document.documentElement.clientWidth - 40) return;
             panelDrag.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
         },
         move: (e) => {
@@ -292,7 +292,7 @@ const Home = () => {
                 const dx = e.clientX - d.x, dy = Math.abs(e.clientY - d.y);
                 if (Math.abs(dx) < 10 && dy < 10) return;
                 // Closed, only a leftward drag opens it.
-                if (Math.abs(dx) <= dy || (!onConfig && cfg.current === 0 && dx > 0)) { panelDrag.current = null; return; }
+                if (Math.abs(dx) <= dy || (!onConfig && dx > 0)) { panelDrag.current = null; return; }
                 stopCfg.current?.();
                 if (!onConfig) setConfig(true); // measures the avatar's ride; the spring it starts is stopped below
                 stopCfg.current?.();
@@ -576,7 +576,8 @@ const Home = () => {
     const notesSwipe = useRef(null);
     notesSwipe.current = {
         down: (e) => {
-            if (e.pointerType !== "touch" || loading || onConfig || cfg.current > 0 || editor || dialog || categoryMenu || pendingDelete || searchOpen || searchQuery.trim()) return;
+            // A panel still closing doesn't hold the notes back: its own pull only starts at the right edge, kept out below.
+            if (e.pointerType !== "touch" || loading || onConfig || editor || dialog || categoryMenu || pendingDelete || searchOpen || searchQuery.trim()) return;
             if (e.clientX >= document.documentElement.clientWidth - 40 || e.clientY <= document.querySelector("[data-category-row]").getBoundingClientRect().bottom) return;
             swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
         },

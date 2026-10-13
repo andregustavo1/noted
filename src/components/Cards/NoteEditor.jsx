@@ -249,8 +249,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         sheetRef.current.style.transform = x || y ? `translate(${x}px, ${y}px)` : "";
         if (!scrub.current) backdropRef.current.style.opacity = x ? String(1 - x / sheetRef.current.offsetWidth) : "";
     };
-    // The shadow is a filter on the sheet: a box-shadow on the panel would be cut off by the close's clip-path.
-    const lift = (on) => { sheetRef.current.style.filter = on ? "drop-shadow(0 12px 20px rgb(0 0 0 / 0.25))" : ""; };
+    // The shadow, by how far off the box is lifted (0 to 1): it comes with the lift and goes as the box settles, in
+    // the same springs. A filter on the sheet: a box-shadow on the panel would be cut off by the close's clip-path.
+    const lift = (a) => { sheetRef.current.style.filter = a > 0.005 ? `drop-shadow(0 12px 20px rgb(0 0 0 / ${(0.25 * a).toFixed(3)}))` : ""; };
     // The box carried sideways with the finger since taking hold of it, ever more heavily the further it goes (the
     // rubber band, over the screen's width), as far as it has been taken hold of (d.t, 0 to 1).
     const carry = (d, t = d.t) => { const dx = d.fx - d.x; paintSheet(t * Math.sign(dx) * rubber(Math.abs(dx), d.w), 0); };
@@ -274,15 +275,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 if (s) {
                     morphing.current = null;
                     // Taking hold: shrinks into its card's spot.
-                    stopSheet.current = animateSpring({ from: 0, to: 1, damping: 1, response: 0.3, onFrame: (t) => { d.t = t; s.seek(t, t); carry(d); } });
+                    stopSheet.current = animateSpring({ from: 0, to: 1, damping: 1, response: 0.3, onFrame: (t) => { d.t = t; s.seek(t, t); carry(d); lift(t); } });
                 }
-                lift(true);
             }
             d.dx = Math.max(0, e.clientX - d.x);
             d.fx = e.clientX;
             d.v.add(d.dx);
             if (scrub.current) carry(d);
-            else paintSheet(d.dx);
+            else { paintSheet(d.dx); lift(Math.min(1, d.dx / 80)); }
         },
         up: (e) => {
             const d = sheetDrag.current;
@@ -294,14 +294,14 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             const s = scrub.current;
             if (!s) {
                 if (lands) return close();
-                stopSheet.current = animateSpring({ from: d.dx, to: 0, velocity: v, damping: 1, onFrame: paintSheet, onDone: () => lift(false) });
+                stopSheet.current = animateSpring({ from: d.dx, to: 0, velocity: v, damping: 1, onFrame: (x) => { paintSheet(x); lift(Math.min(1, x / 80)); } });
                 return;
             }
             stopSheet.current?.(); // still being taken hold of: carries on from there
             const t0 = d.t;
             if (!lands) {
                 // Back where it was: the box grows back out of the spot as the finger lets go of it.
-                stopSheet.current = animateSpring({ from: t0, to: 0, damping: 1, response: 0.3, onFrame: (t) => { s.seek(t, t); carry(d, t); }, onDone: () => { scrub.current = null; s.cancel(); lift(false); } });
+                stopSheet.current = animateSpring({ from: t0, to: 0, damping: 1, response: 0.3, onFrame: (t) => { s.seek(t, t); carry(d, t); lift(t); }, onDone: () => { scrub.current = null; s.cancel(); } });
                 return;
             }
             morphing.current = "closing";
@@ -309,7 +309,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             panelRef.current.parentElement.style.pointerEvents = "none"; // the notes are live again at once
             // Settles back on the spot, let go of as it gets there (and finishing the shrink if it was cut short).
             stopSheet.current = animateSpring({ from: 0, to: 1, velocity: v / d.w, damping: 1, response: 0.35,
-                onFrame: (m) => { const t = t0 + (1 - t0) * m; s.seek(t, t); carry(d, (1 - m) * t0); },
+                onFrame: (m) => { const t = t0 + (1 - t0) * m; s.seek(t, t); carry(d, (1 - m) * t0); lift((1 - m) * t0); },
                 onDone: () => { scrub.current = null; onClose(); } });
         },
     };
@@ -1073,6 +1073,8 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     const wasDocked = useRef(docked);
     const dockFrom = useRef(null);
     const slide = useRef(null);
+    const menuRef = useRef(null); // the open menu, which flips to the toolbar's other side in the dock
+    const menuSlide = useRef(null);
     const placeToolbar = () => {
         const box = toolbarBoxRef.current, row = rowBoxes.current[activeIndex], body = bodyRef.current;
         if (!box || !row || !body) return;
@@ -1098,12 +1100,19 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         // on the iPhone the slide read as a jump (Chrome, at 120+, showed it fine). This one gets halfway by the fourth.
         const run = box.animate([{ transform: `translate(${from.left - to.left}px, ${from.top - to.top}px)` }, { transform: "translate(0px, 0px)" }], { duration: 400, easing: "cubic-bezier(0.32, 0.72, 0, 1)" });
         slide.current = run;
+        // A menu open right then goes to the toolbar's other side (above it in the dock, below it out): it slides across
+        // with the same motion, from where the old side put it (mt-2 / mb-2: 8px each), rather than jumping over.
+        menuSlide.current?.cancel();
+        const menuEl = menuRef.current;
+        const flip = menuEl && menuEl.animate([{ transform: `translateY(${(box.offsetHeight + menuEl.offsetHeight + 16) * (docked ? 1 : -1)}px)` }, { transform: "translateY(0px)" }], { duration: 400, easing: "cubic-bezier(0.32, 0.72, 0, 1)" });
+        menuSlide.current = flip;
         // Into the dock it waits, held where it was, for two frames: iOS draws its selection handles and menu right
         // then, and the slide's first frames were lost to that (it jumped most of the way). Frames are timed by iOS,
         // so a busy moment holds this back until it's over. Out of the dock nothing competes, so it starts at once.
         if (docked) {
             run.pause();
-            requestAnimationFrame(() => requestAnimationFrame(() => { if (run.playState === "paused") run.play(); }));
+            flip?.pause();
+            requestAnimationFrame(() => requestAnimationFrame(() => { if (run.playState === "paused") { run.play(); flip?.play(); } }));
         }
     };
     useLayoutEffect(placeToolbar);
@@ -1576,7 +1585,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             {menu && (
                                 // Options already in effect on the caret's line (or selection) show in the primary color.
                                 // Docked at the bottom, the menu opens upward. The indent menu is centered on its button.
-                                <div onAnimationEnd={() => { if (menuClosing) setShownMenu(null); }} style={centered && centerRefs.current[menu] ? { left: centerRefs.current[menu].offsetLeft + centerRefs.current[menu].offsetWidth / 2 } : undefined}
+                                <div ref={menuRef} onAnimationEnd={() => { if (menuClosing) setShownMenu(null); }} style={centered && centerRefs.current[menu] ? { left: centerRefs.current[menu].offsetLeft + centerRefs.current[menu].offsetWidth / 2 } : undefined}
                                     className={`flex absolute ${centered ? "[translate:-50%_0]" : "left-0"} ${docked ? "bottom-full mb-2" : "top-full mt-2"} w-max h-12 rounded-full overflow-hidden gap-[2px] bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ring-1 ring-inset ring-light-bg-color-secondary dark:ring-dark-bg-color-primary shadow-md text-light-text-color-primary dark:text-dark-text-color-primary ${menuClosing ? "animate-menu-out pointer-events-none" : "animate-menu-in"} ${docked ? (centered ? "origin-bottom" : "origin-bottom-left") : centered ? "origin-top" : "origin-top-left"}`}>
                                     {menu === "list" && LISTS.map(({ label, icon: Icon, prefix }) => (
                                         <button key={prefix} type="button" onClick={() => applyList(prefix)} title={t(label)} aria-label={t(label)} aria-pressed={activeList === prefix}
@@ -1623,7 +1632,20 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         contentEditable
                         suppressContentEditableWarning
                         className="outline-none pl-2 pt-1"
-                        onInput={() => { syncFromDom(); reveal(rows.current[activeRow.current]); }}
+                        onInput={(e) => {
+                            // WebKit doesn't redo a row's line breaks after text is deleted from it: a row that wrapped
+                            // kept its second line after shrinking back to fit one, until something else laid it out
+                            // (any CSS; a bare contenteditable does it too). A 0.02px padding blip re-lays the row out
+                            // at once, without touching the caret or the keyboard.
+                            const row = rows.current[activeRow.current];
+                            if (row && e.nativeEvent.inputType?.startsWith("delete")) {
+                                row.style.paddingRight = "0.02px";
+                                void row.offsetWidth;
+                                row.style.paddingRight = "";
+                            }
+                            syncFromDom();
+                            reveal(rows.current[activeRow.current]);
+                        }}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
                         onCopy={(e) => onCopy(e, false)}

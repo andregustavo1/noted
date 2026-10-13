@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { NiBarFixed, NiBarFloating, NiBell, NiBellOff, NiCornersCut, NiCornersRound, NiLogout, NiMoon, NiSortDown, NiSortUp, NiSun } from "../Icons/NotedIcons";
 import { supabase } from "../../lib/supabase";
 import MfaSetup from "./MfaSetup";
 import Switch from "../Input/Switch";
+import Modal, { ModalButtons, useLinger } from "./Modal";
 import { t } from "../../lib/i18n";
 import { disablePush, enablePush, pushEnabled, pushSupported } from "../../lib/push";
 
 // fg is the + icon color that stays readable on bg.
 export const COLORS = [
-    { name: "Vermelho", bg: "#8d0000", fg: "#fff" },
+    { name: "Vermelho", bg: "#b20707", fg: "#fff" },
     { name: "Laranja", bg: "#e15b00", fg: "#fff" },
     { name: "Amarelo", bg: "#edbb07", fg: "#000" },
     { name: "Verde", bg: "#20a64f", fg: "#000" },
@@ -26,6 +28,9 @@ const LangEn = () => <span className="text-sm font-semibold">EN</span>;
 // Settings come from Home, which keeps them on the account; onChange takes the fields that changed.
 const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSignal, onMessage }) => {
     const [editing, setEditing] = useState(false);
+    // Logging out asks first, like deleting a note.
+    const [confirmLogout, setConfirmLogout] = useState(false);
+    const [logoutShown, logoutClosing] = useLinger(confirmLogout || null);
     // Task reminders on this device (lib/push.js). Asked for on the tap itself: iOS only shows the prompt for one.
     const [push, setPush] = useState(false);
     useEffect(() => { pushEnabled().then(setPush, () => {}); }, []);
@@ -71,16 +76,25 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
         return (
             <button type="button" role="switch" aria-checked={index === 1} aria-label={`${t(label)}: ${t(options[index].name)}`} title={t(options[index].name)}
                 onClick={() => onChange({ [key]: other.value })}
-                className={`relative flex p-1 rounded-full bg-[var(--primary-color)] ${className}`}>
-                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full bg-[var(--primary-color-fg)] shadow-sm"
+                // Neutral, like the panel's other switches (Switch.jsx): a sunken track that darkens with the theme and a gray knob.
+                className={`relative flex p-1 rounded-full transition-[background-color,box-shadow] duration-300 ${dark ? "bg-dark-bg-color-primary" : "bg-light-bg-color-secondary"} ${className}`}
+                style={{
+                    boxShadow: dark
+                        ? "inset 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.45)"
+                        : "inset 0 3px 6px rgba(15, 23, 42, 0.09), inset 0 -2px 4px rgba(15, 23, 42, 0.06)",
+                }}>
+                <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 rounded-full"
                     style={{
                         width: `calc((100% - 0.5rem) / ${options.length})`,
                         transform: `translateX(${index * 100}%)`,
-                        transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1)",
+                        backgroundColor: dark ? "var(--dark-bg-color-tertiary)" : "var(--light-bg-color-tertiary)",
+                        transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1), background-color 300ms ease",
                     }} />
+                {/* The labels (and the icons drawn in their color) change color on the knob's own timing and curve, so the
+                    color lands together with the knob instead of ahead of it. */}
                 {options.map((o) => (
-                    <span key={o.value} aria-hidden="true"
-                        className={`relative flex-1 h-9 grid place-items-center text-sm font-semibold transition-colors duration-300 ${o.value === value ? "text-[var(--primary-color)]" : "text-[var(--primary-color-fg)]"}`}>
+                    <span key={o.value} aria-hidden="true" style={{ transition: "color 350ms cubic-bezier(0.32, 0.72, 0, 1)" }}
+                        className={`relative flex-1 h-9 grid place-items-center text-sm font-semibold ${o.value === value ? (dark ? "text-dark-text-color-primary" : "text-light-text-color-primary") : (dark ? "text-dark-text-color-tertiary" : "text-light-text-color-tertiary")}`}>
                         {typeof o.label === "string" ? t(o.label) : o.label}
                     </span>
                 ))}
@@ -168,9 +182,18 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
                 </div>
                 </div>
 
+                {/* On body: the panel slides with a transform, which would pin a fixed overlay to the panel (as MfaSetup). */}
+                {logoutShown && createPortal(
+                    <Modal danger closing={logoutClosing} title={t("Desconectar?")} onClose={() => setConfirmLogout(false)}>
+                        <p className="text-sm text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-3">{t("Você vai sair da sua conta neste aparelho.")}</p>
+                        <ModalButtons danger confirm={t("Desconectar")} onCancel={() => setConfirmLogout(false)} onConfirm={() => { setConfirmLogout(false); onLogout(); }} />
+                    </Modal>,
+                    document.body
+                )}
+
                 {/* Last in the column, so it sits at the panel's bottom whatever the keyboard does. */}
                 <div className="-mx-5 px-5 py-2 border-t border-light-bg-color-tertiary dark:border-dark-bg-color-tertiary">
-                    <button onClick={onLogout} className="w-full font-semibold rounded-full h-11 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><NiLogout size={22} />{t("Desconectar")}</button>
+                    <button onClick={() => setConfirmLogout(true)} className="w-full font-semibold rounded-full h-11 text-red-500 hover:bg-red-500 hover:text-white active:scale-95 duration-200 flex items-center justify-center gap-2"><NiLogout size={22} />{t("Desconectar")}</button>
                 </div>
             </div>
         </>

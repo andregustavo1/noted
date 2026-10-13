@@ -19,6 +19,8 @@ const EN = {
     "Crescente": "Ascending",
     "Editar nome": "Edit name",
     "Desconectar": "Log out",
+    "Desconectar?": "Log out?",
+    "Você vai sair da sua conta neste aparelho.": "You'll be signed out of your account on this device.",
     "Verde": "Green",
     "Vermelho": "Red",
     "Laranja": "Orange",

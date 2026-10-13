@@ -73,8 +73,14 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
             shown.push(raw);
             budget -= Math.min(text.length, 20);
         } else {
-            // The cut may land inside an inline tag; drop that tail before the line is rendered as HTML.
-            shown.push(raw.slice(0, budget).replace(/<\/?[a-z]*$/, ""));
+            // Less than a card line (~20 chars) left and the line doesn't fit whole: stop here rather than start it as a
+            // stub cut mid-word ("Prompt Cl...") on a line of its own.
+            if (raw.length > budget && budget < 20 && shown.length) break;
+            // A cut ends on a whole word; and it may land inside an inline tag, so that tail is dropped before the line
+            // is rendered as HTML.
+            let piece = raw.slice(0, budget);
+            if (raw.length > budget && piece.lastIndexOf(" ") > 0) piece = piece.slice(0, piece.lastIndexOf(" "));
+            shown.push(piece.replace(/<\/?[a-z]*$/, ""));
             cut = raw.length > budget;
             budget -= raw.length;
         }

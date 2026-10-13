@@ -64,7 +64,9 @@ export const NiIndentMore = icon(<path d="M4 5h16M11 10h9M11 14h9M4 19h16M4 9l3 
 export const NiIndentLess = icon(<path d="M4 5h16M11 10h9M11 14h9M4 19h16M7 9l-3 3 3 3" />);
 export const NiListBullet = icon(<>{dot(5, 6)}{dot(5, 12)}{dot(5, 18)}<path d="M9.5 6H20M9.5 12H20M9.5 18H20" /></>);
 export const NiListDash = icon(<path d="M4 6h2.5M4 12h2.5M4 18h2.5M9.5 6H20M9.5 12H20M9.5 18H20" />);
-export const NiListNumber = icon(<path d="M4 4.5h1.5V9M4 9h3M4 15.5a1.5 1.5 0 0 1 3 0c0 1.5-3 2.5-3 4h3M10.5 6H20M10.5 12H20M10.5 18H20" />);
+// The digits are only ~4.5px tall: at the family's 1.75 line they filled in and read heavier than the other lists'
+// dots, so they get a finer one.
+export const NiListNumber = icon(<><path d="M4 4.5h1.5V9M4 9h3M4 15.5a1.5 1.5 0 0 1 3 0c0 1.5-3 2.5-3 4h3" strokeWidth={1.25} /><path d="M10.5 6H20M10.5 12H20M10.5 18H20" /></>);
 export const NiListCheck = icon(<path d="M4 7l1.75 1.75L9 5.5M4 17l1.75 1.75L9 15.5M12 7h8M12 17h8" />);
 
 // Settings
