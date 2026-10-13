@@ -1,0 +1,34 @@
+# Copia diária das notas e categorias para o repositório privado andregustavo1/noted-backup.
+# Secrets: SUPABASE_DB_URL (connection string do Postgres) e BACKUP_TOKEN (token com escrita no noted-backup).
+name: Backup db
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # 03:17 em Brasília
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: andregustavo1/noted-backup
+          token: ${{ secrets.BACKUP_TOKEN }}
+
+      - name: Exportar
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          # A nota "APIs Keys" fica de fora (por id, então renomear não muda nada).
+          psql "$DB" -Atq -c "select coalesce(json_agg(n order by n.created_at, n.id), '[]') from notes n where n.id <> '9d2dc598-82f1-4a72-89f7-5f4f76035e43'" | jq . > notes.json
+          psql "$DB" -Atq -c "select coalesce(json_agg(c order by c.name, c.id), '[]') from categories c" | jq . > categories.json
+          test "$(jq length notes.json)" -gt 0
+
+      - name: Salvar
+        run: |
+          git config user.name "noted-backup"
+          git config user.email "noted-backup@users.noreply.github.com"
+          git add notes.json categories.json
+          git diff --cached --quiet || { git commit -qm "Backup $(TZ=America/Sao_Paulo date +%d/%m/%Y)" && git push -q; }
