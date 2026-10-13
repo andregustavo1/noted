@@ -9,7 +9,7 @@ import ReminderCalendar, { REPEATS } from "./ReminderCalendar";
 import Modal, { ModalButtons, useLinger } from "./Modal";
 import { findAll } from "../../lib/search";
 import { canMorph, closeInto, openFrom, scrubInto } from "../../lib/morph";
-import { animateSpring, project, tracker } from "../../lib/spring";
+import { animateSpring, project, rubber, tracker } from "../../lib/spring";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
 
@@ -251,8 +251,9 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     };
     // The shadow is a filter on the sheet: a box-shadow on the panel would be cut off by the close's clip-path.
     const lift = (on) => { sheetRef.current.style.filter = on ? "drop-shadow(0 12px 20px rgb(0 0 0 / 0.25))" : ""; };
-    // The box carried sideways by as far as the finger has moved since taking hold of it, as far as it has (d.t, 0 to 1).
-    const carry = (d, t = d.t) => paintSheet(t * (d.fx - d.x), 0);
+    // The box carried sideways with the finger since taking hold of it, ever more heavily the further it goes (the
+    // rubber band, over the screen's width), as far as it has been taken hold of (d.t, 0 to 1).
+    const carry = (d, t = d.t) => { const dx = d.fx - d.x; paintSheet(t * Math.sign(dx) * rubber(Math.abs(dx), d.w), 0); };
     const sheetGesture = useRef(null);
     sheetGesture.current = {
         down: (e) => {
