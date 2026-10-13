@@ -21,6 +21,8 @@ jobs:
           DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           sudo apt-get install -y -qq postgresql-client >/dev/null
+          # O host do pooler pode ser aws-0 ou aws-1 dependendo do projeto: tenta o outro se o primeiro falhar.
+          psql "$DB" -Atqc "select 1" >/dev/null 2>&1 || DB="${DB/@aws-0-/@aws-1-}"
           # A nota "APIs Keys" fica de fora (por id, então renomear não muda nada).
           psql "$DB" -Atq -c "select coalesce(json_agg(n order by n.created_at, n.id), '[]') from notes n where n.id <> '9d2dc598-82f1-4a72-89f7-5f4f76035e43'" | jq . > notes.json
           psql "$DB" -Atq -c "select coalesce(json_agg(c order by c.name, c.id), '[]') from categories c" | jq . > categories.json
