@@ -55,10 +55,10 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
     const size = tall
         ? { previewLength: 90 + jitter, minHeight: 170 + jitter }
         : { previewLength: 45 + jitter, minHeight: 112 + jitter };
-    // A pinned card spans the row, so it keeps one line less than a tall card (budget ~20 chars a line, like list lines).
-    const previewLength = isPinned ? 60 : size.previewLength;
+    const previewLength = size.previewLength;
     // Lines up to maxLines. List and heading lines stay on one line and end in "..." on their own, so a long one never
     // hides the lines under it; plain text wraps, so it spends the character budget and is cut where that runs out.
+    // A pinned card shows its first 3 lines each on one line like that, plain text too: 3 different lines at a glance.
     // Blank lines (spacing in the note) are skipped, so the card shows that many lines that say something.
     const maxLines = isPinned ? 3 : tall ? 5 : 3;
     const all = content.split("\n");
@@ -69,9 +69,9 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
         if (shown.length === maxLines || budget <= 0) break;
         const { list, text, check } = parseLine(raw);
         if (check === undefined && !plain(text).trim()) continue;
-        if (list) {
+        if (list || isPinned) {
             shown.push(raw);
-            budget -= Math.min(text.length, 20);
+            if (!isPinned) budget -= Math.min(text.length, 20);
         } else {
             // Less than a card line (~20 chars) left and the line doesn't fit whole: stop here rather than start it as a
             // stub cut mid-word ("Prompt Cl...") on a line of its own.
@@ -105,7 +105,7 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
                 )}
                 {line.list && !check && !line.heading && <LineMarker line={line} style={{ opacity: 0.8 }} />}
                 {/* Lists and headings stay on one line and end in "..."; plain text still wraps. */}
-                <span className={`relative min-w-0 flex-1 ${line.list ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-50" : "opacity-80"}`}>
+                <span className={`relative min-w-0 flex-1 ${line.list || isPinned ? "truncate" : ""} ${line.heading ? headingSize(line.heading) : ""} ${line.done ? "opacity-50" : "opacity-80"}`}>
                     <span className={line.done ? "strike-done" : ""} dangerouslySetInnerHTML={html(line.done ? trimEnd(line.text) : line.text)} />
                 </span>
             </div>
