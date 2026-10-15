@@ -1327,17 +1327,22 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     // so the rows' DOM is never touched; at is the current one, which the arrows and Enter step through (wrapping).
     // A match in a folded section unfolds it when it becomes the current one.
     const [searching, setSearching] = useState(false);
+    // Kept on screen for its fade-out after closing, ignoring taps meanwhile (useLinger, like the dialogs); its matches
+    // too, so the count doesn't flip to 0 as it fades.
+    const SEARCH_OUT = 150;
+    const [searchShown, searchClosing] = useLinger(searching || null, SEARCH_OUT);
     const [query, setQuery] = useState("");
     const [current, setCurrent] = useState(0);
     const searchInput = useRef(null);
-    const matches = useMemo(() => (searching ? lines.flatMap((raw, row) => findAll(plain(parseLine(raw).text), query).map(([start, end]) => ({ row, start, end }))) : []),
-        [searching, query, content]); // eslint-disable-line react-hooks/exhaustive-deps
+    const matches = useMemo(() => (searchShown ? lines.flatMap((raw, row) => findAll(plain(parseLine(raw).text), query).map(([start, end]) => ({ row, start, end }))) : []),
+        [searchShown, query, content]); // eslint-disable-line react-hooks/exhaustive-deps
     const at = matches.length ? Math.min(current, matches.length - 1) : -1;
     const step = (by) => { if (matches.length) setCurrent((at + by + matches.length) % matches.length); };
     // flushSync, then focus in the same tap: iOS only raises the keyboard for a focus inside the user's gesture.
-    const openSearch = () => { flushSync(() => setSearching(true)); searchInput.current?.focus(); };
+    // The query is cleared when the bar opens, not when it closes, so it fades out (searchShown) as it was.
+    const openSearch = () => { flushSync(() => { setQuery(""); setCurrent(0); setSearching(true); }); searchInput.current?.focus(); };
     // The field goes away with the focus in it, and browsers don't always report that blur: typing would stay on.
-    const closeSearch = () => { setSearching(false); setQuery(""); setCurrent(0); setTyping(false); };
+    const closeSearch = () => { setSearching(false); setTyping(false); };
     const matchRange = (m) => {
         const el = rows.current[m.row];
         if (!el?.isConnected) return null;
@@ -1466,10 +1471,11 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                         </div>
                     </div>
 
-                    {searching && (
+                    {searchShown && (
                         // Over the whole header row; the X ends the search. onMouseDown preventDefault on the arrows keeps
                         // the field focused (and the phone keyboard up) while stepping through matches.
-                        <div className="absolute inset-0 z-20 flex items-center gap-1.5 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary animate-fade-in">
+                        <div style={searchClosing ? { animationDuration: `${SEARCH_OUT}ms` } : undefined}
+                            className={`absolute inset-0 z-20 flex items-center gap-1.5 bg-light-bg-color-primary dark:bg-dark-bg-color-secondary ${searchClosing ? "animate-fade-out pointer-events-none" : "animate-fade-in"}`}>
                             <div className="flex-1 min-w-0 h-11 flex items-center gap-2 pl-4 pr-3 rounded-full bg-light-bg-color-secondary dark:bg-dark-bg-color-primary text-light-text-color-primary dark:text-dark-text-color-primary">
                                 <NiSearch className="shrink-0 text-[22px] text-light-text-color-tertiary dark:text-dark-text-color-tertiary" />
                                 <input
