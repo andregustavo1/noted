@@ -51,3 +51,14 @@ Content is newline-separated lines. `src/lib/lines.js` parses each line's prefix
 - Pinch zoom is blocked through `gesture*` events, since iOS ignores `user-scalable=no` in standalone mode. `<body ontouchstart="">` makes `:active` fire on iOS.
 - `public/sw.js` (prod only): stale-while-revalidate for navigations and shell files, cache-first for hashed `/assets/`. Supabase requests aren't intercepted. Bump `CACHE` when shell files change. A new deploy shows up on the *following* app open.
 - `public/manifest.webmanifest`: `start_url: /dashboard`, standalone mode.
+
+## Editing notes directly in the database (Noted-Supabase MCP)
+
+The assistant role here includes reading and editing the user's notes in Supabase through the `Noted-Supabase` MCP (`execute_sql`). Things learned the hard way:
+
+- **A `;` inside a string literal in the `SET` clause of an `UPDATE` hangs the request** until the MCP's 60 s timeout, and nothing is written (the query never reaches Postgres). It is not a permissions or database problem. The same text in a `SELECT` or a `WHERE` passes. Workarounds that were tested: start the statement with `WITH x AS (SELECT 1) UPDATE ...`, or write the character as `chr(59)`, or avoid the `;` in the text. Always begin note writes with `WITH x AS (SELECT 1)`.
+- Write long text with dollar quoting (`$a$...$a$`), and edit with `replace(content, anchor_line, anchor_line || E'\n' || new_lines)` anchored on an exact existing line. For big inserts, split into several smaller updates.
+- The user edits notes in the app at the same time. Re-read the lines around an insertion point right before writing, and never assume earlier line numbers still hold. Confirm afterwards with a `SELECT ... LIKE`.
+- The app only shows a database write after it syncs (on open or when coming back to the app), and a local edit made before that can overwrite it. Tell the user this after each write.
+- Note format: see "Note content format" above. In the Money Roadmap, tasks are `- [ ] ` lines, small headings are `### `, big ones `## `, with a blank line above each small heading except right after a big one. Projects are written as `- [ ] Fazer o projeto: ... (sucesso: ...)`.
+- A trigger on `notes` (`sync_reminders`) rewrites the `reminders` table whenever `content` changes. Lines containing `<@ISO-date>` become reminders, so don't alter those lines.
