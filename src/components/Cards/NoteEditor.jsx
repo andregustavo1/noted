@@ -1308,6 +1308,20 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
         document.addEventListener("pointerdown", onDown);
         return () => document.removeEventListener("pointerdown", onDown);
     }, [optionsOpen]);
+    // Escape (desktop) closes what's open over the note first, the "..." menu or a toolbar menu, then the note itself
+    // (same close as the X). The search field and the dialogs handle their own Escape (preventDefault / stopPropagation).
+    const escapeRef = useRef();
+    escapeRef.current = (e) => {
+        if (e.key !== "Escape" || e.defaultPrevented || remindOpen) return;
+        if (optionsOpen) setOptionsOpen(false);
+        else if (menuOpen) setMenuOpen(null);
+        else close();
+    };
+    useEffect(() => {
+        const onKey = (e) => escapeRef.current(e);
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, []);
     // "Copiar tudo" answers in place: the item turns into "Copiado" with a check, then back; the menu stays open.
     useEffect(() => {
         if (!copied) return;
@@ -1491,7 +1505,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                                     value={query}
                                     onChange={(e) => { setQuery(e.target.value); setCurrent(0); }}
                                     onKeyDown={(e) => {
-                                        if (e.key === "Escape") closeSearch();
+                                        if (e.key === "Escape") { e.preventDefault(); closeSearch(); } // only the search, not the note
                                         if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
                                         e.preventDefault();
                                         step(e.shiftKey ? -1 : 1);

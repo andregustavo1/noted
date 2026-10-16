@@ -897,12 +897,14 @@ const Home = () => {
             )}
 
 
+            {/* While the panel is open nothing behind it scrolls: a drag on the dim neither pans nor stretches the page
+                (touch-none; the panel's own close drag reads touch events, which still arrive) and the list is locked. */}
             <div ref={configBackdropRef} onClick={() => setConfig(false)} style={{ opacity: "calc(var(--cfg) * 0.2)" }}
-                className={`bg-black fixed inset-0 z-30 ${onConfig ? "" : "pointer-events-none"}`}></div>
+                className={`bg-black fixed inset-0 z-30 ${onConfig ? "touch-none" : "pointer-events-none"}`}></div>
 
             {/* The notes' scroller, and in it the track the swipe moves: the list, and while swiping the other one laid
                 out beside it (peek). The scroller clips sideways, so neither the peek nor the moved track widens it. */}
-            <div ref={scrollerRef} className="flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-y-auto overflow-x-hidden">
+            <div ref={scrollerRef} className={`flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-x-hidden ${onConfig ? "overflow-y-hidden" : "overflow-y-auto"}`}>
             <div ref={trackRef} className="relative pb-28">
                 <div id="container" className="flex flex-wrap justify-between px-4 gap-2 relative">
                     {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">{t("Carregando...")}</p>}

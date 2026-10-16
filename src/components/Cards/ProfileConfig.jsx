@@ -105,7 +105,7 @@ const ProfileConfig = ({ name, email, onLogout, settings, onChange, editNameSign
     return (
         <>
             <div className="h-full max-w-[100vw] flex flex-col shadow-md px-5 bg-light-bg-color-secondary dark:bg-dark-bg-color-secondary rounded-l-3xl">
-                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pt-4">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain no-scrollbar pt-4">
                 {/* The name and email row sits level with the avatar that rides in from the page's header.
                     pl clears the 40px avatar that slides in over the panel's left padding. */}
                 <div className="grid pl-[52px] pr-2 h-11 min-w-0">
