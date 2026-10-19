@@ -275,6 +275,9 @@ const Home = () => {
     // here. Not over the category row (it scrolls sideways) or fields, nor with the editor or a popup open.
     // A drag swallows the click that follows it.
     const panelDrag = useRef(null)
+    const configOpen = useRef(false)
+    configOpen.current = onConfig
+    const touchY = useRef(0)
     const panelDragged = useRef(false)
     const panelGesture = useRef(null)
     panelGesture.current = {
@@ -318,14 +321,28 @@ const Home = () => {
         const call = (name) => (e) => panelGesture.current[name](e);
         const on = { pointerdown: call("down"), pointermove: call("move"), pointerup: call("up"), pointercancel: call("up") };
         // Once dragging, the page must not scroll under the finger (touch-action can't change mid-gesture).
-        const onTouchMove = (e) => { if (panelDrag.current?.on) e.preventDefault(); };
+        // With the panel open, nothing but the panel's own settings list scrolls, and that only while it has room to in
+        // the finger's direction: a vertical drag anywhere else (or past its end, or on it when it all fits) rubber-banded
+        // the whole page, panel included. overscroll-behavior can't stop that: it only holds on a list that overflows.
+        const onTouchStart = (e) => { touchY.current = e.touches[0].clientY; };
+        const onTouchMove = (e) => {
+            if (panelDrag.current?.on) return e.preventDefault();
+            if (!configOpen.current || !e.cancelable) return;
+            const y = e.touches[0].clientY, dy = y - touchY.current;
+            touchY.current = y;
+            const list = e.target.closest?.("[data-panel-scroll]");
+            const room = list && (dy > 0 ? list.scrollTop > 0 : list.scrollTop + list.clientHeight < list.scrollHeight - 1);
+            if (!room) e.preventDefault();
+        };
         const onClick = (e) => { if (panelDragged.current) { e.stopPropagation(); e.preventDefault(); } };
         Object.entries(on).forEach(([t, f]) => window.addEventListener(t, f));
+        window.addEventListener("touchstart", onTouchStart, { passive: true });
         window.addEventListener("touchmove", onTouchMove, { passive: false });
         window.addEventListener("click", onClick, true);
         root.style.touchAction = "pan-y";
         return () => {
             Object.entries(on).forEach(([t, f]) => window.removeEventListener(t, f));
+            window.removeEventListener("touchstart", onTouchStart);
             window.removeEventListener("touchmove", onTouchMove);
             window.removeEventListener("click", onClick, true);
             root.style.touchAction = "";
@@ -658,11 +675,22 @@ const Home = () => {
 
     // A tapped reminder notification opens its note (public/sw.js): the app starts with ?note=<id>, or, already
     // open, gets a message. Notes come from the device's cache, so the note is there before any fetch.
+    // Another note open in the editor closes first (unmounting saves its pending edits under its own id); one the
+    // device doesn't have yet opens once the fetch brings it (pushNote).
     const openFromPush = useRef(null);
+    const pushNote = useRef(null);
     openFromPush.current = (id) => {
         const note = notes.find((n) => n.id === id);
-        if (note) openEditor(note);
+        pushNote.current = note ? null : id;
+        if (!note) return;
+        if (onConfig) setConfig(false);
+        if (editor && editorNoteId.current === id) return;
+        if (editor) flushSync(() => setEditor(null));
+        openEditor(note);
     };
+    useEffect(() => {
+        if (pushNote.current && notes.some((n) => n.id === pushNote.current)) openFromPush.current(pushNote.current);
+    }, [notes]);
     useEffect(() => {
         const id = new URLSearchParams(window.location.search).get("note");
         if (id) {
@@ -897,14 +925,13 @@ const Home = () => {
             )}
 
 
-            {/* While the panel is open nothing behind it scrolls: a drag on the dim neither pans nor stretches the page
-                (touch-none; the panel's own close drag reads touch events, which still arrive) and the list is locked. */}
+            {/* Nothing behind the open panel scrolls: see onTouchMove in the panel gesture. */}
             <div ref={configBackdropRef} onClick={() => setConfig(false)} style={{ opacity: "calc(var(--cfg) * 0.2)" }}
-                className={`bg-black fixed inset-0 z-30 ${onConfig ? "touch-none" : "pointer-events-none"}`}></div>
+                className={`bg-black fixed inset-0 z-30 ${onConfig ? "" : "pointer-events-none"}`}></div>
 
             {/* The notes' scroller, and in it the track the swipe moves: the list, and while swiping the other one laid
                 out beside it (peek). The scroller clips sideways, so neither the peek nor the moved track widens it. */}
-            <div ref={scrollerRef} className={`flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-x-hidden ${onConfig ? "overflow-y-hidden" : "overflow-y-auto"}`}>
+            <div ref={scrollerRef} className="flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-y-auto overflow-x-hidden">
             <div ref={trackRef} className="relative pb-28">
                 <div id="container" className="flex flex-wrap justify-between px-4 gap-2 relative">
                     {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">{t("Carregando...")}</p>}
