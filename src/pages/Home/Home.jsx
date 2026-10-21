@@ -129,7 +129,7 @@ const useCategoryRow = (callbacks) => {
             ref.current.setPointerCapture(e.pointerId);
             const rect = chip.getBoundingClientRect();
             Object.assign(chip.style, LIFT_STYLE);
-            s.timer = setTimeout(() => cb.current.onHold(chip.dataset.chip, rect), MENU - LIFT);
+            s.timer = setTimeout(() => { s.menu = true; cb.current.onHold(chip.dataset.chip, rect); }, MENU - LIFT);
         }, LIFT);
     };
 
@@ -198,8 +198,12 @@ const useCategoryRow = (callbacks) => {
             ).finished.then(() => Object.assign(chip.style, DROP_STYLE), () => {});
         }
         s.swallow = s.phase !== "idle";
+        // A mouse click held a little long (past LIFT, released before the menu, without dragging) is still a click:
+        // the lift had captured the pointer, so the native click misses the chip, and it's replayed on it. Touch keeps
+        // its hold, which is deliberate there.
+        const tap = s.mouse && s.phase === "lifted" && !s.menu ? s.chip : null;
         // Keep the flag until the click that follows this pointerup has been swallowed.
-        setTimeout(() => { g.current = null; });
+        setTimeout(() => { g.current = null; tap?.click(); });
     };
     const onClickCapture = (e) => {
         if (g.current?.swallow) e.stopPropagation();

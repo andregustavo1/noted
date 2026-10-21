@@ -489,12 +489,24 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
     };
     // Rows are uncontrolled while typing; their HTML is pushed only when the state changed elsewhere
     // (Enter, Backspace merges, undo, rows shifting under an inserted line).
+    // A caret in a row that gets rewritten is put back at its offset: replacing the HTML under it drops it to the
+    // row's start (unless the edit itself places it, focusAfterRender).
     useLayoutEffect(() => {
+        const sel = window.getSelection();
+        let keep = null;
         lines.forEach((raw, index) => {
             const el = rows.current[index];
             const { text } = parseLine(raw);
-            if (el && sanitize(el.innerHTML) !== text) el.innerHTML = text;
+            if (!el || sanitize(el.innerHTML) === text) return;
+            if (!focusAfterRender.current && sel.rangeCount && sel.isCollapsed && el.contains(sel.anchorNode)) {
+                const r = document.createRange();
+                r.selectNodeContents(el);
+                r.setEnd(sel.anchorNode, sel.anchorOffset);
+                keep = [el, Math.min(r.toString().length, plain(text).length)];
+            }
+            el.innerHTML = text;
         });
+        if (keep) setSelection(...keep);
     });
     const activeRow = useRef(0);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -787,6 +799,12 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                 update(next, { index, caret: offset });
             }
         } else if (!span.collapsed && (type === "insertText" || type === "insertReplacementText")) {
+            // iOS corrects a word (autocorrect, the two-space period) by selecting it and replacing the selection:
+            // left to WebKit, which then places the caret by the nodes it edited. Done here instead (the row's HTML
+            // rewritten under it), WebKit placed the caret by nodes that were gone, at the row's start. Only a
+            // selection across rows or over a whole row's text (WebKit prunes the emptied element) is done here.
+            const whole = span.start[1] === 0 && span.end[1] === rowLength(span.end[0]);
+            if (!span.multi && !whole) return;
             e.preventDefault();
             replaceSpan(span, [escapeHtml(e.data ?? e.dataTransfer?.getData("text/plain") ?? "")]);
         }
