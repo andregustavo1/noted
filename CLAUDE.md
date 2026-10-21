@@ -40,7 +40,7 @@ React 18 + Vite + Tailwind (`darkMode: "class"`, `hoverOnlyWhenSupported`) + Sup
 ### Data model (`supabase/schema.sql`, rerunnable, RLS per user)
 - `notes`: title, content, category (**stored by name**, not FK), color, is_pinned. A trigger bumps `updated_at` only on title/content/category changes, so pinning and recoloring don't reorder notes. The client never sends timestamps.
 - `categories`: unique `(user_id, name)`. Renaming or deleting a category also updates `notes.category`.
-- Routine streak (`src/lib/routine.js`): a note with "Rotina" in its title (as a word) is judged once per local day by `Home.jsx` (after the server notes and settings load, and at midnight). All tasks ticked adds 1 to its streak, otherwise it resets to 0, and the tasks are unticked. The streak is stored in `settings.routine[noteId]` and shown only on the card.
+- Routine streak (`src/lib/routine.js`): a note with "Rotina" in its title (as a word) is judged once per local day by `Home.jsx` (after the server notes and settings load, and when the day turns). The routine day turns at 03:00, not midnight (`DAY_START_HOUR`). All tasks ticked adds 1 to its streak, otherwise it resets to 0, and the tasks are unticked. The streak is stored in `settings.routine[noteId]` and shown only on the card.
 - Settings live in Supabase `user_metadata.settings` (`src/lib/settings.js`) and are mirrored to localStorage so `index.html` can apply theme and primary color before React renders (no flash).
 
 ### Note content format

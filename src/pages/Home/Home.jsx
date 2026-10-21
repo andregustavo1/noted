@@ -16,7 +16,7 @@ import Modal, { ModalButtons, useLinger } from "../../components/Cards/Modal";
 import { noteMatches } from "../../lib/search";
 import { t } from "../../lib/i18n";
 import { applySettings, fetchSettings, readLocalSettings, sortNotes } from "../../lib/settings";
-import { isRoutine, localDay, rollover } from "../../lib/routine";
+import { isRoutine, localDay, nextDayStart, rollover } from "../../lib/routine";
 import { addOp, applyQueue, clearCache, pendingSettings, readCache, readQueue, uuid, writeCache, writeQueue } from "../../lib/queue";
 import { flush, flushedSince } from "../../lib/sync";
 import { animateSpring, project, rubber, tracker } from "../../lib/spring";
@@ -781,14 +781,12 @@ const Home = () => {
     // Routine notes (lib/routine.js): once a day has passed, judge its checklist, move the streak and untick the
     // tasks. It waits for the server's notes and settings (or their failure, offline), so a day another device already
     // judged isn't judged again from a stale copy, and skips a routine open in the editor (its own copy would win); it
-    // runs again as notes change, on returning to the app (fresh notes) and at midnight (today).
+    // runs again as notes change, on returning to the app (fresh notes) and when the routine day turns, 03:00 (today).
     // ponytail: two devices judging the same day before either syncs would both count it; add a server-side check if
     // that ever shows.
     const [today, setToday] = useState(localDay);
     useEffect(() => {
-        const midnight = new Date();
-        midnight.setHours(24, 0, 1, 0);
-        const timer = setTimeout(() => setToday(localDay()), midnight - Date.now());
+        const timer = setTimeout(() => setToday(localDay()), nextDayStart() - Date.now());
         return () => clearTimeout(timer);
     }, [today]);
     useEffect(() => {
@@ -931,7 +929,7 @@ const Home = () => {
 
             {/* The notes' scroller, and in it the track the swipe moves: the list, and while swiping the other one laid
                 out beside it (peek). The scroller clips sideways, so neither the peek nor the moved track widens it. */}
-            <div ref={scrollerRef} className="flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-y-auto overflow-x-hidden">
+            <div ref={scrollerRef} className="flex-1 min-h-0 max-w-[768px] w-full mx-auto overflow-y-auto overflow-x-hidden no-scrollbar">
             <div ref={trackRef} className="relative pb-28">
                 <div id="container" className="flex flex-wrap justify-between px-4 gap-2 relative">
                     {loading && <p className="w-full text-center text-light-text-color-tertiary dark:text-dark-text-color-tertiary mt-10">{t("Carregando...")}</p>}

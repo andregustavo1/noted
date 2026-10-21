@@ -7,9 +7,23 @@ import { parseLine } from "./lines";
 
 export const isRoutine = (note) => /(^|\s)rotina(\s|$)/i.test(note.title || "");
 
-// The device's local date as YYYY-MM-DD: the day turns over at local midnight.
-export const localDay = (date = new Date()) =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+// A routine's day turns over at 03:00 local, not midnight: a task ticked after midnight, before bed, still counts
+// for the day it belongs to.
+export const DAY_START_HOUR = 3;
+
+// The routine day as YYYY-MM-DD: the local date of the moment DAY_START_HOUR hours earlier.
+export const localDay = (date = new Date()) => {
+    const d = new Date(date.getTime() - DAY_START_HOUR * 3600000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// When the next routine day starts (a second past DAY_START_HOUR:00), for the timer that judges it while the app is open.
+export const nextDayStart = (now = new Date()) => {
+    const at = new Date(now);
+    at.setHours(DAY_START_HOUR, 0, 1, 0);
+    if (at <= now) at.setDate(at.getDate() + 1);
+    return at;
+};
 
 const daysBetween = (from, to) => Math.round((new Date(`${to}T12:00`) - new Date(`${from}T12:00`)) / 86400000);
 
