@@ -72,17 +72,21 @@ export const renumber = (lines) => {
 export const lineStyle = (line) => ({ paddingLeft: line.indent ? `${line.indent.length * 1.5}rem` : undefined, textAlign: ALIGNS[line.align[1]] });
 
 // size styles the row (editor and card previews); menu is the same look one step smaller so the four fit in one line.
+// Headings are 20 / 17 / 15px over the 14px text, all with a 1.4 line height (the # keeps its 28px line).
 export const HEADINGS = [
-    { label: "Texto", prefix: "# ", size: "text-xl font-semibold", menu: "text-lg font-semibold" },
-    { label: "Texto", prefix: "## ", size: "text-lg font-semibold", menu: "text-base font-semibold" },
-    { label: "Texto", prefix: "### ", size: "text-base font-medium", menu: "text-sm font-medium" },
+    { label: "Texto", prefix: "# ", size: "text-[20px] leading-[1.4] font-semibold", menu: "text-lg font-semibold" },
+    { label: "Texto", prefix: "## ", size: "text-[17px] leading-[1.4] font-semibold", menu: "text-base font-semibold" },
+    { label: "Texto", prefix: "### ", size: "text-[15px] leading-[1.4] font-medium", menu: "text-sm font-medium" },
     { label: "Texto", prefix: "", size: "", menu: "text-xs" },
 ];
 export const headingSize = (hashes) => HEADINGS.find((h) => h.prefix.trim() === hashes)?.size ?? "";
 
-// Space above a row, by kind, so the editor and the card previews space lines the same way.
-// Plain and list lines 4px apart, checkboxes 6px, headings more.
-export const lineGap = (line) => (line.heading ? "mt-1" : line.check !== undefined ? "mt-1.5" : "mt-0");
+// Space above a row, so the editor and the card previews space lines the same way. Each kind wants its own room
+// (plain and list lines none, headings 4px, checkboxes 6px) and the gap between two rows is the larger of the two:
+// a plain line between two checkboxes then sits 6px from each, instead of touching the one above (its own 0px) and
+// floating away from the one below (that one's 6px).
+const GAP = (line) => (line?.check !== undefined ? 6 : line?.heading ? 4 : 0);
+export const lineGap = (line, prev) => ({ 0: "mt-0", 4: "mt-1", 6: "mt-1.5" })[Math.max(GAP(line), GAP(prev))];
 
 // Nothing written on the line: no marker and no text (contentEditable leaves tags and nbsp behind).
 const isBlank = (line) => {

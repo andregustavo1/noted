@@ -119,14 +119,14 @@ const reminderDay = (at) => {
 
 // One line of the note. Memoized: with hundreds of lines, re-rendering them all on every keystroke made typing lag.
 // Its props are plain values and refs (actions holds the editor's current handlers), so only rows that changed render.
-const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isFolded, foldable: canFold, active, justChecked, only, selecting }) {
+const Row = memo(function Row({ raw, prev, index, rows, rowBoxes, actions, hidden, isFolded, foldable: canFold, active, justChecked, only, selecting }) {
     const line = parseLine(raw);
     const remind = remindOf(raw);
     const foldable = line.heading && canFold;
     const island = selecting ? { pointerEvents: "none" } : undefined;
     return (
         <div data-line={index} ref={(el) => { rowBoxes.current[index] = el; }} style={lineStyle(line)}
-            className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line)} ${hidden ? "hidden" : ""}`}>
+            className={`pl-1 relative group flex items-start gap-2 ${index === 0 ? "" : lineGap(line, parseLine(prev ?? ""))} ${hidden ? "hidden" : ""}`}>
             {line.heading && (
                 // Fold chevron left of the text, overhanging the pl-2 gutter into the card's padding (the note body spans it,
                 // so nothing is clipped). The glyph of NiChevronRight ends 5px before its 20px box, so the box ends 5px into
@@ -150,7 +150,7 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                 // The hit area grows up, down and to the left, not to the right: a tap near the text's start is for the text.
                 <span contentEditable={false} suppressContentEditableWarning style={island} className="invisible relative top-[0.5px] h-[1.625em] shrink-0 flex items-center select-none">
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => actions.current.toggleCheck(index)} aria-pressed={line.done}
-                    className={`visible relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked ? "animate-check-pop" : ""}`}>
+                    className={`visible relative after:absolute after:-inset-y-2 after:-left-4 after:right-0 after:content-[''] w-[22px] h-[22px] -mx-[2px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? "bg-[var(--primary-color)] text-[var(--primary-color-fg)]" : "border-2 border-current opacity-60"} ${line.done && justChecked ? "animate-check-pop" : ""}`}>
                     {/* The card preview's check (NiCheck) traced as a stroke, so it can draw in. Always in the DOM, just hidden
                         while unticked: a selection dragged onto the box lands on a position inside the button, and the browsers
                         resolve that differently for an empty button and one with a child (see locate), so both states keep the child. */}
@@ -169,7 +169,9 @@ const Row = memo(function Row({ raw, index, rows, rowBoxes, actions, hidden, isF
                 <div
                     ref={(el) => { rows.current[index] = el; }}
                     data-placeholder={only ? "" : undefined}
-                    className={`min-h-[1.625em] whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
+                    // min-h one line (1lh) of the row's own size: 1.625em was the text's line, and a heading's bigger em made it
+                    // taller than its line, a few px left over under it.
+                    className={`min-h-[1lh] whitespace-pre-wrap break-words ${headingClass(line.heading)}`}
                 />
                 {/* An invisible copy of the text over the row, whose background draws the strike line. */}
                 {/* overflow-hidden: a space where the text wraps hangs past the box, and the line (the span's background) would paint it into the padding. */}
@@ -1710,7 +1712,7 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
                             if (index < fromRow || index >= toRow) return null;
                             const isFolded = folded.has(keys[index]);
                             return (
-                                <Row key={keys[index]} raw={raw} index={index} rows={rows} rowBoxes={rowBoxes} actions={rowActions}
+                                <Row key={keys[index]} raw={raw} prev={lines[index - 1]} index={index} rows={rows} rowBoxes={rowBoxes} actions={rowActions}
                                     hidden={hidden.has(index)} isFolded={isFolded} foldable={isFolded || headingSection(lines, index)[1] > index + 1}
                                     active={focused && index === activeIndex} justChecked={justChecked === keys[index]} only={lines.length === 1} selecting={selecting}
                                     />

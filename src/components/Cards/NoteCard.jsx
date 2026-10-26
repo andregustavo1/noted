@@ -90,15 +90,15 @@ const NoteCard = ({ id, hidden, title, content, date, onOpen, onEdit, isPinned, 
 
     // Each line renders like the open note does (same markers, heading sizes and spacing), cut to fit the card.
     // Checklist lines are display only here; they are ticked inside the open note.
-    const renderLine = (raw, index) => {
+    const renderLine = (raw, index, shownLines) => {
         const line = parseLine(raw);
         const check = line.check !== undefined;
         const fill = isPinned ? "bg-[var(--primary-color-fg)] text-[var(--primary-color)]" : "bg-[var(--primary-color)] text-[var(--primary-color-fg)]";
         return (
-            <div key={index} style={lineStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line) : ""}`}>
+            <div key={index} style={lineStyle(line)} className={`flex items-start gap-2 ${index ? lineGap(line, parseLine(shownLines[index - 1])) : ""}`}>
                 {check && (
                     <span className="relative top-[0.5px] h-[1.625em] shrink-0 flex items-center">
-                        <span className={`w-[22px] h-[22px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-50"}`}>
+                        <span className={`w-[22px] h-[22px] -mx-[2px] shrink-0 rounded-full grid place-items-center text-xs ${line.done ? fill : "border-2 border-current opacity-50"}`}>
                             {line.done && <NiCheck size={14} />}
                         </span>
                     </span>

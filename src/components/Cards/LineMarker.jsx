@@ -4,11 +4,13 @@ import React from "react";
 // One line tall (1.625em = leading-relaxed) so the mark centers on the first line of text.
 // Drawn marks (and the checkbox) sit 0.5px low, where lowercase-heavy text looks centered; text never moves, so a
 // line keeps its place whatever its marker (a number is text, and lines up by itself).
-// Numbers sit right-aligned in a gutter three characters wide (the font is monospace), so "10." and "2." end at the
-// same place and the text of a long list lines up, as in Apple Notes; a hundredth item widens it.
+// Numbers sit right-aligned in the same 18px slot as the bullet and the dash, so a numbered line's text starts where
+// theirs does; "1." to "9." fit it, a tenth item and up widens it a little.
+// The 22px checkbox (NoteCard, NoteEditor) is centered on that same 18px slot too (-mx-[2px]), so every kind of line
+// starts its text in one column.
 // Extra props go on the outer span (the editor marks it non-editable).
 const LineMarker = ({ line, ...props }) => {
-    if (line.number) return <span {...props} className="min-w-[3ch] shrink-0 text-right select-none">{line.number}.</span>;
+    if (line.number) return <span {...props} className="min-w-[18px] shrink-0 text-right select-none">{line.number}.</span>;
     // Drawn rather than typed: a "•" or "–" glyph sits wherever the font puts it, a shape centers exactly.
     const dash = line.marker.includes("–");
     return (
