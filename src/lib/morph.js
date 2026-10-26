@@ -28,6 +28,15 @@ const CLOSE = spring(1, 0.35);
 // What the editor grows out of and shrinks back into: the note's card, or the + button for a note that doesn't exist.
 const cardOf = (id) => document.querySelector(id ? `.note-card[data-note="${id}"]` : "[data-new-note]");
 
+// The card to close into, scrolled whole into the notes' view first. The editor panel sits above the whole page, so
+// shrinking onto a card half scrolled under the header (clipped by the list, not by the panel) drew it over the
+// header and the chips. The list is hidden behind the editor while it's open, so the jump doesn't show.
+const landingOf = (id) => {
+    const card = cardOf(id);
+    card?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+    return card;
+};
+
 // Whether the editor for this note can open out of its source: it is on the page. Runs under
 // prefers-reduced-motion too, like the card reorder (index.css): Windows with animations off reports it, and the
 // creator wants this motion there.
@@ -94,7 +103,7 @@ export const openFrom = (panel, backdrop, id) => {
 // Shrinks the panel back into the note's card, from wherever it is now (even mid-opening), then calls done.
 // Returns false when the card is gone (deleted, filtered out), and the editor closes its own way.
 export const closeInto = (panel, backdrop, id, running, done) => {
-    const card = cardOf(id);
+    const card = landingOf(id);
     if (!card) return false;
     const now = getComputedStyle(panel);
     const from = { transform: now.transform, clipPath: now.clipPath, backgroundColor: now.backgroundColor };
@@ -120,7 +129,7 @@ export const closeInto = (panel, backdrop, id, running, done) => {
 // cancelled, which leaves the panel as it was. Null when the card is gone, like closeInto. The panel must be
 // untransformed when this starts. width and height are the card's.
 export const scrubInto = (panel, backdrop, id, running) => {
-    const card = cardOf(id);
+    const card = landingOf(id);
     if (!card) return null;
     running?.forEach((a) => a.cancel()); // also drops the opening's copy
     const f = frames(panel, card);
