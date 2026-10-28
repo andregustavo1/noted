@@ -255,3 +255,14 @@ select cron.schedule('send-reminders', '* * * * *', $$
             || '/functions/v1/send-reminders'
     );
 $$);
+
+-- Realtime: the app's open devices get every notes change as it happens (Home.jsx), instead of only on their next
+-- reload. Rows still go out under RLS, so each device hears only its own user's notes.
+do $$ begin
+    if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+        create publication supabase_realtime;
+    end if;
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notes') then
+        alter publication supabase_realtime add table public.notes;
+    end if;
+end $$;

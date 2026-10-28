@@ -366,6 +366,21 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             return { stack: [...stack.slice(0, i + 1), { title, content }], i: i + 1 };
         });
     }, [title, content]);
+    // The note as stored changed under the open editor (another device through realtime, or the reload on returning
+    // to the app) while nothing typed here is waiting to be saved: take it. Without this, a note left open on a phone
+    // kept the copy it opened with, and the next tick there sent that stale copy over what the desktop had saved.
+    // Own saves come back equal to lastSaved; an edit still pending here wins (it is sent over the server's, as before).
+    // History restarts at the new version, so undo can't bring the replaced copy back and send it again.
+    useEffect(() => {
+        if (!saved || pending.current) return;
+        const stored = { title: (saved.title ?? "").trim(), content: saved.content ?? "" };
+        const json = JSON.stringify(stored);
+        if (json === lastSaved.current) return;
+        lastSaved.current = json;
+        setTitle(stored.title);
+        setContent(stored.content);
+        setHistory({ stack: [stored], i: 0 });
+    }, [saved?.title, saved?.content]); // eslint-disable-line react-hooks/exhaustive-deps
     const go = (step) => {
         const i = history.i + step;
         const snap = history.stack[i];

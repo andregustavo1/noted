@@ -449,13 +449,19 @@ const Home = () => {
 
     // Back online or back in the foreground (a home-screen app keeps running in the background): send what's
     // queued and pick up what changed elsewhere. Leaving for the background sends what's queued while it can.
+    // On the desktop, switching windows doesn't change visibility, so focus reloads too; a load within the last second
+    // (visibilitychange and focus often come together) is enough.
     useEffect(() => {
-        const onOnline = () => { retryDelay.current = 0; loadNotes(); };
-        const onVisibility = () => { if (document.visibilityState === "visible") loadNotes(); else flushNow(); };
+        let last = 0;
+        const reload = () => { if (Date.now() - last < 1000) return; last = Date.now(); loadNotes(); };
+        const onOnline = () => { retryDelay.current = 0; last = 0; reload(); };
+        const onVisibility = () => { if (document.visibilityState === "visible") reload(); else flushNow(); };
         window.addEventListener("online", onOnline);
+        window.addEventListener("focus", reload);
         document.addEventListener("visibilitychange", onVisibility);
         return () => {
             window.removeEventListener("online", onOnline);
+            window.removeEventListener("focus", reload);
             document.removeEventListener("visibilitychange", onVisibility);
             clearTimeout(flushTimer.current);
         };
@@ -509,6 +515,35 @@ const Home = () => {
         else setSettings(next);
         queueOp({ type: "settings", settings: next });
     };
+    // Realtime: every change to the notes on the server (another device, the 03:00 routine check, an edit through the
+    // database) reaches the open app at once, laid under what's still queued here like a reload's answer, so pending
+    // local changes win. A device that slept missed its events; the reload on returning covers that. Deletes carry
+    // only the id and aren't filtered by RLS: an unknown id just matches nothing. The open editor takes the new version
+    // through its saved prop (NoteEditor).
+    const applyRemote = (list, { eventType, new: row, old }) => {
+        if (eventType === "DELETE") return list.filter((n) => n.id !== old.id);
+        // eslint-disable-next-line no-unused-vars
+        const { user_id, ...note } = row;
+        const next = list.some((n) => n.id === note.id) ? list.map((n) => (n.id === note.id ? note : n)) : [note, ...list];
+        return applyQueue({ notes: next, categories: [] }, readQueue(userId)).notes;
+    };
+    const remote = useRef(null);
+    remote.current = (payload) => {
+        if (!loaded.current) return;
+        const order = (list) => sortNotes(list, settings).map((n) => n.id).join();
+        const update = () => setNotes((prev) => applyRemote(prev, payload));
+        // A card that moves glides like a pin does; an edit that keeps the order just updates in place.
+        if (order(applyRemote(notes, payload)) !== order(notes)) animateNotes(update);
+        else update();
+    };
+    useEffect(() => {
+        if (!userId) return;
+        const channel = supabase.channel(`notes:${userId}`)
+            .on("postgres_changes", { event: "*", schema: "public", table: "notes" }, (payload) => remote.current(payload))
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [userId]);
+
     const userName = getUserName(user);
 
     const onLogout = async () => {
