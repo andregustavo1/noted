@@ -19,6 +19,13 @@ export const upsertNote = async ({ id, title, content, category, color = "", is_
 export const updateNote = async (id, changes) =>
     unwrap(await supabase.from("notes").update(changes).eq("id", id).select(FIELDS).maybeSingle());
 
+// The same update, only if the note is still at the version it was based on (its updated_at): null otherwise, or
+// when it's gone. Lets a save notice that another device saved in between (sync.js merges then).
+export const updateNoteIf = async (id, changes, updatedAt) =>
+    unwrap(await supabase.from("notes").update(changes).eq("id", id).eq("updated_at", updatedAt).select(FIELDS).maybeSingle());
+
+export const fetchNote = async (id) => unwrap(await supabase.from("notes").select(FIELDS).eq("id", id).maybeSingle());
+
 export const deleteNote = async (id) => {
     unwrap(await supabase.from("notes").delete().eq("id", id));
 };

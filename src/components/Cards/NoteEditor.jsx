@@ -9,6 +9,7 @@ import ReminderCalendar, { REPEATS } from "./ReminderCalendar";
 import Modal, { ModalButtons, useLinger } from "./Modal";
 import { findAll } from "../../lib/search";
 import { canMorph, closeInto, openFrom, scrubInto } from "../../lib/morph";
+import { mergeLines } from "../../lib/merge";
 import { animateSpring, project, rubber, tracker } from "../../lib/spring";
 
 const EMPTY = JSON.stringify({ title: "", content: "" });
@@ -366,20 +367,27 @@ const NoteEditor = ({ note, saved, error, onSave, onClose, onPin, onCategory, on
             return { stack: [...stack.slice(0, i + 1), { title, content }], i: i + 1 };
         });
     }, [title, content]);
-    // The note as stored changed under the open editor (another device through realtime, or the reload on returning
-    // to the app) while nothing typed here is waiting to be saved: take it. Without this, a note left open on a phone
-    // kept the copy it opened with, and the next tick there sent that stale copy over what the desktop had saved.
-    // Own saves come back equal to lastSaved; an edit still pending here wins (it is sent over the server's, as before).
-    // History restarts at the new version, so undo can't bring the replaced copy back and send it again.
+    // The note as stored changed under the open editor (another device through realtime, a reload on returning to the
+    // app, or a save that sync.js merged): take it. Without this, a note left open on a phone kept the copy it opened
+    // with, and the next tick there sent that stale copy over what the desktop had saved. Own saves come back equal to
+    // lastSaved. With nothing typed waiting to be saved, the stored version replaces the editor's and history restarts
+    // there (undo can't bring the replaced copy back and send it again); with an edit pending, the two are merged by
+    // line against the last saved version (merge.js), so both the edit and the other device's changes stay.
     useEffect(() => {
-        if (!saved || pending.current) return;
+        if (!saved) return;
         const stored = { title: (saved.title ?? "").trim(), content: saved.content ?? "" };
         const json = JSON.stringify(stored);
         if (json === lastSaved.current) return;
+        const base = lastSaved.current === EMPTY ? { title: "", content: "" } : JSON.parse(lastSaved.current);
         lastSaved.current = json;
-        setTitle(stored.title);
-        setContent(stored.content);
-        setHistory({ stack: [stored], i: 0 });
+        if (!pending.current) {
+            setTitle(stored.title);
+            setContent(stored.content);
+            setHistory({ stack: [stored], i: 0 });
+            return;
+        }
+        setContent((mine) => mergeLines(base.content, mine, stored.content));
+        setTitle((mine) => (mine.trim() === base.title ? stored.title : mine));
     }, [saved?.title, saved?.content]); // eslint-disable-line react-hooks/exhaustive-deps
     const go = (step) => {
         const i = history.i + step;

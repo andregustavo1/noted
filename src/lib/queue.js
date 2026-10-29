@@ -2,7 +2,8 @@
 // into a queue for Supabase, replayed in order once the app is online (sync.js). All of it is keyed by user id,
 // so another account on the same device never sees, or sends, this one's data.
 //
-// Ops: { type: "note", id, create?, changes } (a create carries the whole row in changes), { type: "deleteNote", id },
+// Ops: { type: "note", id, create?, changes, base? } (a create carries the whole row in changes; base is the note as
+// the server last had it when the op was first queued, kept through later merges, for sync.js to merge against), { type: "deleteNote", id },
 // { type: "createCategory", category }, { type: "renameCategory", id, from, to }, { type: "deleteCategory", id, name },
 // { type: "settings", settings }. Changes to one note merge into its pending op and only the latest settings are
 // kept, so a burst of changes (the theme switched twenty times, a note being typed) reaches Supabase as one request.

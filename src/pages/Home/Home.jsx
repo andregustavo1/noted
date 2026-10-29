@@ -453,7 +453,19 @@ const Home = () => {
     // (visibilitychange and focus often come together) is enough.
     useEffect(() => {
         let last = 0;
-        const reload = () => { if (Date.now() - last < 1000) return; last = Date.now(); loadNotes(); };
+        // Also probe the realtime socket: after standby (or in a throttled tab) it can look open while nothing gets
+        // through, and its own heartbeat only notices after 50s, a blind spot where the other device's changes were
+        // missed. A second heartbeat 3s after the first finds the first unanswered and reconnects (rejoining the
+        // channel); on a healthy socket the first is answered by then and nothing happens.
+        let probe = 0;
+        const reload = () => {
+            if (Date.now() - last < 1000) return;
+            last = Date.now();
+            loadNotes();
+            supabase.realtime.sendHeartbeat();
+            clearTimeout(probe);
+            probe = setTimeout(() => supabase.realtime.sendHeartbeat(), 3000);
+        };
         const onOnline = () => { retryDelay.current = 0; last = 0; reload(); };
         const onVisibility = () => { if (document.visibilityState === "visible") reload(); else flushNow(); };
         window.addEventListener("online", onOnline);
@@ -462,6 +474,7 @@ const Home = () => {
         return () => {
             window.removeEventListener("online", onOnline);
             window.removeEventListener("focus", reload);
+            clearTimeout(probe);
             document.removeEventListener("visibilitychange", onVisibility);
             clearTimeout(flushTimer.current);
         };
@@ -798,8 +811,12 @@ const Home = () => {
     const changeNote = (id, changes) => {
         // The server moves updated_at when these change (schema.sql); mirror it so the card takes its new place now.
         const full = ["title", "content", "category"].some((k) => k in changes) ? { ...changes, updated_at: now() } : changes;
+        // base: the note before this change, what the save merges against if another device saved meanwhile (sync.js).
+        // Only the first op of a burst sets it (queue.js keeps it through merges), so it's the server's version.
+        const before = notes.find((note) => note.id === id);
+        const base = before && { title: before.title, content: before.content, updated_at: before.updated_at };
         setNotes((prev) => sortNotes(prev.map((note) => (note.id === id ? { ...note, ...full } : note))));
-        queueOp({ type: "note", id, changes: full });
+        queueOp({ type: "note", id, changes: full, base });
     };
 
     const handleSave = (fields) => {

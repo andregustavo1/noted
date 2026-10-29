@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import { deleteNote, updateNote, upsertNote } from "./notes";
+import { deleteNote, fetchNote, updateNote, updateNoteIf, upsertNote } from "./notes";
+import { mergeLines } from "./merge";
 import { createCategory, deleteCategory, renameCategory } from "./categories";
 import { saveSettings } from "./settings";
 import { readQueue, removeOp, writeQueue } from "./queue";
@@ -18,13 +19,34 @@ export const isNetworkError = (error) =>
     [401, 408, 429, 502, 503, 504].includes(error?.status) ||
     error?.code === "PGRST301";
 
+// A note's text saved over the version it was based on (op.base: the note as this device last had it from the server,
+// before the change). If another device saved in between, the server's version is fetched and the lines merged
+// (merge.js): each side's changes are kept instead of this device's copy replacing the whole note. Retried a few
+// times against a busy note, then saved plainly. Ops queued before this existed have no base and save plainly.
+const saveMerged = async (id, fields, base) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const row = await updateNoteIf(id, fields, base.updated_at);
+        if (row) return row;
+        const server = await fetchNote(id);
+        if (!server) return null; // deleted on another device
+        fields = { ...fields };
+        if (fields.content !== undefined) fields.content = mergeLines(base.content, fields.content, server.content);
+        // A title only this device changed is kept; one only the other changed is taken.
+        if (fields.title !== undefined && fields.title === base.title) fields.title = server.title;
+        base = server;
+    }
+    return updateNote(id, fields);
+};
+
 const send = (op) => {
     switch (op.type) {
         case "note": {
             // Timestamps are the server's (its trigger moves updated_at on content changes); the device only mirrors them.
             // eslint-disable-next-line no-unused-vars
             const { created_at, updated_at, ...fields } = op.changes;
-            return op.create ? upsertNote({ id: op.id, ...fields }) : updateNote(op.id, fields);
+            if (op.create) return upsertNote({ id: op.id, ...fields });
+            const text = fields.content !== undefined || fields.title !== undefined;
+            return text && op.base ? saveMerged(op.id, fields, op.base) : updateNote(op.id, fields);
         }
         case "deleteNote":
             return deleteNote(op.id);
